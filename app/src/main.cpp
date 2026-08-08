@@ -30,6 +30,7 @@ unsigned int sceLibcHeapSize             = 24 * 1024 * 1024;
 #include "link_cell.hpp"
 #include "main_activity.hpp"
 #include "main_tabs_view.hpp"
+#include "performance_tab.hpp"
 #include "settings_tab.hpp"
 #include "views/boolean_slider_cell.hpp"
 
@@ -152,6 +153,7 @@ int main(int argc, char* argv[]) {
     brls::Application::registerXMLView("HostTab", HostTab::create);
     brls::Application::registerXMLView("AddHostTab", AddHostTab::create);
     brls::Application::registerXMLView("SettingsTab", SettingsTab::create);
+    brls::Application::registerXMLView("PerformanceTab", PerformanceTab::create);
 
     // Add custom values to the theme
     brls::Theme::getLightTheme().addColor("captioned_image/caption",
