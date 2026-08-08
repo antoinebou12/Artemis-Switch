@@ -11,21 +11,21 @@ This document defines how the open Artemis-Switch feature PRs move from portable
 - Put Switch renderer behavior in the deko3d path and keep portable math independently unit tested.
 - Every feature must pass portable unit tests and the real Nintendo Switch build before merge.
 
-## PR responsibilities
+## PR responsibilities and current status
 
-1. `agent/test-infrastructure`: portable C++20 tests and common CI helpers.
-2. `agent/benchmark-core`: live Moonlight telemetry adapter, benchmark lifecycle, aggregation.
-3. `agent/auto-tune`: benchmark profile plan, state machine, recommendation selection.
-4. `agent/custom-stream-settings`: persistent custom resolution/bitrate and existing Settings/Borealis UI integration.
-5. `agent/scaling-modes`: Fit/Fill/Stretch portable math plus deko3d renderer integration.
-6. `agent/apollo-capabilities`: detect and gate Apollo-only capabilities, preserving Sunshine fallback.
-7. `agent/benchmark-export`: safe JSON/CSV serialization and Switch filesystem persistence.
-8. `agent/performance-lite`: existing `StreamingView` stats overlay gains Artemis-style Lite mode.
-9. `agent/advanced-stream-options`: high-FPS policy, full-range-video request, packet-loss policy hooks.
-10. `agent/switch-motion-options`: settings around the existing Joy-Con/Pro Controller IMU forwarding path.
-11. `agent/quick-stream-menu`: extend the existing `IngameOverlay` with benchmark/performance/keyboard/mouse actions.
-12. `agent/zoom-pan`: renderer-facing zoom/pan state, persistence, and Switch controls.
-13. `agent/ci-feature-integration`: feature matrix, combined portable integration suite, and full Switch build gate.
+1. `agent/test-infrastructure`: portable C++20 tests, GitHub Actions, ASan and UBSan coverage.
+2. `agent/benchmark-core`: benchmark aggregation plus autonomous 250 ms sampling from live `MoonlightSession` and `AVFrameHolder` telemetry.
+3. `agent/auto-tune`: quick/extended Switch test plans, state machine and asynchronous profile/restart/benchmark/recommend loop. Automatically cooperates with custom-resolution settings when present.
+4. `agent/custom-stream-settings`: persistent custom resolution and exact bitrate, native Borealis Artemis settings tab, real `MoonlightSession::start()` negotiation. The tab conditionally exposes compatible options from PRs 5, 9, 10 and 12 when combined.
+5. `agent/scaling-modes`: tested Fit/Fill/Stretch geometry and persistent mode. Borealis setting is exposed through PR 4 when combined. Final deko3d viewport application is still pending.
+6. `agent/apollo-capabilities`: conservative Apollo/Sunshine capability detection plus adapter from real cached `SERVER_DATA`. Apollo-specific HTTP/protocol operations remain a follow-up after endpoint compatibility is mapped.
+7. `agent/benchmark-export`: escaped JSON/CSV serialization plus safe filesystem persistence to benchmark files.
+8. `agent/performance-lite`: real Performance tab in the existing in-game Borealis overlay. Uses live session/queue telemetry and conditionally exposes benchmark, export and Auto Tune controls when those PRs are present.
+9. `agent/advanced-stream-options`: tested 30/40/60 versus 90/120 FPS policy plus persistent full-range and packet-loss experimental preferences. Packet-loss transport mutation is intentionally not enabled until Artemis Android behavior is verified. Full-range renderer application is pending.
+10. `agent/switch-motion-options`: tested Joy-Con/Pro/console motion policy plus persistence. The low-level Moonlight-Switch motion forwarding already exists; gating the large existing `InputManager.cpp` callback is pending a safe targeted patch.
+11. `agent/quick-stream-menu`: real Quick Actions section added to the existing in-stream Options overlay: keyboard, performance stats, conditional benchmark, disconnect and quit-host.
+12. `agent/zoom-pan`: tested normalized zoom/pan state plus persistence/reset/remember policy. Borealis setting is exposed through PR 4 when combined. Final deko3d transform and in-stream pan/zoom controls are pending.
+13. `agent/ci-feature-integration`: feature matrix, combined portable integration suite, implementation plan and full Switch build gate.
 
 ## Integration order
 
@@ -33,19 +33,19 @@ This document defines how the open Artemis-Switch feature PRs move from portable
 
 `test-infrastructure -> benchmark-core -> performance-lite -> benchmark-export`
 
-Acceptance: a running Switch stream can start/stop a benchmark, display live stats using the existing overlay, and save a result.
+Acceptance: a running Switch stream can start/stop a benchmark, display live stats using the existing overlay, and save JSON/CSV results.
 
 ### Milestone B: tuning
 
 `custom-stream-settings -> advanced-stream-options -> auto-tune`
 
-Acceptance: the client can apply tested stream profiles, restart the session safely, collect benchmark results, and recommend a profile.
+Acceptance: the client can apply tested stream profiles, restart the session safely, collect benchmark results, and recommend/apply a profile.
 
 ### Milestone C: rendering and input
 
 `scaling-modes -> zoom-pan -> switch-motion-options -> quick-stream-menu`
 
-Acceptance: Fit/Fill/Stretch and Zoom/Pan affect the deko3d presentation path, motion options control the existing IMU forwarding policy, and the existing in-game overlay exposes the features.
+Acceptance: Fit/Fill/Stretch and Zoom/Pan affect the deko3d presentation path, motion options gate the existing IMU forwarding policy, and the existing in-game overlay exposes the features.
 
 ### Milestone D: Apollo
 
@@ -55,20 +55,24 @@ Acceptance: Sunshine remains fully functional; Apollo-specific features are enab
 
 ## Shared integration points
 
-- `app/src/utils/Settings.hpp` and `Settings.cpp`: persistent feature settings.
-- `app/src/settings_tab.cpp` and `resources/xml/tabs/settings.xml`: existing global settings UI.
+- `app/src/utils/Settings.hpp` and `Settings.cpp`: existing Moonlight settings.
+- `app/src/settings_tab.cpp`: existing standard settings UI, kept intact where possible.
+- `app/src/artemis_settings_tab.cpp`: Artemis-specific tuning UI and optional feature composition.
 - `app/src/streaming/MoonlightSession.*`: stream configuration and live telemetry.
-- `app/src/streaming_view.cpp`: live stats/benchmark display.
-- `app/src/ingame_overlay_view.cpp` and existing overlay XML: quick in-stream controls.
-- `app/src/streaming/video/deko3d/DKVideoRenderer.cpp`: Switch-only scaling/zoom presentation.
-- existing `InputManager` paths: Joy-Con/controller motion policy.
+- `app/src/streaming_view.cpp`: existing advanced stats rendering.
+- existing `IngameOverlay`, Options XML and Performance tab: in-stream controls.
+- `app/src/streaming/video/deko3d/DKVideoRenderer.cpp`: Switch-only scaling/zoom/full-range presentation hook.
+- existing `InputManager` paths: Joy-Con/controller motion policy hook.
 
 ## CI acceptance
 
 For each PR:
 
 1. Portable C++ unit tests pass.
-2. Feature branch is included in the feature matrix.
-3. Combined portable integration suite passes.
-4. Existing `All Builds` workflow produces a Nintendo Switch build successfully.
-5. Feature code used by the real app is compiled by the main CMake target, not only by the portable test target.
+2. Sanitizer tests pass where the portable harness is present.
+3. Feature branch is included in the feature matrix.
+4. Combined portable integration suite passes.
+5. Existing `All Builds` workflow produces a Nintendo Switch build successfully.
+6. Feature code used by the real app is compiled by the main CMake target, not only by the portable test target.
+
+Large platform source files are not replaced wholesale merely to land a feature. Renderer/input changes must be targeted and validated by the real Switch build to minimize regressions.
