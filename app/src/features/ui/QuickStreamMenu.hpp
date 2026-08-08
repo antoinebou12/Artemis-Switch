@@ -1,0 +1,25 @@
+#pragma once
+
+#include <vector>
+
+namespace artemis::ui {
+
+enum class QuickAction {
+    ToggleKeyboard,
+    TogglePerformanceStats,
+    ToggleMouseMode,
+    SendSpecialKey,
+    StartBenchmark,
+    StopBenchmark,
+    Disconnect,
+    QuitHostApp,
+};
+
+struct QuickMenuContext {
+    bool benchmarkRunning = false;
+    bool canQuitHostApp = true;
+};
+
+std::vector<QuickAction> buildQuickActions(const QuickMenuContext& context);
+
+} // namespace artemis::ui

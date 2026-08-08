@@ -2,7 +2,7 @@
 //  ingame_overlay.hpp
 //  Moonlight
 //
-//  Created by Даниил Виноградов on 29.05.2021.
+//  Created by Даниил Vinogradov on 29.05.2021.
 //
 
 #pragma once
@@ -39,7 +39,7 @@ class LogoutTab : public brls::Box {
     BRLS_BIND(brls::DetailCell, terminateButton, "terminate");
 };
 
-// MARK: - Debug Tab
+// MARK: - Options Tab
 class OptionsTab : public brls::Box {
   public:
     explicit OptionsTab(StreamingView* streamView);
@@ -51,6 +51,12 @@ class OptionsTab : public brls::Box {
     static std::string getTextFromButtons(std::vector<brls::ControllerButton> buttons);
     static NVGcolor getColorFromButtons(const std::vector<brls::ControllerButton>& buttons);
     void setupButtonsSelectorCell(brls::DetailCell* cell, const std::vector<brls::ControllerButton>& buttons);
+
+    BRLS_BIND(brls::DetailCell, quickKeyboard, "quick_keyboard");
+    BRLS_BIND(brls::DetailCell, quickPerformance, "quick_performance");
+    BRLS_BIND(brls::DetailCell, quickBenchmark, "quick_benchmark");
+    BRLS_BIND(brls::DetailCell, quickDisconnect, "quick_disconnect");
+    BRLS_BIND(brls::DetailCell, quickQuitHost, "quick_quit_host");
 
     BRLS_BIND(brls::DetailCell, inputOverlayButton, "input_overlay");
     BRLS_BIND(brls::SelectorCell, keyboardType, "keyboard_type");

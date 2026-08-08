@@ -3,6 +3,7 @@
 #include "GameStreamClient.hpp"
 #include "InputManager.hpp"
 #include "Settings.hpp"
+#include "StreamProfileStore.hpp"
 #include "borealis.hpp"
 #include <string.h>
 
@@ -15,7 +16,6 @@ using namespace brls;
 int m_video_format;
 static MoonlightSession* m_active_session = nullptr;
 static MoonlightSessionDecoderAndRenderProvider* m_provider = nullptr;
-
 
 MoonlightSession* MoonlightSession::activeSession() {
     return m_active_session;
@@ -103,8 +103,6 @@ void MoonlightSession::connection_terminated(int error_code) {
 
     if (error_code != 0) {
         brls::Logger::info("MoonlightSession: Reconnection attempt");
-
-        // Connection is already terminated here; avoid toggling the user stop flag.
         LiStopConnection();
 
         m_active_session->start([](const GSResult<bool>& result) {
@@ -143,12 +141,10 @@ void MoonlightSession::connection_rumble(unsigned short controller,
                                                    highFreqMotor);
 }
 
-
-void MoonlightSession::connection_rumble_triggers(uint16_t controllerNumber, 
-                                                  uint16_t leftTriggerMotor, 
-                                                  uint16_t rightTriggerMotor) 
-{
-    // MoonlightInputManager::instance().handleRumbleTriggers(controllerNumber, leftTriggerMotor, rightTriggerMotor);                                                
+void MoonlightSession::connection_rumble_triggers(uint16_t controllerNumber,
+                                                  uint16_t leftTriggerMotor,
+                                                  uint16_t rightTriggerMotor) {
+    // MoonlightInputManager::instance().handleRumbleTriggers(controllerNumber, leftTriggerMotor, rightTriggerMotor);
 }
 
 void MoonlightSession::connection_status_update(int connection_status) {
@@ -195,11 +191,9 @@ void MoonlightSession::video_decoder_cleanup() {
     }
 }
 
-int MoonlightSession::video_decoder_submit_decode_unit(
-    PDECODE_UNIT decode_unit) {
+int MoonlightSession::video_decoder_submit_decode_unit(PDECODE_UNIT decode_unit) {
     if (m_active_session && m_active_session->m_video_decoder) {
-        return m_active_session->m_video_decoder->submit_decode_unit(
-            decode_unit);
+        return m_active_session->m_video_decoder->submit_decode_unit(decode_unit);
     }
     return DR_OK;
 }
@@ -251,32 +245,38 @@ void MoonlightSession::start(ServerCallback<bool> callback, bool is_sunshine) {
 
     LiInitializeStreamConfiguration(&m_config);
 
-    int resolution = Settings::instance().resolution();
-    int h = resolution;
-    int w = h * 16 / 9;
-    if (resolution == -1) {
+    int w = 0;
+    int h = 0;
+    const auto custom = artemis::streaming::StreamProfileStore::instance().get();
+    if (custom.customResolutionEnabled) {
+        w = custom.width;
+        h = custom.height;
+        brls::Logger::info("Artemis custom stream resolution: {}x{}", w, h);
+    } else {
+        const int resolution = Settings::instance().resolution();
+        h = resolution;
+        w = h * 16 / 9;
+        if (resolution == -1) {
 #if defined(PLATFORM_IOS) || defined(PLATFORM_VISIONOS)
-        getWindowSize(&w, &h);
+            getWindowSize(&w, &h);
 #else
-        h = Application::windowHeight;
-        w = Application::windowWidth;
+            h = Application::windowHeight;
+            w = Application::windowWidth;
 #endif
 
-        int nativeResolutionScale = Settings::instance().native_resolution_scale();
-        if (nativeResolutionScale != 100 && w > 0 && h > 0) {
-            w = (w * nativeResolutionScale + 50) / 100;
-            h = (h * nativeResolutionScale + 50) / 100;
+            const int nativeResolutionScale = Settings::instance().native_resolution_scale();
+            if (nativeResolutionScale != 100 && w > 0 && h > 0) {
+                w = (w * nativeResolutionScale + 50) / 100;
+                h = (h * nativeResolutionScale + 50) / 100;
+            }
         }
     }
 
-    // Prohibit odd values rounding up
-    if ((h & 1) == 1) {
+    // Video dimensions must be even for the decoder and common YUV formats.
+    if ((h & 1) == 1)
         h += 1;
-    }
-
-    if ((w & 1) == 1) {
+    if ((w & 1) == 1)
         w += 1;
-    }
 
     m_config.width = w;
     m_config.height = h;
@@ -293,13 +293,13 @@ void MoonlightSession::start(ServerCallback<bool> callback, bool is_sunshine) {
         break;
     case H265:
         m_config.supportedVideoFormats = VIDEO_FORMAT_H265;
-            if (Settings::instance().request_hdr())
-                m_config.supportedVideoFormats |= VIDEO_FORMAT_H265_MAIN10;
+        if (Settings::instance().request_hdr())
+            m_config.supportedVideoFormats |= VIDEO_FORMAT_H265_MAIN10;
         break;
     case AV1:
         m_config.supportedVideoFormats = VIDEO_FORMAT_AV1_MAIN8;
-            if (Settings::instance().request_hdr())
-                m_config.supportedVideoFormats |= VIDEO_FORMAT_AV1_MAIN10;
+        if (Settings::instance().request_hdr())
+            m_config.supportedVideoFormats |= VIDEO_FORMAT_AV1_MAIN10;
         break;
     default:
         break;
@@ -324,29 +324,25 @@ void MoonlightSession::start(ServerCallback<bool> callback, bool is_sunshine) {
     m_video_callbacks.cleanup = video_decoder_cleanup;
     m_video_callbacks.submitDecodeUnit = video_decoder_submit_decode_unit;
 
-    if (m_video_decoder) {
+    if (m_video_decoder)
         m_video_callbacks.capabilities = m_video_decoder->capabilities();
-    }
 
     LiInitializeAudioCallbacks(&m_audio_callbacks);
     m_audio_callbacks.init = audio_renderer_init;
     m_audio_callbacks.start = audio_renderer_start;
     m_audio_callbacks.stop = audio_renderer_stop;
     m_audio_callbacks.cleanup = audio_renderer_cleanup;
-    m_audio_callbacks.decodeAndPlaySample =
-        audio_renderer_decode_and_play_sample;
+    m_audio_callbacks.decodeAndPlaySample = audio_renderer_decode_and_play_sample;
 
-    if (m_audio_renderer) {
+    if (m_audio_renderer)
         m_audio_callbacks.capabilities = m_audio_renderer->capabilities();
-    }
 
     GameStreamClient::instance().start(
         m_address, m_config, m_app_id, [this, callback](auto result) {
             if (result.isSuccess()) {
                 m_config = result.value();
                 brls::async([this, callback]() mutable {
-                    auto m_data =
-                        GameStreamClient::instance().server_data(m_address);
+                    auto m_data = GameStreamClient::instance().server_data(m_address);
 
                     int result = LiStartConnection(
                         &m_data.serverInfo, &m_config, &m_connection_callbacks,
@@ -354,8 +350,7 @@ void MoonlightSession::start(ServerCallback<bool> callback, bool is_sunshine) {
 
                     if (result != 0) {
                         LiStopConnection();
-                        callback(
-                            GSResult<bool>::failure("error/stream_start"_i18n));
+                        callback(GSResult<bool>::failure("error/stream_start"_i18n));
                     } else {
                         callback(GSResult<bool>::success(true));
                     }
@@ -375,9 +370,8 @@ void MoonlightSession::stop(int terminate_app) {
 
     m_stop_requested = true;
 
-    if (terminate_app) {
+    if (terminate_app)
         GameStreamClient::instance().quit(m_address, [](auto _) {});
-    }
 
     LiStopConnection();
 }
@@ -407,10 +401,8 @@ void MoonlightSession::draw(NVGcontext* vg, int width, int height) {
 
         const uint64_t now = LiGetMillis();
         if (m_last_stats_update_ms == 0 || now - m_last_stats_update_ms >= 250) {
-            m_session_stats.video_decode_stats =
-                *m_video_decoder->video_decode_stats();
-            m_session_stats.video_render_stats =
-                *m_video_renderer->video_render_stats();
+            m_session_stats.video_decode_stats = *m_video_decoder->video_decode_stats();
+            m_session_stats.video_render_stats = *m_video_renderer->video_render_stats();
             m_last_stats_update_ms = now;
         }
     }

@@ -1,0 +1,80 @@
+name: Feature and Integration CI
+
+on:
+  push:
+    branches:
+      - master
+      - agent/artemis-switch-integration
+  pull_request:
+    branches:
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: artemis-integration-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  portable-integration:
+    name: Consolidated portable integration
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure unit suite
+        run: cmake -S tests -B build/tests -DCMAKE_BUILD_TYPE=Debug
+
+      - name: Build unit suite
+        run: cmake --build build/tests --parallel
+
+      - name: Run unit suite
+        run: ctest --test-dir build/tests --output-on-failure
+
+      - name: Configure cross-feature integration suite
+        run: cmake -S ci/integration -B build/integration -DCMAKE_BUILD_TYPE=Debug
+
+      - name: Build cross-feature integration suite
+        run: cmake --build build/integration --parallel
+
+      - name: Run cross-feature integration suite
+        run: ctest --test-dir build/integration --output-on-failure
+
+  sanitizer-integration:
+    name: ASan + UBSan integration
+    runs-on: ubuntu-latest
+    env:
+      ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+      UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure
+        run: >-
+          cmake -S tests -B build/tests-sanitized
+          -DCMAKE_BUILD_TYPE=Debug
+          -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer"
+          -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined"
+
+      - name: Build
+        run: cmake --build build/tests-sanitized --parallel
+
+      - name: Test
+        run: ctest --test-dir build/tests-sanitized --output-on-failure
+
+  ci-summary:
+    name: Artemis CI summary
+    if: always()
+    needs:
+      - portable-integration
+      - sanitizer-integration
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require all integration jobs
+        run: |
+          test "${{ needs.portable-integration.result }}" = "success"
+          test "${{ needs.sanitizer-integration.result }}" = "success"
