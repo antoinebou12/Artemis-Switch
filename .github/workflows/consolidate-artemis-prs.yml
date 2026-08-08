@@ -1,0 +1,157 @@
+name: Consolidate Artemis PRs
+
+on:
+  push:
+    branches:
+      - agent/consolidate-prs
+    paths:
+      - .github/workflows/consolidate-artemis-prs.yml
+      - README.md
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  consolidate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+        with:
+          ref: agent/artemis-switch-integration
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "Artemis-Switch CI"
+          git config user.email "artemis-switch-ci@users.noreply.github.com"
+
+      - name: Fetch feature branches
+        run: |
+          for branch in \
+            agent/test-infrastructure \
+            agent/benchmark-core \
+            agent/benchmark-export \
+            agent/auto-tune \
+            agent/custom-stream-settings \
+            agent/scaling-modes \
+            agent/apollo-capabilities \
+            agent/performance-lite \
+            agent/advanced-stream-options \
+            agent/switch-motion-options \
+            agent/quick-stream-menu \
+            agent/zoom-pan \
+            agent/ci-feature-integration \
+            agent/consolidate-prs; do
+              git fetch --no-tags origin "+refs/heads/${branch}:refs/remotes/origin/${branch}"
+          done
+
+      - name: Merge feature histories
+        shell: bash
+        run: |
+          set -euo pipefail
+          branches=(
+            agent/test-infrastructure
+            agent/benchmark-core
+            agent/benchmark-export
+            agent/auto-tune
+            agent/custom-stream-settings
+            agent/scaling-modes
+            agent/apollo-capabilities
+            agent/performance-lite
+            agent/advanced-stream-options
+            agent/switch-motion-options
+            agent/quick-stream-menu
+            agent/zoom-pan
+            agent/ci-feature-integration
+          )
+
+          for branch in "${branches[@]}"; do
+            echo "Merging ${branch}"
+            if git merge --no-edit --no-ff "origin/${branch}"; then
+              continue
+            fi
+
+            mapfile -t conflicts < <(git diff --name-only --diff-filter=U)
+            if [[ ${#conflicts[@]} -eq 0 ]]; then
+              echo "Merge failed without conflict markers"
+              exit 1
+            fi
+
+            for conflict in "${conflicts[@]}"; do
+              case "$conflict" in
+                tests/CMakeLists.txt)
+                  # A combined portable test manifest is generated after all merges.
+                  git checkout --ours "$conflict"
+                  git add "$conflict"
+                  ;;
+                *)
+                  echo "Unexpected feature conflict: $conflict"
+                  git status --short
+                  exit 1
+                  ;;
+              esac
+            done
+            git commit --no-edit
+          done
+
+      - name: Install consolidated portable test manifest
+        run: |
+          cat > tests/CMakeLists.txt <<'CMAKE'
+          cmake_minimum_required(VERSION 3.20)
+          project(ArtemisSwitchUnitTests LANGUAGES CXX)
+          enable_testing()
+
+          get_filename_component(REPO_ROOT "${CMAKE_CURRENT_LIST_DIR}/.." ABSOLUTE)
+
+          function(add_artemis_test target test_source feature_source include_dir)
+              add_executable(${target}
+                  "${REPO_ROOT}/${test_source}"
+                  "${REPO_ROOT}/${feature_source}"
+              )
+              target_include_directories(${target} PRIVATE "${REPO_ROOT}/${include_dir}")
+              target_compile_features(${target} PRIVATE cxx_std_20)
+              add_test(NAME ${target} COMMAND ${target})
+          endfunction()
+
+          add_artemis_test(benchmark_tests tests/benchmark_tests.cpp app/src/benchmark/BenchmarkAccumulator.cpp app/src/benchmark)
+
+          add_executable(benchmark_export_tests
+              "${REPO_ROOT}/tests/benchmark_export_tests.cpp"
+              "${REPO_ROOT}/app/src/benchmark/BenchmarkExport.cpp"
+              "${REPO_ROOT}/app/src/benchmark/BenchmarkFileStore.cpp")
+          target_include_directories(benchmark_export_tests PRIVATE "${REPO_ROOT}/app/src/benchmark")
+          target_compile_features(benchmark_export_tests PRIVATE cxx_std_20)
+          add_test(NAME benchmark_export_tests COMMAND benchmark_export_tests)
+
+          add_executable(auto_tune_tests
+              "${REPO_ROOT}/tests/auto_tune_tests.cpp"
+              "${REPO_ROOT}/app/src/benchmark/AutoTune.cpp"
+              "${REPO_ROOT}/app/src/benchmark/AutoTunePlan.cpp")
+          target_include_directories(auto_tune_tests PRIVATE "${REPO_ROOT}/app/src/benchmark")
+          target_compile_features(auto_tune_tests PRIVATE cxx_std_20)
+          add_test(NAME auto_tune_tests COMMAND auto_tune_tests)
+
+          add_artemis_test(stream_profile_tests tests/stream_profile_tests.cpp app/src/streaming/SwitchStreamProfile.cpp app/src/streaming)
+          add_artemis_test(video_scale_tests tests/video_scale_tests.cpp app/src/video/VideoScale.cpp app/src/video)
+          add_artemis_test(host_capability_tests tests/host_capability_tests.cpp app/src/host/HostCapabilities.cpp app/src/host)
+          add_artemis_test(performance_lite_test tests/performance_lite_test.cpp app/src/features/performance/PerformanceLite.cpp app/src/features/performance)
+          add_artemis_test(advanced_stream_options_test tests/advanced_stream_options_test.cpp app/src/features/stream/AdvancedStreamOptions.cpp app/src/features/stream)
+          add_artemis_test(switch_motion_policy_test tests/switch_motion_policy_test.cpp app/src/features/input/SwitchMotionPolicy.cpp app/src/features/input)
+          add_artemis_test(quick_stream_menu_test tests/quick_stream_menu_test.cpp app/src/features/ui/QuickStreamMenu.cpp app/src/features/ui)
+          add_artemis_test(zoom_pan_state_test tests/zoom_pan_state_test.cpp app/src/features/video/ZoomPanState.cpp app/src/features/video)
+          CMAKE
+
+      - name: Apply Artemis README branding
+        run: git checkout origin/agent/consolidate-prs -- README.md
+
+      - name: Commit consolidation
+        run: |
+          git add tests/CMakeLists.txt README.md
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: consolidate Artemis Switch features and branding"
+          fi
+
+      - name: Push integration branch
+        run: git push origin HEAD:agent/artemis-switch-integration
