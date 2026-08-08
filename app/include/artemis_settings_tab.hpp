@@ -34,4 +34,7 @@ private:
 
     BRLS_BIND(brls::BooleanCell, rememberZoomPan, "remember_zoom_pan");
     BRLS_BIND(brls::DetailCell, resetZoomPan, "reset_zoom_pan");
+
+    brls::Event<int>::Subscription frameRateSubscription;
+    bool hasFrameRateSubscription = false;
 };
