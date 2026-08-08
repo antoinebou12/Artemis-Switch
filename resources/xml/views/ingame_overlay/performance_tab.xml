@@ -26,6 +26,10 @@
             <brls:Header title="Benchmark" paddingTop="60" lineTop="1px"/>
             <brls:DetailCell id="benchmark_summary"/>
             <brls:DetailCell id="benchmark_action"/>
+            <brls:DetailCell id="benchmark_save"/>
+            <brls:Header title="Auto Tune" paddingTop="60" lineTop="1px"/>
+            <brls:DetailCell id="auto_tune_summary"/>
+            <brls:DetailCell id="auto_tune_action"/>
             <brls:Header title="Actions" paddingTop="60" lineTop="1px"/>
             <brls:DetailCell id="refresh"/>
         </brls:Box>
