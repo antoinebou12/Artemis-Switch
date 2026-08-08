@@ -29,6 +29,7 @@ class StreamingView : public brls::Box {
     void onLayout() override;
 
     void terminate(bool terminateApp);
+    void showKeyboard() { addKeyboard(); }
 
     bool draw_stats = false;
 
