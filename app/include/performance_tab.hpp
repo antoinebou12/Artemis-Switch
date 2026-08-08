@@ -10,6 +10,7 @@ public:
 
 private:
     void refresh();
+    void updateBenchmarkStatus();
 
     BRLS_BIND(brls::DetailCell, streamProfile, "stream_profile");
     BRLS_BIND(brls::DetailCell, network, "network");
@@ -19,6 +20,8 @@ private:
     BRLS_BIND(brls::DetailCell, packetLoss, "packet_loss");
     BRLS_BIND(brls::DetailCell, renderedFps, "rendered_fps");
     BRLS_BIND(brls::DetailCell, queueDepth, "queue_depth");
+    BRLS_BIND(brls::DetailCell, benchmarkSummary, "benchmark_summary");
+    BRLS_BIND(brls::DetailCell, benchmarkAction, "benchmark_action");
     BRLS_BIND(brls::DetailCell, refreshButton, "refresh");
 
     uint64_t previousReceived = 0;
