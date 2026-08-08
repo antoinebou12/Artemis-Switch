@@ -26,8 +26,6 @@ jobs:
     steps:
       - name: Check out tested revision
         uses: actions/checkout@v4
-      - name: Install build tools
-        run: sudo apt-get update && sudo apt-get install -y cmake ninja-build
       - name: Run portable unit tests
         run: bash scripts/ci/run-portable-tests.sh
 
@@ -62,8 +60,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ matrix.branch }}
-      - name: Install build tools
-        run: sudo apt-get update && sudo apt-get install -y cmake ninja-build
       - name: Run feature unit tests
         shell: bash
         run: |
@@ -80,7 +76,7 @@ jobs:
           fi
 
   integration-smoke:
-    name: Combined features / merge + portable tests
+    name: Combined features / compile + test
     needs: prepare-feature-matrix
     if: needs.prepare-feature-matrix.result == 'success'
     runs-on: ubuntu-latest
@@ -90,12 +86,10 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Install build tools
-        run: sudo apt-get update && sudo apt-get install -y cmake ninja-build
       - name: Merge active feature branches
         run: bash scripts/ci/merge-feature-branches.sh
-      - name: Run combined portable tests
-        run: bash scripts/ci/run-portable-tests.sh
+      - name: Compile and run all feature tests together
+        run: bash scripts/ci/run-integration-tests.sh
 
   ci-summary:
     name: CI summary
@@ -112,7 +106,7 @@ jobs:
         run: |
           echo "Current branch tests: ${{ needs.current-branch-tests.result }}"
           echo "Feature matrix:       ${{ needs.feature-branch-tests.result }}"
-          echo "Integration smoke:    ${{ needs.integration-smoke.result }}"
+          echo "Integration suite:    ${{ needs.integration-smoke.result }}"
 
           [[ "${{ needs.current-branch-tests.result }}" == "success" ]] || exit 1
 
