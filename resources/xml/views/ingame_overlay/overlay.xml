@@ -1,27 +1,15 @@
-<brls:Box
-    id="backplate"
-    width="auto"
-    height="auto"
-    backgroundColor="@theme/brls/backdrop">
-    
-    <brls:AppletFrame
-        id="applet"
-        width="80%"
-        height="auto"
-        backgroundColor="@theme/brls/background">
-        
+<brls:Box id="backplate" width="auto" height="auto" backgroundColor="@theme/brls/backdrop">
+    <brls:AppletFrame id="applet" width="80%" height="auto" backgroundColor="@theme/brls/background">
         <brls:TabFrame>
-            
-            <brls:Tab label="@i18n/streaming/options" >
+            <brls:Tab label="Options">
                 <OptionsTab />
             </brls:Tab>
-            
-            <brls:Tab label="@i18n/streaming/logout" >
+            <brls:Tab label="Performance">
+                <PerformanceTab />
+            </brls:Tab>
+            <brls:Tab label="Disconnect">
                 <LogoutTab />
             </brls:Tab>
-            
         </brls:TabFrame>
-    
     </brls:AppletFrame>
-    
 </brls:Box>
