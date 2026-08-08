@@ -1,0 +1,13 @@
+# Active Artemis-Switch feature branches tested by CI.
+# Keep one branch per line. CI ignores blank lines and comments.
+agent/benchmark-core
+agent/benchmark-export
+agent/auto-tune
+agent/custom-stream-settings
+agent/scaling-modes
+agent/apollo-capabilities
+agent/performance-lite
+agent/advanced-stream-options
+agent/switch-motion-options
+agent/quick-stream-menu
+agent/zoom-pan
