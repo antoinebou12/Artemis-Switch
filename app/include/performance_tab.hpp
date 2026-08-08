@@ -11,6 +11,7 @@ public:
 private:
     void refresh();
     void updateBenchmarkStatus();
+    void updateAutoTuneStatus();
 
     BRLS_BIND(brls::DetailCell, streamProfile, "stream_profile");
     BRLS_BIND(brls::DetailCell, network, "network");
@@ -22,6 +23,9 @@ private:
     BRLS_BIND(brls::DetailCell, queueDepth, "queue_depth");
     BRLS_BIND(brls::DetailCell, benchmarkSummary, "benchmark_summary");
     BRLS_BIND(brls::DetailCell, benchmarkAction, "benchmark_action");
+    BRLS_BIND(brls::DetailCell, benchmarkSave, "benchmark_save");
+    BRLS_BIND(brls::DetailCell, autoTuneSummary, "auto_tune_summary");
+    BRLS_BIND(brls::DetailCell, autoTuneAction, "auto_tune_action");
     BRLS_BIND(brls::DetailCell, refreshButton, "refresh");
 
     uint64_t previousReceived = 0;
