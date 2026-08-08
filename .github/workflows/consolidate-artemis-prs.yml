@@ -7,6 +7,12 @@ on:
     paths:
       - .github/workflows/consolidate-artemis-prs.yml
       - README.md
+  pull_request:
+    branches:
+      - agent/artemis-switch-integration
+    paths:
+      - .github/workflows/consolidate-artemis-prs.yml
+      - README.md
   workflow_dispatch:
 
 permissions:
@@ -82,7 +88,6 @@ jobs:
             for conflict in "${conflicts[@]}"; do
               case "$conflict" in
                 tests/CMakeLists.txt)
-                  # A combined portable test manifest is generated after all merges.
                   git checkout --ours "$conflict"
                   git add "$conflict"
                   ;;
