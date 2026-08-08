@@ -1,0 +1,18 @@
+name: Unit tests
+
+on:
+  push:
+    branches: ["master", "agent/**"]
+  pull_request:
+
+jobs:
+  portable-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -S tests -B build/tests
+      - name: Build
+        run: cmake --build build/tests --parallel
+      - name: Test
+        run: ctest --test-dir build/tests --output-on-failure
