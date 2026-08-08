@@ -32,6 +32,7 @@
 #endif
 
 #include <algorithm>
+#include <cstdlib>
 #include <fmt/format.h>
 #include <vector>
 
@@ -147,8 +148,8 @@ ArtemisSettingsTab::ArtemisSettingsTab() {
 
 #if ARTEMIS_HAS_VIDEO_SCALE
     const auto currentScale = artemis::video::VideoScaleStore::instance().get();
-    int scaleSelection = currentScale == artemis::video::ScaleMode::Fit ? 0
-                       : currentScale == artemis::video::ScaleMode::Fill ? 1 : 2;
+    const int scaleSelection = currentScale == artemis::video::ScaleMode::Fit ? 0
+                             : currentScale == artemis::video::ScaleMode::Fill ? 1 : 2;
     scaleMode->init("Video scale mode", {"Fit", "Fill", "Stretch"}, scaleSelection,
                     [](int selected) {
         const auto mode = selected == 0 ? artemis::video::ScaleMode::Fit
@@ -208,6 +209,8 @@ ArtemisSettingsTab::ArtemisSettingsTab() {
 }
 
 ArtemisSettingsTab::~ArtemisSettingsTab() {
+    if (hasFrameRateSubscription)
+        frameRate->getEvent()->unsubscribe(frameRateSubscription);
     Settings::instance().save();
     artemis::streaming::StreamProfileStore::instance().save();
 }
@@ -218,14 +221,18 @@ void ArtemisSettingsTab::refreshFrameRateSelector() {
     const auto values = activeFrameRates();
     frameRate->setData(frameRateLabels(values));
     frameRate->setSelection(frameRateSelection(values, Settings::instance().fps()));
-    frameRate->getEvent()->clear();
-    frameRate->getEvent()->subscribe([this, values](int selected) {
-        if (selected < 0 || selected >= static_cast<int>(values.size()))
+
+    if (hasFrameRateSubscription)
+        frameRate->getEvent()->unsubscribe(frameRateSubscription);
+    frameRateSubscription = frameRate->getEvent()->subscribe([this](int selected) {
+        const auto currentValues = activeFrameRates();
+        if (selected < 0 || selected >= static_cast<int>(currentValues.size()))
             return;
-        Settings::instance().set_fps(values[selected]);
+        Settings::instance().set_fps(currentValues[selected]);
         Settings::instance().save();
         refreshValues();
     });
+    hasFrameRateSubscription = true;
 }
 
 void ArtemisSettingsTab::refreshValues() {
