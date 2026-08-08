@@ -1,0 +1,30 @@
+<brls:Box width="auto" height="auto">
+    <brls:ScrollingFrame
+        width="auto"
+        height="auto"
+        axis="column"
+        alignItems="stretch"
+        grow="1.0">
+        <brls:Box
+            width="10000"
+            height="auto"
+            axis="column"
+            alignItems="stretch"
+            paddingTop="@style/brls/tab_details/padding_top"
+            paddingRight="@style/brls/tab_details/padding_right"
+            paddingBottom="@style/brls/tab_details/padding_bottom"
+            paddingLeft="@style/brls/tab_details/padding_left">
+            <brls:Header title="Artemis Switch Performance"/>
+            <brls:DetailCell id="stream_profile"/>
+            <brls:DetailCell id="network"/>
+            <brls:DetailCell id="receive_latency"/>
+            <brls:DetailCell id="decode_latency"/>
+            <brls:DetailCell id="render_latency"/>
+            <brls:DetailCell id="packet_loss"/>
+            <brls:DetailCell id="rendered_fps"/>
+            <brls:DetailCell id="queue_depth"/>
+            <brls:Header title="Actions" paddingTop="60" lineTop="1px"/>
+            <brls:DetailCell id="refresh"/>
+        </brls:Box>
+    </brls:ScrollingFrame>
+</brls:Box>
