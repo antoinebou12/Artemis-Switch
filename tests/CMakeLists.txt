@@ -6,6 +6,7 @@ enable_testing()
 add_executable(auto_tune_tests
     auto_tune_tests.cpp
     ../app/src/benchmark/AutoTune.cpp
+    ../app/src/benchmark/AutoTunePlan.cpp
 )
 target_include_directories(auto_tune_tests PRIVATE ../app/src/benchmark)
 target_compile_features(auto_tune_tests PRIVATE cxx_std_20)
