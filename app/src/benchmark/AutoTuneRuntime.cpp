@@ -5,10 +5,18 @@
 #include "benchmark/BenchmarkRuntime.hpp"
 #include "MoonlightSession.hpp"
 #include "Settings.hpp"
+#include <algorithm>
 #include <borealis.hpp>
 #include <chrono>
 #else
 #define ARTEMIS_AUTOTUNE_HAS_BENCHMARK 0
+#endif
+
+#if __has_include("streaming/StreamProfileStore.hpp")
+#include "streaming/StreamProfileStore.hpp"
+#define ARTEMIS_AUTOTUNE_HAS_CUSTOM_PROFILE 1
+#else
+#define ARTEMIS_AUTOTUNE_HAS_CUSTOM_PROFILE 0
 #endif
 
 namespace artemis::benchmark {
@@ -91,6 +99,15 @@ void AutoTuneRuntime::worker(bool extended) {
     const int originalThreads = Settings::instance().decoder_threads();
     const VideoCodec originalCodec = Settings::instance().video_codec();
 
+#if ARTEMIS_AUTOTUNE_HAS_CUSTOM_PROFILE
+    const auto originalCustomProfile =
+        artemis::streaming::StreamProfileStore::instance().get();
+    if (originalCustomProfile.customResolutionEnabled) {
+        artemis::streaming::StreamProfileStore::instance().setCustomResolution(
+            false, originalCustomProfile.width, originalCustomProfile.height);
+    }
+#endif
+
     auto sleepCancelable = [this](int milliseconds) {
         int remaining = milliseconds;
         while (remaining > 0 && !m_cancelRequested.load()) {
@@ -171,6 +188,12 @@ void AutoTuneRuntime::worker(bool extended) {
     if (!m_cancelRequested.load() && best) {
         applyProfile(best->profile);
     } else {
+#if ARTEMIS_AUTOTUNE_HAS_CUSTOM_PROFILE
+        artemis::streaming::StreamProfileStore::instance().setCustomResolution(
+            originalCustomProfile.customResolutionEnabled,
+            originalCustomProfile.width,
+            originalCustomProfile.height);
+#endif
         brls::sync([=] {
             Settings::instance().set_resolution(originalResolution);
             Settings::instance().set_fps(originalFps);
