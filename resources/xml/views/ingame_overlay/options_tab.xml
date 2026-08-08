@@ -1,14 +1,12 @@
 <brls:Box
     width="auto"
     height="auto">
-    
     <brls:ScrollingFrame
         width="auto"
         height="auto"
         axis="column"
         alignItems="stretch"
         grow="1.0" >
-        
         <brls:Box
             width="10000"
             height="auto"
@@ -18,106 +16,48 @@
             paddingRight="@style/brls/tab_details/padding_right"
             paddingBottom="@style/brls/tab_details/padding_bottom"
             paddingLeft="@style/brls/tab_details/padding_left">
-            
-            <brls:Header
-                title="@i18n/streaming/input"/>
-            
-            <brls:DetailCell
-                id="input_overlay"/>
 
-            <brls:SelectorCell
-                id="keyboard_type"/>
-
-            <brls:SelectorCell
-                id="keyboard_fingers"/>
-
-            <brls:BooleanCell
-                id="touchscreen_mouse_mode"/>
+            <brls:Header title="Quick Actions"/>
+            <brls:DetailCell id="quick_keyboard"/>
+            <brls:DetailCell id="quick_performance"/>
+            <brls:DetailCell id="quick_benchmark"/>
+            <brls:DetailCell id="quick_disconnect"/>
+            <brls:DetailCell id="quick_quit_host"/>
 
             <brls:Header
-                title="@i18n/settings/guide_key"
-                paddingTop="60"/>
-            
-            <brls:DetailCell
-                id="guide_key_buttons"/>
-                
-            <brls:SelectorCell
-                id="guide_by_system_button"/>
-            
-            <brls:Header
-                id="volume_header"
-                paddingTop="60"
-                title="@i18n/streaming/volume"/>
-                
-            <brls:Slider
-                id="volume_slider"
-                width="auto"
-                height="84"/>
-
-            <brls:Header
-                id="rumble_slider_header"
-                title="@i18n/settings/rumble_force"
-                subtitle=""
+                title="@i18n/streaming/input"
                 paddingTop="60"
                 lineTop="1px"/>
-                
-            <brls:Slider
-                id="rumble_slider"
-                width="auto"
-                height="84"
-                grow="1"/>
+            <brls:DetailCell id="input_overlay"/>
+            <brls:SelectorCell id="keyboard_type"/>
+            <brls:SelectorCell id="keyboard_fingers"/>
+            <brls:BooleanCell id="touchscreen_mouse_mode"/>
 
-            <brls:Header
-                title="@i18n/settings/single_joycon"
-                paddingTop="60"
-                lineTop="1px"/>
+            <brls:Header title="@i18n/settings/guide_key" paddingTop="60"/>
+            <brls:DetailCell id="guide_key_buttons"/>
+            <brls:SelectorCell id="guide_by_system_button"/>
 
-            <brls:BooleanCell
-                    id="swap_stick_to_dpad"/>
-        
-            <brls:Header
-                id="mouse_speed_header"
-                title="@i18n/streaming/mouse_speed"
-                subtitle=""
-                paddingTop="60"/>
-                
-            <brls:Slider
-                id="mouse_speed_slider"
-                width="auto"
-                height="84"
-                grow="1"/>
+            <brls:Header id="volume_header" paddingTop="60" title="@i18n/streaming/volume"/>
+            <brls:Slider id="volume_slider" width="auto" height="84"/>
 
-            <brls:Header
-                id="image_adjustments_header"
-                title="@i18n/settings/image_adjustments"
-                paddingTop="60"
-                lineTop="1px"/>
+            <brls:Header id="rumble_slider_header" title="@i18n/settings/rumble_force" subtitle="" paddingTop="60" lineTop="1px"/>
+            <brls:Slider id="rumble_slider" width="auto" height="84" grow="1"/>
 
-            <BooleanSliderCell
-                id="dithering"/>
+            <brls:Header title="@i18n/settings/single_joycon" paddingTop="60" lineTop="1px"/>
+            <brls:BooleanCell id="swap_stick_to_dpad"/>
 
-            <brls:BooleanCell
-                id="upscaling"/>
+            <brls:Header id="mouse_speed_header" title="@i18n/streaming/mouse_speed" subtitle="" paddingTop="60"/>
+            <brls:Slider id="mouse_speed_slider" width="auto" height="84" grow="1"/>
 
-            <brls:SelectorCell
-                id="upscaling_mode"/>
+            <brls:Header id="image_adjustments_header" title="@i18n/settings/image_adjustments" paddingTop="60" lineTop="1px"/>
+            <BooleanSliderCell id="dithering"/>
+            <brls:BooleanCell id="upscaling"/>
+            <brls:SelectorCell id="upscaling_mode"/>
+            <BooleanSliderCell id="rcas"/>
 
-            <BooleanSliderCell
-                id="rcas"/>
-            
-            <brls:Header
-                title="@i18n/settings/debug"
-                paddingTop="60"
-                lineTop="1px"/>
-                
-            <brls:BooleanCell
-                id="debug"/>
-                
-            <brls:BooleanCell
-                id="onscreen_log"/>
-        
+            <brls:Header title="@i18n/settings/debug" paddingTop="60" lineTop="1px"/>
+            <brls:BooleanCell id="debug"/>
+            <brls:BooleanCell id="onscreen_log"/>
         </brls:Box>
-    
     </brls:ScrollingFrame>
-    
 </brls:Box>
