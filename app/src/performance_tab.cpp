@@ -55,6 +55,7 @@ PerformanceTab::PerformanceTab() {
     refreshButton->setText("Refresh performance data");
 
 #if ARTEMIS_HAS_BENCHMARK_RUNTIME
+    benchmarkSummary->setDetailText("Ready");
     benchmarkAction->registerClickAction([this](View*) {
         auto& runtime = artemis::benchmark::BenchmarkRuntime::instance();
         if (runtime.running()) {
@@ -93,8 +94,6 @@ void PerformanceTab::updateBenchmarkStatus() {
             runtime.sampleCount(), summary.stabilityScore));
     } else {
         benchmarkAction->setText("Start benchmark");
-        if (benchmarkSummary->getDetailText().empty())
-            benchmarkSummary->setDetailText("Ready");
     }
 #endif
 }
