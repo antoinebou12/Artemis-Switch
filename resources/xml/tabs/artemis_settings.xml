@@ -1,0 +1,30 @@
+<brls:Box width="auto" height="auto">
+    <brls:ScrollingFrame width="auto" height="auto" axis="column" alignItems="stretch" grow="1.0">
+        <brls:Box
+            width="10000"
+            height="auto"
+            axis="column"
+            alignItems="stretch"
+            paddingTop="@style/brls/tab_details/padding_top"
+            paddingRight="@style/brls/tab_details/padding_right"
+            paddingBottom="@style/brls/tab_details/padding_bottom"
+            paddingLeft="@style/brls/tab_details/padding_left">
+            <brls:Header title="Artemis Stream Tuning"/>
+            <brls:DetailCell id="active_profile"/>
+            <brls:BooleanCell id="custom_resolution"/>
+            <brls:DetailCell id="custom_width"/>
+            <brls:DetailCell id="custom_height"/>
+            <brls:DetailCell id="exact_bitrate"/>
+            <brls:Header
+                title="Notes"
+                paddingTop="60"
+                lineTop="1px"/>
+            <brls:Label
+                text="Resolution and bitrate changes apply when the stream starts or restarts. Standard Sunshine hosts keep using the normal GameStream path."
+                width="auto"
+                height="auto"
+                fontSize="22"
+                marginTop="16"/>
+        </brls:Box>
+    </brls:ScrollingFrame>
+</brls:Box>
