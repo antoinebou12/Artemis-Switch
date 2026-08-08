@@ -1,4 +1,5 @@
 #include "AutoTune.hpp"
+#include "AutoTunePlan.hpp"
 
 #include <cassert>
 #include <vector>
@@ -34,6 +35,34 @@ int main() {
     strict.maximumHeight = 720;
     best = AutoTune::chooseBest({high}, strict);
     assert(!best.has_value());
+
+    const auto quick = AutoTunePlan::quickSwitchPlan();
+    assert(quick.size() == 6);
+    assert(quick.front().profile.height == 720);
+    assert(quick[2].profile.bitrateKbps == 20000);
+    assert(quick.back().profile.decoderThreads == 4);
+
+    AutoTuneSession session(quick);
+    assert(!session.finished());
+    assert(session.currentIndex() == 0);
+    assert(session.current()->profile.height == 720);
+
+    AutoTuneResult first = low;
+    assert(session.record(first));
+    assert(session.currentIndex() == 1);
+
+    for (size_t i = 1; i < quick.size(); ++i) {
+        AutoTuneResult result = high;
+        result.profile = quick[i].profile;
+        result.stabilityScore = 98.0;
+        result.renderedFpsMean = 60.0;
+        result.networkDropPercent = 0.0;
+        result.clientP99Ms = 5.0;
+        assert(session.record(result));
+    }
+    assert(session.finished());
+    assert(session.results().size() == quick.size());
+    assert(session.recommendation().has_value());
 
     return 0;
 }
