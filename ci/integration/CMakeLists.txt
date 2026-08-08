@@ -20,15 +20,25 @@ add_artemis_test(benchmark_tests
     app/src/benchmark/BenchmarkAccumulator.cpp
     app/src/benchmark)
 
-add_artemis_test(benchmark_export_tests
-    tests/benchmark_export_tests.cpp
-    app/src/benchmark/BenchmarkExport.cpp
-    app/src/benchmark)
+add_executable(benchmark_export_tests
+    "${REPO_ROOT}/tests/benchmark_export_tests.cpp"
+    "${REPO_ROOT}/app/src/benchmark/BenchmarkExport.cpp"
+    "${REPO_ROOT}/app/src/benchmark/BenchmarkFileStore.cpp"
+)
+target_include_directories(benchmark_export_tests PRIVATE
+    "${REPO_ROOT}/app/src/benchmark")
+target_compile_features(benchmark_export_tests PRIVATE cxx_std_20)
+add_test(NAME benchmark_export_tests COMMAND benchmark_export_tests)
 
-add_artemis_test(auto_tune_tests
-    tests/auto_tune_tests.cpp
-    app/src/benchmark/AutoTune.cpp
-    app/src/benchmark)
+add_executable(auto_tune_tests
+    "${REPO_ROOT}/tests/auto_tune_tests.cpp"
+    "${REPO_ROOT}/app/src/benchmark/AutoTune.cpp"
+    "${REPO_ROOT}/app/src/benchmark/AutoTunePlan.cpp"
+)
+target_include_directories(auto_tune_tests PRIVATE
+    "${REPO_ROOT}/app/src/benchmark")
+target_compile_features(auto_tune_tests PRIVATE cxx_std_20)
+add_test(NAME auto_tune_tests COMMAND auto_tune_tests)
 
 add_artemis_test(stream_profile_tests
     tests/stream_profile_tests.cpp
