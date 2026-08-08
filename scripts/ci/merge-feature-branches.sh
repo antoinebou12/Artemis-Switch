@@ -22,10 +22,33 @@ done
 for branch in "${branches[@]}"; do
   echo "::group::Merge $branch"
   if ! git merge --no-edit --no-ff "origin/${branch}"; then
-    echo "::error::Integration merge conflict while adding ${branch}"
-    git status --short
-    git diff --name-only --diff-filter=U || true
-    exit 1
+    mapfile -t conflicts < <(git diff --name-only --diff-filter=U)
+
+    only_shared_test_manifest=true
+    if [[ ${#conflicts[@]} -eq 0 ]]; then
+      only_shared_test_manifest=false
+    fi
+
+    for conflict in "${conflicts[@]}"; do
+      if [[ "$conflict" != "tests/CMakeLists.txt" ]]; then
+        only_shared_test_manifest=false
+        break
+      fi
+    done
+
+    if [[ "$only_shared_test_manifest" == true ]]; then
+      echo "::notice::Resolving shared tests/CMakeLists.txt in favor of the CI integration harness"
+      git checkout --ours tests/CMakeLists.txt
+      git add tests/CMakeLists.txt
+      git commit --no-edit
+    else
+      echo "::error::Integration merge conflict while adding ${branch}"
+      git status --short
+      printf 'Unresolved files:\n'
+      printf '  %s\n' "${conflicts[@]}"
+      git merge --abort || true
+      exit 1
+    fi
   fi
   echo "::endgroup::"
 done
