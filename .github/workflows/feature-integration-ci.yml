@@ -1,0 +1,122 @@
+name: Feature and Integration CI
+
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches:
+      - master
+      - agent/ci-feature-integration
+  workflow_dispatch:
+  schedule:
+    - cron: "17 8 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: feature-integration-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  current-branch-tests:
+    name: Current branch / portable tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out tested revision
+        uses: actions/checkout@v4
+      - name: Install build tools
+        run: sudo apt-get update && sudo apt-get install -y cmake ninja-build
+      - name: Run portable unit tests
+        run: bash scripts/ci/run-portable-tests.sh
+
+  prepare-feature-matrix:
+    name: Prepare feature matrix
+    if: github.event_name != 'pull_request' || github.head_ref == 'agent/ci-feature-integration'
+    runs-on: ubuntu-latest
+    outputs:
+      branches: ${{ steps.matrix.outputs.branches }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: matrix
+        name: Read active feature branches
+        shell: bash
+        run: |
+          branches=$(grep -Ev '^\s*(#|$)' ci/feature-branches.txt | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          echo "branches=$branches" >> "$GITHUB_OUTPUT"
+          echo "$branches"
+
+  feature-branch-tests:
+    name: Feature / ${{ matrix.branch }}
+    needs: prepare-feature-matrix
+    if: needs.prepare-feature-matrix.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        branch: ${{ fromJSON(needs.prepare-feature-matrix.outputs.branches) }}
+    steps:
+      - name: Check out feature branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ matrix.branch }}
+      - name: Install build tools
+        run: sudo apt-get update && sudo apt-get install -y cmake ninja-build
+      - name: Run feature unit tests
+        shell: bash
+        run: |
+          if [[ -x scripts/ci/run-portable-tests.sh ]]; then
+            scripts/ci/run-portable-tests.sh
+          elif [[ -f tests/CMakeLists.txt ]]; then
+            rm -rf build-tests
+            cmake -S tests -B build-tests -DCMAKE_BUILD_TYPE=Release
+            cmake --build build-tests --parallel 2
+            ctest --test-dir build-tests --output-on-failure
+          else
+            echo "::error::${{ matrix.branch }} has no portable test harness"
+            exit 1
+          fi
+
+  integration-smoke:
+    name: Combined features / merge + portable tests
+    needs: prepare-feature-matrix
+    if: needs.prepare-feature-matrix.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out CI integration base
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install build tools
+        run: sudo apt-get update && sudo apt-get install -y cmake ninja-build
+      - name: Merge active feature branches
+        run: bash scripts/ci/merge-feature-branches.sh
+      - name: Run combined portable tests
+        run: bash scripts/ci/run-portable-tests.sh
+
+  ci-summary:
+    name: CI summary
+    if: always()
+    needs:
+      - current-branch-tests
+      - prepare-feature-matrix
+      - feature-branch-tests
+      - integration-smoke
+    runs-on: ubuntu-latest
+    steps:
+      - name: Report results
+        shell: bash
+        run: |
+          echo "Current branch tests: ${{ needs.current-branch-tests.result }}"
+          echo "Feature matrix:       ${{ needs.feature-branch-tests.result }}"
+          echo "Integration smoke:    ${{ needs.integration-smoke.result }}"
+
+          [[ "${{ needs.current-branch-tests.result }}" == "success" ]] || exit 1
+
+          if [[ "${{ needs.prepare-feature-matrix.result }}" != "skipped" ]]; then
+            [[ "${{ needs.feature-branch-tests.result }}" == "success" ]] || exit 1
+            [[ "${{ needs.integration-smoke.result }}" == "success" ]] || exit 1
+          fi
