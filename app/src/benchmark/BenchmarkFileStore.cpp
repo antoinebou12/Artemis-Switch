@@ -39,11 +39,15 @@ BenchmarkFileStore::save(const std::filesystem::path& directory,
         directory / (stem + ".csv")
     };
 
+    // Snapshot device state once so the paired JSON/CSV files represent the
+    // same Switch operation mode, battery state, and clock readings.
+    const auto runtime = collectSwitchRuntimeMetadata();
+
     {
         std::ofstream output(paths.json, std::ios::binary | std::ios::trunc);
         if (!output)
             return std::nullopt;
-        output << BenchmarkExport::toJson(profile, summary);
+        output << BenchmarkExport::toJson(profile, summary, runtime);
         if (!output.good())
             return std::nullopt;
     }
@@ -55,7 +59,7 @@ BenchmarkFileStore::save(const std::filesystem::path& directory,
             return std::nullopt;
         }
         output << BenchmarkExport::csvHeader()
-               << BenchmarkExport::toCsvRow(profile, summary);
+               << BenchmarkExport::toCsvRow(profile, summary, runtime);
         if (!output.good()) {
             std::filesystem::remove(paths.json, error);
             std::filesystem::remove(paths.csv, error);
