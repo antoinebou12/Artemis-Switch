@@ -1,0 +1,121 @@
+name: Validate Artemis Switch Runtime
+
+on:
+  push:
+    branches:
+      - agent/artemis-switch-integration
+    paths:
+      - ci/VALIDATE_SWITCH_RUNTIME
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  validate-switch:
+    runs-on: ubuntu-latest
+    container:
+      image: docker://devkitpro/devkita64:latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          ref: agent/artemis-switch-integration
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Prepare devkitPro image
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf ./resources/font
+          dkp-pacman --noconfirm -R switch-enet || true
+
+      - name: Run portable Artemis tests
+        id: portable
+        shell: bash
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          cmake -S tests -B build/artemis-tests -DCMAKE_BUILD_TYPE=Debug 2>&1 | tee /tmp/artemis-tests.log
+          cmake --build build/artemis-tests --parallel 2 2>&1 | tee -a /tmp/artemis-tests.log
+          ctest --test-dir build/artemis-tests --output-on-failure 2>&1 | tee -a /tmp/artemis-tests.log
+
+      - name: Configure Nintendo Switch build
+        id: configure
+        shell: bash
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          cmake -B build/switch -DCMAKE_BUILD_TYPE=Release -DPLATFORM_SWITCH=ON -DUSE_DEKO3D=ON 2>&1 | tee /tmp/switch-configure.log
+          cmake -B build/switch -DCMAKE_BUILD_TYPE=Release -DPLATFORM_SWITCH=ON -DUSE_DEKO3D=ON 2>&1 | tee -a /tmp/switch-configure.log
+
+      - name: Build Nintendo Switch NRO
+        id: switch_build
+        if: steps.configure.outcome == 'success'
+        shell: bash
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          make -C build/switch Moonlight.nro -j8 2>&1 | tee /tmp/switch-build.log
+
+      - name: Write branch-visible validation report
+        if: always()
+        shell: bash
+        env:
+          PORTABLE_RESULT: ${{ steps.portable.outcome }}
+          CONFIGURE_RESULT: ${{ steps.configure.outcome }}
+          SWITCH_RESULT: ${{ steps.switch_build.outcome }}
+        run: |
+          set -euo pipefail
+          mkdir -p ci
+          {
+            echo '# Artemis Switch runtime validation'
+            echo
+            echo "Commit: ${GITHUB_SHA}"
+            echo "Portable tests: ${PORTABLE_RESULT}"
+            echo "Switch configure: ${CONFIGURE_RESULT}"
+            echo "Switch NRO build: ${SWITCH_RESULT:-skipped}"
+            echo
+            echo '## Configure log tail'
+            echo '```text'
+            tail -n 80 /tmp/switch-configure.log 2>/dev/null || true
+            echo '```'
+            echo
+            echo '## Switch build log tail'
+            echo '```text'
+            tail -n 160 /tmp/switch-build.log 2>/dev/null || true
+            echo '```'
+            echo
+            echo '## Portable test log tail'
+            echo '```text'
+            tail -n 80 /tmp/artemis-tests.log 2>/dev/null || true
+            echo '```'
+          } > ci/SWITCH_RUNTIME_VALIDATION.md
+          rm -f ci/VALIDATE_SWITCH_RUNTIME
+
+      - name: Persist validation report
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'Artemis-Switch CI'
+          git config user.email 'artemis-switch-ci@users.noreply.github.com'
+          git add ci/SWITCH_RUNTIME_VALIDATION.md ci/VALIDATE_SWITCH_RUNTIME
+          if ! git diff --cached --quiet; then
+            git commit -m 'ci: record Artemis Switch runtime validation'
+            git push origin HEAD:agent/artemis-switch-integration
+          fi
+
+      - name: Enforce validation result
+        if: always()
+        shell: bash
+        env:
+          PORTABLE_RESULT: ${{ steps.portable.outcome }}
+          CONFIGURE_RESULT: ${{ steps.configure.outcome }}
+          SWITCH_RESULT: ${{ steps.switch_build.outcome }}
+        run: |
+          test "$PORTABLE_RESULT" = success
+          test "$CONFIGURE_RESULT" = success
+          test "$SWITCH_RESULT" = success
