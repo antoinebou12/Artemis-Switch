@@ -192,7 +192,6 @@ void MoonlightSession::video_decoder_cleanup() {
 }
 
 int MoonlightSession::video_decoder_submit_decode_unit(PDECODE_UNIT decode_unit) {
-    m_video_format = video_format;
     if (m_active_session && m_active_session->m_video_decoder) {
         return m_active_session->m_video_decoder->submit_decode_unit(decode_unit);
     }
