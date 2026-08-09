@@ -78,7 +78,8 @@ ArtemisSettingsTab::ArtemisSettingsTab() {
     inflateFromXMLRes("xml/tabs/artemis_settings.xml");
 
     const auto stored = artemis::streaming::StreamProfileStore::instance().get();
-    customResolution->init("Use custom resolution", stored.customResolutionEnabled,
+    customResolution->init("artemis/settings/use_custom_resolution"_i18n,
+                           stored.customResolutionEnabled,
                            [this](bool enabled) {
         const auto value = artemis::streaming::StreamProfileStore::instance().get();
         artemis::streaming::StreamProfileStore::instance().setCustomResolution(
@@ -86,10 +87,10 @@ ArtemisSettingsTab::ArtemisSettingsTab() {
         refreshValues();
     });
 
-    width->setText("Custom width");
-    height->setText("Custom height");
-    exactBitrate->setText("Exact bitrate");
-    activeProfile->setText("Configured stream");
+    width->setText("artemis/settings/custom_width"_i18n);
+    height->setText("artemis/settings/custom_height"_i18n);
+    exactBitrate->setText("artemis/settings/exact_bitrate"_i18n);
+    activeProfile->setText("artemis/settings/active_profile"_i18n);
 
     width->registerClickAction([this](View*) {
         editWidth();
@@ -104,12 +105,13 @@ ArtemisSettingsTab::ArtemisSettingsTab() {
         return true;
     });
 
-    frameRate->setText("Stream frame rate");
+    frameRate->setText("artemis/settings/stream_frame_rate"_i18n);
     refreshFrameRateSelector();
 
 #if ARTEMIS_HAS_ADVANCED_STREAM
     const auto advanced = artemis::stream::AdvancedStreamOptionsStore::instance().get();
-    unlockHighFps->init("Unlock 90 / 120 FPS", advanced.unlockAllFrameRates,
+    unlockHighFps->init("artemis/settings/unlock_high_fps"_i18n,
+                        advanced.unlockAllFrameRates,
                         [this](bool enabled) {
         auto options = artemis::stream::AdvancedStreamOptionsStore::instance().get();
         options.unlockAllFrameRates = enabled;
@@ -123,7 +125,7 @@ ArtemisSettingsTab::ArtemisSettingsTab() {
         refreshFrameRateSelector();
         refreshValues();
     });
-    forceFullRange->init("Force full-range video (Experimental)",
+    forceFullRange->init("artemis/settings/force_full_range"_i18n,
                          advanced.forceFullRangeVideo, [](bool enabled) {
         auto options = artemis::stream::AdvancedStreamOptionsStore::instance().get();
         options.forceFullRangeVideo = enabled;
@@ -131,28 +133,31 @@ ArtemisSettingsTab::ArtemisSettingsTab() {
     });
     forceFullRange->setDetailText(
         "Requests full range from the host on the next stream start/restart");
-    preventPacketLoss->init("Prevent packet loss (Experimental)",
+    preventPacketLoss->init("artemis/settings/prevent_packet_loss"_i18n,
                             advanced.preventPacketLoss, [](bool enabled) {
         auto options = artemis::stream::AdvancedStreamOptionsStore::instance().get();
         options.preventPacketLoss = enabled;
         artemis::stream::AdvancedStreamOptionsStore::instance().set(options);
     });
-    preventPacketLoss->setDetailText("Preference only until Switch transport behavior is verified");
+    preventPacketLoss->setDetailText("artemis/settings/packet_loss_unverified"_i18n);
 #else
-    unlockHighFps->init("Unlock 90 / 120 FPS", false, [](bool) {});
-    forceFullRange->init("Force full-range video (Experimental)", false, [](bool) {});
-    preventPacketLoss->init("Prevent packet loss (Experimental)", false, [](bool) {});
+    unlockHighFps->init("artemis/settings/unlock_high_fps"_i18n, false, [](bool) {});
+    forceFullRange->init("artemis/settings/force_full_range"_i18n, false, [](bool) {});
+    preventPacketLoss->init("artemis/settings/prevent_packet_loss"_i18n, false, [](bool) {});
     unlockHighFps->setEnabled(false);
     forceFullRange->setEnabled(false);
     preventPacketLoss->setEnabled(false);
-    unlockHighFps->setDetailText("Advanced stream PR not present");
 #endif
 
 #if ARTEMIS_HAS_VIDEO_SCALE
     const auto currentScale = artemis::video::VideoScaleStore::instance().get();
     const int scaleSelection = currentScale == artemis::video::ScaleMode::Fit ? 0
                              : currentScale == artemis::video::ScaleMode::Fill ? 1 : 2;
-    scaleMode->init("Video scale mode", {"Fit", "Fill", "Stretch"}, scaleSelection,
+    scaleMode->init("artemis/settings/video_scale_mode"_i18n,
+                    {"artemis/settings/fit"_i18n,
+                     "artemis/settings/fill"_i18n,
+                     "artemis/settings/stretch"_i18n},
+                    scaleSelection,
                     [](int selected) {
         const auto mode = selected == 0 ? artemis::video::ScaleMode::Fit
                         : selected == 2 ? artemis::video::ScaleMode::Stretch
@@ -160,59 +165,76 @@ ArtemisSettingsTab::ArtemisSettingsTab() {
         artemis::video::VideoScaleStore::instance().set(mode);
     });
 #else
-    scaleMode->init("Video scale mode", {"Fill"}, 0, [](int) {});
+    scaleMode->init("artemis/settings/video_scale_mode"_i18n,
+                    {"artemis/settings/fill"_i18n}, 0, [](int) {});
     scaleMode->setEnabled(false);
-    scaleMode->setDetailText("Scaling PR not present");
 #endif
 
 #if ARTEMIS_HAS_MOTION_POLICY
     auto motion = artemis::input::SwitchMotionPolicyStore::instance().get();
-    forwardMotion->init("Forward Joy-Con / controller motion",
+    forwardMotion->init("artemis/settings/forward_motion"_i18n,
                         motion.allowGamepadMotionSensors, [](bool enabled) {
         auto options = artemis::input::SwitchMotionPolicyStore::instance().get();
         options.allowGamepadMotionSensors = enabled;
         artemis::input::SwitchMotionPolicyStore::instance().set(options);
     });
 
-    // The current Borealis callback identifies controller sensor events but does
-    // not expose an unambiguous separate console IMU source. Keep the stored
-    // capability off and make the UI honest until that source exists.
-    if (motion.allowConsoleMotionFallback) {
+    const auto capabilities = artemis::input::detectSwitchMotionCapabilities();
+    const bool consoleFallbackSupported =
+        artemis::input::canEnableConsoleMotionFallback(capabilities);
+
+    // Always force an unsupported saved value back to OFF. This makes console
+    // fallback disabled by default and prevents stale/manual settings from
+    // enabling a path for which libnx does not yet expose mapped motion vectors.
+    if (!consoleFallbackSupported && motion.allowConsoleMotionFallback) {
         motion.allowConsoleMotionFallback = false;
         artemis::input::SwitchMotionPolicyStore::instance().set(motion);
     }
-    consoleMotionFallback->init("Console motion fallback (Unavailable)",
-                                false, [](bool) {});
-    consoleMotionFallback->setEnabled(false);
-    consoleMotionFallback->setDetailText(
-        "Waiting for a distinct console IMU source from Borealis/libnx");
+
+    consoleMotionFallback->init("artemis/settings/console_motion_fallback"_i18n,
+                                consoleFallbackSupported &&
+                                    motion.allowConsoleMotionFallback,
+                                [consoleFallbackSupported](bool enabled) {
+        if (!consoleFallbackSupported)
+            return;
+        auto options = artemis::input::SwitchMotionPolicyStore::instance().get();
+        options.allowConsoleMotionFallback = enabled;
+        artemis::input::SwitchMotionPolicyStore::instance().set(options);
+    });
+    consoleMotionFallback->setEnabled(consoleFallbackSupported);
+    if (!consoleFallbackSupported) {
+        consoleMotionFallback->setDetailText(
+            capabilities.libnxSevenSixAxisApiAvailable
+                ? "artemis/settings/console_motion_api_unmapped"_i18n
+                : "artemis/settings/console_motion_unavailable"_i18n);
+    }
 #else
-    forwardMotion->init("Forward Joy-Con / controller motion", true, [](bool) {});
-    consoleMotionFallback->init("Console motion fallback (Unavailable)", false, [](bool) {});
+    forwardMotion->init("artemis/settings/forward_motion"_i18n, true, [](bool) {});
+    consoleMotionFallback->init("artemis/settings/console_motion_fallback"_i18n,
+                                false, [](bool) {});
     forwardMotion->setEnabled(false);
     consoleMotionFallback->setEnabled(false);
-    forwardMotion->setDetailText("Motion policy PR not present");
-    consoleMotionFallback->setDetailText("Motion policy PR not present");
 #endif
 
 #if ARTEMIS_HAS_ZOOM_PAN
     const auto zoom = artemis::video::ZoomPanStore::instance().get();
-    rememberZoomPan->init("Remember Zoom & Pan", zoom.rememberBetweenSessions,
+    rememberZoomPan->init("artemis/settings/remember_zoom_pan"_i18n,
+                          zoom.rememberBetweenSessions,
                           [](bool enabled) {
         artemis::video::ZoomPanStore::instance().setRemember(enabled);
     });
-    resetZoomPan->setText("Reset Zoom & Pan");
+    resetZoomPan->setText("artemis/settings/reset_zoom_pan"_i18n);
     resetZoomPan->registerClickAction([this](View*) {
         artemis::video::ZoomPanStore::instance().reset();
-        resetZoomPan->setDetailText("Reset to 1.0x / centered");
+        resetZoomPan->setDetailText("artemis/settings/reset_zoom_pan_done"_i18n);
         return true;
     });
 #else
-    rememberZoomPan->init("Remember Zoom & Pan", false, [](bool) {});
+    rememberZoomPan->init("artemis/settings/remember_zoom_pan"_i18n,
+                          false, [](bool) {});
     rememberZoomPan->setEnabled(false);
-    resetZoomPan->setText("Reset Zoom & Pan");
+    resetZoomPan->setText("artemis/settings/reset_zoom_pan"_i18n);
     resetZoomPan->setEnabled(false);
-    rememberZoomPan->setDetailText("Zoom/Pan PR not present");
 #endif
 
     refreshValues();
@@ -256,7 +278,7 @@ void ArtemisSettingsTab::refreshValues() {
     const std::string resolutionText = stored.customResolutionEnabled
         ? fmt::format("{}x{}", stored.width, stored.height)
         : (configuredResolution == -1
-               ? "Native"
+               ? "settings/resolution_native"_i18n
                : fmt::format("{}x{}", configuredResolution * 16 / 9,
                              configuredResolution));
 
@@ -281,7 +303,8 @@ void ArtemisSettingsTab::editWidth() {
                 current.customResolutionEnabled, value, current.height);
             refreshValues();
         },
-        "Custom stream width", "640 - 1920", 4,
+        "artemis/settings/custom_width_title"_i18n,
+        "artemis/settings/custom_width_hint"_i18n, 4,
         std::to_string(current.width), "", "", 0);
 }
 
@@ -294,7 +317,8 @@ void ArtemisSettingsTab::editHeight() {
                 current.customResolutionEnabled, current.width, value);
             refreshValues();
         },
-        "Custom stream height", "360 - 1080", 4,
+        "artemis/settings/custom_height_title"_i18n,
+        "artemis/settings/custom_height_hint"_i18n, 4,
         std::to_string(current.height), "", "", 0);
 }
 
@@ -307,6 +331,7 @@ void ArtemisSettingsTab::editBitrate() {
             Settings::instance().save();
             refreshValues();
         },
-        "Exact stream bitrate", "1 - 100 Mbps", 3,
+        "artemis/settings/exact_bitrate_title"_i18n,
+        "artemis/settings/exact_bitrate_hint"_i18n, 3,
         std::to_string(currentMbps), "", "", 0);
 }
