@@ -129,6 +129,8 @@ ArtemisSettingsTab::ArtemisSettingsTab() {
         options.forceFullRangeVideo = enabled;
         artemis::stream::AdvancedStreamOptionsStore::instance().set(options);
     });
+    forceFullRange->setDetailText(
+        "Requests full range from the host on the next stream start/restart");
     preventPacketLoss->init("Prevent packet loss (Experimental)",
                             advanced.preventPacketLoss, [](bool enabled) {
         auto options = artemis::stream::AdvancedStreamOptionsStore::instance().get();
@@ -164,25 +166,33 @@ ArtemisSettingsTab::ArtemisSettingsTab() {
 #endif
 
 #if ARTEMIS_HAS_MOTION_POLICY
-    const auto motion = artemis::input::SwitchMotionPolicyStore::instance().get();
+    auto motion = artemis::input::SwitchMotionPolicyStore::instance().get();
     forwardMotion->init("Forward Joy-Con / controller motion",
                         motion.allowGamepadMotionSensors, [](bool enabled) {
         auto options = artemis::input::SwitchMotionPolicyStore::instance().get();
         options.allowGamepadMotionSensors = enabled;
         artemis::input::SwitchMotionPolicyStore::instance().set(options);
     });
-    consoleMotionFallback->init("Allow console motion fallback",
-                                motion.allowConsoleMotionFallback, [](bool enabled) {
-        auto options = artemis::input::SwitchMotionPolicyStore::instance().get();
-        options.allowConsoleMotionFallback = enabled;
-        artemis::input::SwitchMotionPolicyStore::instance().set(options);
-    });
+
+    // The current Borealis callback identifies controller sensor events but does
+    // not expose an unambiguous separate console IMU source. Keep the stored
+    // capability off and make the UI honest until that source exists.
+    if (motion.allowConsoleMotionFallback) {
+        motion.allowConsoleMotionFallback = false;
+        artemis::input::SwitchMotionPolicyStore::instance().set(motion);
+    }
+    consoleMotionFallback->init("Console motion fallback (Unavailable)",
+                                false, [](bool) {});
+    consoleMotionFallback->setEnabled(false);
+    consoleMotionFallback->setDetailText(
+        "Waiting for a distinct console IMU source from Borealis/libnx");
 #else
     forwardMotion->init("Forward Joy-Con / controller motion", true, [](bool) {});
-    consoleMotionFallback->init("Allow console motion fallback", false, [](bool) {});
+    consoleMotionFallback->init("Console motion fallback (Unavailable)", false, [](bool) {});
     forwardMotion->setEnabled(false);
     consoleMotionFallback->setEnabled(false);
     forwardMotion->setDetailText("Motion policy PR not present");
+    consoleMotionFallback->setDetailText("Motion policy PR not present");
 #endif
 
 #if ARTEMIS_HAS_ZOOM_PAN
