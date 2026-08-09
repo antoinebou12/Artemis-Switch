@@ -63,7 +63,7 @@ void MainTabs::refillTabs(bool keepFocus) {
 
     addTab("tabs/add_host"_i18n, AddHostTab::create);
     addTab("tabs/settings"_i18n, SettingsTab::create);
-    addTab("Artemis", ArtemisSettingsTab::create);
+    addTab("artemis/tab"_i18n, ArtemisSettingsTab::create);
     addSeparator();
     addTab("tabs/about"_i18n, AboutTab::create);
     sidebar->setContentOffsetY(-40, false);
