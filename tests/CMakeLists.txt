@@ -26,6 +26,7 @@ add_artemis_test(benchmark_tests
 
 add_executable(benchmark_export_tests
     "${REPO_ROOT}/tests/benchmark_export_tests.cpp"
+    "${REPO_ROOT}/app/src/benchmark/SwitchRuntimeMetadata.cpp"
     "${REPO_ROOT}/app/src/benchmark/BenchmarkExport.cpp"
     "${REPO_ROOT}/app/src/benchmark/BenchmarkFileStore.cpp"
 )
