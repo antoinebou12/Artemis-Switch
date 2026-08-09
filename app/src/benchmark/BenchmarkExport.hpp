@@ -1,5 +1,6 @@
 #pragma once
 
+#include "SwitchRuntimeMetadata.hpp"
 #include <string>
 
 namespace artemis::benchmark {
@@ -26,11 +27,21 @@ struct ExportSummary {
 
 class BenchmarkExport {
 public:
+    // Convenience overloads collect a fresh runtime snapshot.
     static std::string toJson(const ExportProfile& profile,
                               const ExportSummary& summary);
-    static std::string csvHeader();
     static std::string toCsvRow(const ExportProfile& profile,
                                 const ExportSummary& summary);
+
+    // File export uses these overloads so JSON and CSV share exactly the same
+    // Switch state/clock snapshot.
+    static std::string toJson(const ExportProfile& profile,
+                              const ExportSummary& summary,
+                              const SwitchRuntimeMetadata& runtime);
+    static std::string csvHeader();
+    static std::string toCsvRow(const ExportProfile& profile,
+                                const ExportSummary& summary,
+                                const SwitchRuntimeMetadata& runtime);
 };
 
 } // namespace artemis::benchmark
