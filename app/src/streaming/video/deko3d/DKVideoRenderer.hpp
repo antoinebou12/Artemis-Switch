@@ -68,20 +68,20 @@ class DKVideoRenderer : public IVideoRenderer {
 
     CShader vertexShader;
     CShader fragmentShader;
-  #ifdef SUPPORT_UPSCALING
+#ifdef SUPPORT_UPSCALING
     CShader upscalingFragmentShader;
     CShader rcasFragmentShader;
     CShader upscalingPassFragmentShader;
-  #endif
+#endif
 
     CMemPool::Handle vertexBuffer;
     CMemPool::Handle transformUniformBuffer;
-  #ifdef SUPPORT_UPSCALING
+#ifdef SUPPORT_UPSCALING
     CMemPool::Handle easuUniformBuffer;
     CMemPool::Handle ditheringUniformBuffer;
     CMemPool::Handle rcasUniformBuffer;
     DkFence upscalingFence = {};
-  #endif
+#endif
 
     dk::ImageLayout lumaMappingLayout;
     dk::ImageLayout chromaMappingLayout;
@@ -103,7 +103,7 @@ class DKVideoRenderer : public IVideoRenderer {
 
     int lumaTextureId = -1;
     int chromaTextureId = -1;
-  #ifdef SUPPORT_UPSCALING
+#ifdef SUPPORT_UPSCALING
     CMemPool::Handle sourceTargetHandle;
     dk::ImageLayout sourceTargetLayout;
     dk::Image sourceTargetImage;
@@ -123,19 +123,27 @@ class DKVideoRenderer : public IVideoRenderer {
     int m_source_target_height = 0;
     int m_upscaling_target_width = 0;
     int m_upscaling_target_height = 0;
-  #endif
+#endif
     int m_color_space = -1;
     bool m_color_full = false;
     bool m_dithering_enabled = false;
     bool m_upscaling_enabled = false;
-  #ifdef SUPPORT_UPSCALING
+#ifdef SUPPORT_UPSCALING
     bool m_rcas_enabled = false;
     bool m_dithering_requested = false;
     bool m_upscaling_requested = false;
     bool m_rcas_requested = false;
     float m_dithering_strength = 3.0f;
     float m_rcas_strength = 0.2f;
-  #endif
+#endif
+
+    // Cached Artemis presentation settings. These are deliberately primitive
+    // values so the renderer header remains independent of feature headers.
+    int m_artemis_scale_mode = -1;
+    float m_artemis_zoom = 1.0f;
+    float m_artemis_pan_x = 0.0f;
+    float m_artemis_pan_y = 0.0f;
+    bool m_artemis_force_full_range = false;
 
     VideoRenderStats m_video_render_stats_progress = {};
     VideoRenderStats m_video_render_stats_cache = {};

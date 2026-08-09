@@ -2,7 +2,7 @@
 //  ingame_overlay.cpp
 //  Moonlight
 //
-//  Created by Даниил Виноградов on 29.05.2021.
+//  Created by XITRIX on 29.05.2021.
 //
 
 #ifdef PLATFORM_SWITCH
@@ -14,6 +14,13 @@
 #include "streaming_input_overlay.hpp"
 #include "button_selecting_dialog.hpp"
 #include "UpscalingSupport.hpp"
+
+#if __has_include("benchmark/BenchmarkRuntime.hpp")
+#include "benchmark/BenchmarkRuntime.hpp"
+#define ARTEMIS_QUICK_HAS_BENCHMARK 1
+#else
+#define ARTEMIS_QUICK_HAS_BENCHMARK 0
+#endif
 
 #include <cmath>
 #include <iomanip>
@@ -114,6 +121,54 @@ LogoutTab::LogoutTab(StreamingView* streamView) : streamView(streamView) {
 OptionsTab::OptionsTab(StreamingView* streamView) : streamView(streamView) {
     this->inflateFromXMLRes("xml/views/ingame_overlay/options_tab.xml");
 
+    quickKeyboard->setText("artemis/overlay/show_keyboard"_i18n);
+    quickKeyboard->registerClickAction([this, streamView](View*) {
+        this->dismiss([streamView] { streamView->showKeyboard(); });
+        return true;
+    });
+
+    quickPerformance->setText("artemis/overlay/toggle_performance"_i18n);
+    quickPerformance->setDetailText(streamView->draw_stats ? "hints/on"_i18n : "hints/off"_i18n);
+    quickPerformance->registerClickAction([this, streamView](View*) {
+        streamView->draw_stats = !streamView->draw_stats;
+        quickPerformance->setDetailText(streamView->draw_stats ? "hints/on"_i18n : "hints/off"_i18n);
+        return true;
+    });
+
+    quickBenchmark->setText("artemis/overlay/benchmark"_i18n);
+#if ARTEMIS_QUICK_HAS_BENCHMARK
+    quickBenchmark->setDetailText(
+        artemis::benchmark::BenchmarkRuntime::instance().running()
+            ? "artemis/overlay/stop"_i18n
+            : "artemis/overlay/start"_i18n);
+    quickBenchmark->registerClickAction([this](View*) {
+        auto& benchmark = artemis::benchmark::BenchmarkRuntime::instance();
+        if (benchmark.running())
+            benchmark.stop();
+        else
+            benchmark.start(Settings::instance().fps());
+        quickBenchmark->setDetailText(benchmark.running()
+            ? "artemis/overlay/stop"_i18n
+            : "artemis/overlay/start"_i18n);
+        return true;
+    });
+#else
+    quickBenchmark->setDetailText("artemis/overlay/requires_benchmark"_i18n);
+    quickBenchmark->setEnabled(false);
+#endif
+
+    quickDisconnect->setText("artemis/overlay/disconnect_stream"_i18n);
+    quickDisconnect->registerClickAction([this, streamView](View*) {
+        this->dismiss([streamView] { streamView->terminate(false); });
+        return true;
+    });
+
+    quickQuitHost->setText("artemis/overlay/quit_host_app"_i18n);
+    quickQuitHost->registerClickAction([this, streamView](View*) {
+        this->dismiss([streamView] { streamView->terminate(true); });
+        return true;
+    });
+
     guideKeyButtons->setText("settings/guide_key_buttons"_i18n);
     setupButtonsSelectorCell(guideKeyButtons,
                              Settings::instance().guide_key_options().buttons);
@@ -192,8 +247,7 @@ OptionsTab::OptionsTab(StreamingView* streamView) : streamView(streamView) {
     inputOverlayButton->setText("streaming/mouse_input"_i18n);
     inputOverlayButton->registerClickAction([this](View* view) {
         this->dismiss([this]() {
-            auto* overlay =
-                new StreamingInputOverlay(this->streamView);
+            auto* overlay = new StreamingInputOverlay(this->streamView);
             Application::pushActivity(new Activity(overlay));
         });
         return true;
@@ -242,7 +296,7 @@ OptionsTab::OptionsTab(StreamingView* streamView) : streamView(streamView) {
                                [](bool value) {
                                    Settings::instance().set_touchscreen_mouse_mode(value);
                                });
-    
+
     swapStickToDpad->init("settings/swap_stick_to_dpad"_i18n, Settings::instance().swap_joycon_stick_to_dpad(),
                           [](bool value) { Settings::instance().set_swap_joycon_stick_to_dpad(value); });
 

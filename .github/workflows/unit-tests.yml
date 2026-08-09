@@ -1,0 +1,46 @@
+name: Unit tests
+
+on:
+  push:
+    branches: ["master", "agent/**"]
+  pull_request:
+
+jobs:
+  portable-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate Artemis English/French translations
+        run: python tests/i18n_consistency_test.py
+
+      - name: Validate release/CD contract
+        run: python tests/release_contract_test.py
+
+      - name: Configure
+        run: cmake -S tests -B build/tests -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build/tests --parallel
+
+      - name: Test
+        run: ctest --test-dir build/tests --output-on-failure
+
+  portable-sanitizers:
+    runs-on: ubuntu-latest
+    env:
+      CXXFLAGS: -fsanitize=address,undefined -fno-omit-frame-pointer
+      LDFLAGS: -fsanitize=address,undefined
+      ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+      UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure sanitizer build
+        run: cmake -S tests -B build/tests-sanitized -DCMAKE_BUILD_TYPE=Debug
+
+      - name: Build with sanitizers
+        run: cmake --build build/tests-sanitized --parallel
+
+      - name: Test with sanitizers
+        run: ctest --test-dir build/tests-sanitized --output-on-failure
