@@ -21,6 +21,7 @@ Artemis Switch is developed through a single consolidated integration branch and
 - Switch-oriented stability score
 - JSON/CSV benchmark export
 - Artemis Performance tab in the existing in-game overlay
+- benchmark runtime metadata for handheld/docked mode, battery level, charging-enabled state and best-effort read-only CPU/GPU/EMC clock rates
 
 ### Stream tuning
 
@@ -30,6 +31,7 @@ Artemis Switch is developed through a single consolidated integration branch and
 - 30/40/60/90/120 FPS policy
 - Auto Tune quick and extended benchmark plans
 - reconnect/warm-up/benchmark/rank/apply runtime
+- full-range preference applied both to Moonlight `STREAM_CONFIGURATION.colorRange` and Switch renderer conversion
 
 ### UI and Switch controls
 
@@ -39,6 +41,7 @@ Artemis Switch is developed through a single consolidated integration branch and
 - Fit / Fill / Stretch state and tested presentation geometry
 - Zoom/Pan persistence and tested source-crop geometry
 - Joy-Con / Pro Controller motion policy
+- console-motion fallback is shown as unavailable until the runtime exposes a distinct console IMU source
 
 ### Nintendo Switch runtime integration
 
@@ -47,9 +50,10 @@ Artemis Switch is developed through a single consolidated integration branch and
 - `Fit`, `Stretch`, Zoom/Pan and forced full-range video are connected to an Artemis deko3D direct-presentation path
 - Fit mode clears the full framebuffer and renders into a centered aspect-preserving viewport for black letterbox/pillarbox bars
 - Fill and Zoom/Pan use source UV cropping rather than resizing decoded frames on the CPU
-- forced full range reuses the existing deko3D YUV full-range conversion matrices
+- forced full range requests `COLOR_RANGE_FULL` from the host and reuses the existing deko3D YUV full-range conversion matrices
 - the existing `LiSendControllerMotionEvent()` boundary is policy-gated without rewriting Moonlight-Switch's input implementation
 - console-IMU fallback remains capability-gated because the current Borealis controller sensor callback does not identify a distinct console motion source
+- Switch benchmark metadata uses read-only libnx services and never changes clocks
 
 The first Artemis presentation milestone intentionally uses the direct deko3D path whenever Fit, Stretch, Zoom/Pan or forced full range is active. The untouched default Fill path retains the current FSR/RCAS/dithering pipeline. After real-device validation, the same presentation geometry can be propagated through the post-processing path so those effects remain available in every scale mode.
 
@@ -69,17 +73,17 @@ The consolidated PR uses:
 
 ## Remaining deep integration and validation work
 
-The main Switch presentation and motion hooks are now implemented in code. Remaining release work is:
+The main Switch presentation, motion, full-range negotiation and benchmark metadata hooks are now implemented in code. Remaining release work is:
 
 - obtain a green Nintendo Switch `.nro` / `.elf` build for the consolidated PR
 - boot and stream-test Fit / Fill / Stretch on real Switch hardware
 - validate Zoom/Pan direction, edges and persistence on-device
 - validate forced full-range output against known limited/full-range host content
+- verify that read-only CPU/GPU/EMC clock queries are permitted on the target homebrew environment; unavailable services intentionally export zero
 - propagate Artemis presentation geometry through the existing FSR/RCAS/dithering post-processing path after the direct path is proven stable
 - expose a distinct console-IMU fallback only if Borealis/libnx provides an unambiguous source separate from controller motion
 - map and implement verified Apollo virtual-display/server-command/clipboard operations
 - run benchmark/Auto Tune validation on real Switch hardware and tune scoring thresholds from collected data
-- add Switch runtime metadata to benchmark exports where reliable APIs are available, such as docked/handheld state and clock information
 
 ## Release acceptance
 
