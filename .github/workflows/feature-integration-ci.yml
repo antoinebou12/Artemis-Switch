@@ -9,6 +9,7 @@ on:
     branches:
       - master
   workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read
@@ -25,10 +26,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Validate English and French localization JSON
+      - name: Validate localization JSON syntax
         run: |
           python -m json.tool resources/i18n/en-US/main.json > /dev/null
           python -m json.tool resources/i18n/fr/main.json > /dev/null
+
+      - name: Validate Artemis English/French translation coverage
+        run: python tests/i18n_consistency_test.py
+
+      - name: Validate release/CD contract
+        run: python tests/release_contract_test.py
 
       - name: Configure unit suite
         run: cmake -S tests -B build/tests -DCMAKE_BUILD_TYPE=Debug
@@ -47,6 +54,34 @@ jobs:
 
       - name: Run cross-feature integration suite
         run: ctest --test-dir build/integration --output-on-failure
+
+  release-package-contract:
+    name: Release source package contract
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository and submodules
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Build dry-run source packages
+        shell: bash
+        run: |
+          chmod +x scripts/package-release-source.sh
+          scripts/package-release-source.sh v0.0.0-ci "$RUNNER_TEMP/artemis-release"
+
+      - name: Inspect source packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          tarball="$RUNNER_TEMP/artemis-release/Artemis-Switch-0.0.0-ci-source.tar.gz"
+          zipfile="$RUNNER_TEMP/artemis-release/Artemis-Switch-0.0.0-ci-source.zip"
+          test -s "$tarball"
+          test -s "$zipfile"
+          tar -tzf "$tarball" | grep -q 'Artemis-Switch-0.0.0-ci/README.md$'
+          tar -tzf "$tarball" | grep -q 'Artemis-Switch-0.0.0-ci/SOURCE_INFO.txt$'
+          unzip -l "$zipfile" | grep -q 'Artemis-Switch-0.0.0-ci/README.md'
+          unzip -l "$zipfile" | grep -q 'Artemis-Switch-0.0.0-ci/SOURCE_INFO.txt'
 
   sanitizer-integration:
     name: ASan + UBSan integration
@@ -74,10 +109,12 @@ jobs:
     if: always()
     needs:
       - portable-integration
+      - release-package-contract
       - sanitizer-integration
     runs-on: ubuntu-latest
     steps:
       - name: Require all integration jobs
         run: |
           test "${{ needs.portable-integration.result }}" = "success"
+          test "${{ needs.release-package-contract.result }}" = "success"
           test "${{ needs.sanitizer-integration.result }}" = "success"
