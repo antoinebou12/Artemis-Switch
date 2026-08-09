@@ -1,4 +1,17 @@
+#ifdef __SWITCH__
+#include <switch.h>
+#endif
+
+#include "InputManager.hpp"
 #include "Limelight.h"
+#include "Settings.hpp"
+#include <borealis.hpp>
+#include <streaming_view.hpp>
+#include <algorithm>
+#include <chrono>
+#include <cmath>
+#include <limits>
+
 #include "../features/input/SwitchMotionPolicy.hpp"
 #include "../features/input/SwitchMotionPolicyStore.hpp"
 
@@ -25,6 +38,8 @@ static int ArtemisSendControllerMotionEvent(uint8_t controllerNumber,
     return LiSendControllerMotionEvent(controllerNumber, motionType, x, y, z);
 }
 
+// All includes used by InputManagerLegacy.inc are already loaded above, so this
+// macro only rewrites the actual motion-send calls in the original source body.
 #define LiSendControllerMotionEvent ArtemisSendControllerMotionEvent
 #include "InputManagerLegacy.inc"
 #undef LiSendControllerMotionEvent
