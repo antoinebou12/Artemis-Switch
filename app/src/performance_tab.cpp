@@ -62,7 +62,7 @@ std::string configuredResolutionText() {
         && !artemis::streaming::StreamProfileStore::instance().get().customResolutionEnabled
 #endif
     )
-        return fmt::format("Native ({}x{})", width, height);
+        return fmt::format("{} ({}x{})", "settings/resolution_native"_i18n, width, height);
     return fmt::format("{}x{}", width, height);
 }
 
@@ -98,29 +98,29 @@ artemis::benchmark::ExportSummary exportSummary(
 PerformanceTab::PerformanceTab() {
     inflateFromXMLRes("xml/views/ingame_overlay/performance_tab.xml");
 
-    streamProfile->setText("Stream profile");
-    network->setText("Configured bitrate");
-    receiveLatency->setText("Receive latency");
-    decodeLatency->setText("Decode latency");
-    renderLatency->setText("Render latency");
-    packetLoss->setText("Packet loss");
-    renderedFps->setText("Rendered FPS");
-    queueDepth->setText("Frame queue");
-    benchmarkSummary->setText("Benchmark");
-    benchmarkAction->setText("Start benchmark");
-    benchmarkSave->setText("Save benchmark JSON + CSV");
-    autoTuneSummary->setText("Auto Tune status");
-    autoTuneAction->setText("Start quick Auto Tune");
-    refreshButton->setText("Refresh performance data");
+    streamProfile->setText("artemis/performance/stream_profile"_i18n);
+    network->setText("artemis/performance/configured_bitrate"_i18n);
+    receiveLatency->setText("artemis/performance/receive_latency"_i18n);
+    decodeLatency->setText("artemis/performance/decode_latency"_i18n);
+    renderLatency->setText("artemis/performance/render_latency"_i18n);
+    packetLoss->setText("artemis/performance/packet_loss"_i18n);
+    renderedFps->setText("artemis/performance/rendered_fps"_i18n);
+    queueDepth->setText("artemis/performance/frame_queue"_i18n);
+    benchmarkSummary->setText("artemis/performance/benchmark"_i18n);
+    benchmarkAction->setText("artemis/performance/start_benchmark"_i18n);
+    benchmarkSave->setText("artemis/performance/save_benchmark"_i18n);
+    autoTuneSummary->setText("artemis/performance/auto_tune_status"_i18n);
+    autoTuneAction->setText("artemis/performance/start_auto_tune"_i18n);
+    refreshButton->setText("artemis/performance/refresh"_i18n);
 
 #if ARTEMIS_HAS_BENCHMARK_RUNTIME
-    benchmarkSummary->setDetailText("Ready");
+    benchmarkSummary->setDetailText("artemis/performance/ready"_i18n);
     benchmarkAction->registerClickAction([this](View*) {
         auto& runtime = artemis::benchmark::BenchmarkRuntime::instance();
         if (runtime.running()) {
             const auto result = runtime.stop();
             benchmarkSummary->setDetailText(fmt::format(
-                "Stopped: {:.1f}/100, {:.2f}% loss, P99 {:.2f} ms",
+                "{:.1f}/100, {:.2f}% loss, P99 {:.2f} ms",
                 result.stabilityScore, result.networkDropPercent,
                 result.clientProcessingMs.p99));
         } else {
@@ -130,7 +130,7 @@ PerformanceTab::PerformanceTab() {
         return true;
     });
 #else
-    benchmarkSummary->setDetailText("Benchmark core not present in this branch");
+    benchmarkSummary->setDetailText("artemis/performance/benchmark_unavailable"_i18n);
     benchmarkAction->setEnabled(false);
 #endif
 
@@ -139,7 +139,7 @@ PerformanceTab::PerformanceTab() {
         auto& runtime = artemis::benchmark::BenchmarkRuntime::instance();
         const auto summary = runtime.snapshot();
         if (runtime.running() || summary.sampleCount < 2) {
-            benchmarkSave->setDetailText("Stop and collect a benchmark first");
+            benchmarkSave->setDetailText("artemis/performance/stop_collect_first"_i18n);
             return true;
         }
 
@@ -151,12 +151,12 @@ PerformanceTab::PerformanceTab() {
             directory, fmt::format("benchmark_{}", epoch), exportProfile(),
             exportSummary(summary));
         benchmarkSave->setDetailText(paths
-            ? fmt::format("Saved: {}", paths->json.filename().string())
-            : "Failed to save benchmark");
+            ? paths->json.filename().string()
+            : "artemis/performance/save_failed"_i18n);
         return true;
     });
 #else
-    benchmarkSave->setDetailText("Benchmark export PR not present");
+    benchmarkSave->setDetailText("artemis/performance/export_unavailable"_i18n);
     benchmarkSave->setEnabled(false);
 #endif
 
@@ -171,7 +171,7 @@ PerformanceTab::PerformanceTab() {
         return true;
     });
 #else
-    autoTuneSummary->setDetailText("Auto Tune PR not present");
+    autoTuneSummary->setDetailText("artemis/performance/auto_tune_unavailable"_i18n);
     autoTuneAction->setEnabled(false);
 #endif
 
@@ -188,13 +188,13 @@ void PerformanceTab::updateBenchmarkStatus() {
     auto& runtime = artemis::benchmark::BenchmarkRuntime::instance();
     if (runtime.running()) {
         const auto summary = runtime.snapshot();
-        benchmarkAction->setText("Stop benchmark");
+        benchmarkAction->setText("artemis/performance/stop_benchmark"_i18n);
         benchmarkSummary->setDetailText(fmt::format(
-            "Running: {} samples, {:.1f}/100 stability",
+            "{} samples, {:.1f}/100",
             runtime.sampleCount(), summary.stabilityScore));
         benchmarkSave->setEnabled(false);
     } else {
-        benchmarkAction->setText("Start benchmark");
+        benchmarkAction->setText("artemis/performance/start_benchmark"_i18n);
 #if ARTEMIS_HAS_BENCHMARK_EXPORT
         benchmarkSave->setEnabled(runtime.sampleCount() >= 2);
 #endif
@@ -206,23 +206,23 @@ void PerformanceTab::updateAutoTuneStatus() {
 #if ARTEMIS_HAS_AUTO_TUNE
     auto& runtime = artemis::benchmark::AutoTuneRuntime::instance();
     if (runtime.running()) {
-        autoTuneAction->setText("Cancel Auto Tune");
+        autoTuneAction->setText("artemis/performance/cancel_auto_tune"_i18n);
         autoTuneSummary->setDetailText(fmt::format(
-            "Profile {} / {}", runtime.currentStep() + 1, runtime.totalSteps()));
+            "{} / {}", runtime.currentStep() + 1, runtime.totalSteps()));
         return;
     }
 
-    autoTuneAction->setText("Start quick Auto Tune");
+    autoTuneAction->setText("artemis/performance/start_auto_tune"_i18n);
     if (const auto best = runtime.recommendation()) {
         autoTuneSummary->setDetailText(fmt::format(
-            "Recommended: {}x{} @ {} FPS, {:.1f} Mbps, {} threads",
+            "{}x{} @ {} FPS, {:.1f} Mbps, {} threads",
             best->profile.width, best->profile.height, best->profile.fps,
             static_cast<double>(best->profile.bitrateKbps) / 1000.0,
             best->profile.decoderThreads));
     } else if (runtime.available()) {
-        autoTuneSummary->setDetailText("Ready, about 1-2 minutes");
+        autoTuneSummary->setDetailText("artemis/performance/auto_tune_ready"_i18n);
     } else {
-        autoTuneSummary->setDetailText("Requires benchmark core and active stream");
+        autoTuneSummary->setDetailText("artemis/performance/auto_tune_requires_stream"_i18n);
     }
 #endif
 }
@@ -230,7 +230,7 @@ void PerformanceTab::updateAutoTuneStatus() {
 void PerformanceTab::refresh() {
     auto* session = MoonlightSession::activeSession();
     if (!session || !session->is_active()) {
-        streamProfile->setDetailText("No active stream");
+        streamProfile->setDetailText("artemis/performance/no_active_stream"_i18n);
         network->setDetailText("-");
         receiveLatency->setDetailText("-");
         decodeLatency->setDetailText("-");
