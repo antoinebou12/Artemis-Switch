@@ -51,6 +51,22 @@ int main() {
     assert(near(stretchGeometry.destination.width, 1280.0f));
     assert(near(stretchGeometry.destination.height, 800.0f));
 
+    // 4:3 content on the Switch OLED's 16:9 panel should pillarbox in Fit
+    // and crop vertically in Fill.
+    const auto fourThreeFit = VideoScale::presentationGeometry(
+        1024, 768, 1280, 720, ScaleMode::Fit);
+    assert(near(fourThreeFit.destination.x, 160.0f));
+    assert(near(fourThreeFit.destination.y, 0.0f));
+    assert(near(fourThreeFit.destination.width, 960.0f));
+    assert(near(fourThreeFit.destination.height, 720.0f));
+
+    const auto fourThreeFill = VideoScale::presentationGeometry(
+        1024, 768, 1280, 720, ScaleMode::Fill);
+    assert(near(fourThreeFill.source.x, 0.0f));
+    assert(near(fourThreeFill.source.y, 96.0f));
+    assert(near(fourThreeFill.source.width, 1024.0f));
+    assert(near(fourThreeFill.source.height, 576.0f));
+
     const auto zoomed = VideoScale::presentationGeometry(
         1920, 1080, 1280, 720, ScaleMode::Fit, 2.0f, 0.0f, 0.0f);
     assert(near(zoomed.source.width, 960.0f));
@@ -65,10 +81,30 @@ int main() {
     assert(near(panned.source.width, 960.0f));
     assert(near(panned.source.height, 540.0f));
 
+    // Zoom and pan inputs are clamped so UVs cannot escape the decoded frame.
+    const auto extreme = VideoScale::presentationGeometry(
+        1920, 1080, 1280, 720, ScaleMode::Fit, 10.0f, 1.0f, -1.0f);
+    assert(near(extreme.source.width, 480.0f));
+    assert(near(extreme.source.height, 270.0f));
+    assert(near(extreme.source.x, 1440.0f));
+    assert(near(extreme.source.y, 0.0f));
+
+    const auto belowOne = VideoScale::presentationGeometry(
+        1920, 1080, 1280, 720, ScaleMode::Stretch, 0.1f, 1.0f, 1.0f);
+    assert(near(belowOne.source.x, 0.0f));
+    assert(near(belowOne.source.y, 0.0f));
+    assert(near(belowOne.source.width, 1920.0f));
+    assert(near(belowOne.source.height, 1080.0f));
+
     const auto invalid = VideoScale::presentationGeometry(
         0, 1080, 1280, 720, ScaleMode::Fit);
     assert(near(invalid.source.width, 0.0f));
     assert(near(invalid.destination.width, 0.0f));
+
+    const auto invalidViewport = VideoScale::presentationGeometry(
+        1920, 1080, -1, 720, ScaleMode::Fit);
+    assert(near(invalidViewport.source.width, 0.0f));
+    assert(near(invalidViewport.destination.width, 0.0f));
 
     return 0;
 }
