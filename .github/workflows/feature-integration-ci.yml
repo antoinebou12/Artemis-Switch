@@ -25,6 +25,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Validate English and French localization JSON
+        run: |
+          python -m json.tool resources/i18n/en-US/main.json > /dev/null
+          python -m json.tool resources/i18n/fr/main.json > /dev/null
+
       - name: Configure unit suite
         run: cmake -S tests -B build/tests -DCMAKE_BUILD_TYPE=Debug
 
