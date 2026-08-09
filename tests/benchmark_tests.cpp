@@ -3,6 +3,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <iostream>
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -43,6 +44,9 @@ void testPercentileInterpolation() {
     const std::vector<double> values{1, 2, 3, 4, 5};
     near(BenchmarkAccumulator::percentile(values, 0.50), 3.0, 1e-9, "median");
     near(BenchmarkAccumulator::percentile(values, 0.95), 4.8, 1e-9, "p95");
+    near(BenchmarkAccumulator::percentile(values, -1.0), 1.0, 1e-9, "percentile clamps low");
+    near(BenchmarkAccumulator::percentile(values, 2.0), 5.0, 1e-9, "percentile clamps high");
+    near(BenchmarkAccumulator::percentile({}, 0.5), 0.0, 1e-9, "empty percentile");
 }
 
 void testCounterDeltas() {
@@ -55,6 +59,28 @@ void testCounterDeltas() {
     expect(summary.networkDroppedFrames == 1, "network drop counter uses delta");
     near(summary.durationSeconds, 2.0, 1e-9, "duration");
     near(summary.networkDropPercent, 100.0 / 121.0, 1e-6, "drop percentage");
+}
+
+void testCounterResetDoesNotUnderflow() {
+    BenchmarkAccumulator accumulator(60);
+    accumulator.addSample(makeSample(1000, 60.0f, 5000, 50));
+    accumulator.addSample(makeSample(2000, 60.0f, 10, 1));
+    const auto summary = accumulator.summarize();
+
+    expect(summary.receivedFrames == 0, "counter reset must not underflow received frames");
+    expect(summary.networkDroppedFrames == 0, "counter reset must not underflow dropped frames");
+    near(summary.networkDropPercent, 0.0, 1e-9, "counter reset does not create fake packet loss");
+}
+
+void testNonFiniteSamplesAreIgnored() {
+    BenchmarkAccumulator accumulator(60);
+    auto invalid = makeSample(0, std::numeric_limits<float>::quiet_NaN(), 100, 0);
+    accumulator.addSample(invalid);
+    accumulator.addSample(makeSample(1000, 60.0f, 160, 0));
+
+    const auto summary = accumulator.summarize();
+    near(summary.renderedFps.mean, 60.0, 1e-9, "NaN FPS sample is ignored");
+    expect(std::isfinite(summary.stabilityScore), "stability score remains finite");
 }
 
 void testCleanStreamScoresHigh() {
@@ -73,13 +99,36 @@ void testLossIsPenalized() {
     expect(accumulator.summarize().stabilityScore < 60.0,
            "multi-percent network loss should make profile undesirable");
 }
+
+void testQueueFaultsArePenalized() {
+    BenchmarkAccumulator clean(60);
+    auto cleanFirst = makeSample(0, 60.0f, 1000, 0);
+    auto cleanLast = makeSample(2000, 60.0f, 1120, 0);
+    clean.addSample(cleanFirst);
+    clean.addSample(cleanLast);
+
+    BenchmarkAccumulator faulty(60);
+    auto faultyFirst = cleanFirst;
+    auto faultyLast = cleanLast;
+    faultyLast.queueUnderflows = 4;
+    faultyLast.queueOverflowDrops = 2;
+    faultyLast.queueResyncs = 1;
+    faulty.addSample(faultyFirst);
+    faulty.addSample(faultyLast);
+
+    expect(faulty.summarize().stabilityScore < clean.summarize().stabilityScore,
+           "queue faults must lower stability score");
+}
 } // namespace
 
 int main() {
     testPercentileInterpolation();
     testCounterDeltas();
+    testCounterResetDoesNotUnderflow();
+    testNonFiniteSamplesAreIgnored();
     testCleanStreamScoresHigh();
     testLossIsPenalized();
+    testQueueFaultsArePenalized();
 
     if (failures) return EXIT_FAILURE;
     std::cout << "Artemis Switch benchmark tests passed\n";
