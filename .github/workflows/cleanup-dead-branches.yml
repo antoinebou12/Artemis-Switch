@@ -1,0 +1,58 @@
+name: Cleanup superseded Artemis branches
+
+on:
+  push:
+    branches:
+      - agent/artemis-switch-integration
+    paths:
+      - .github/cleanup-dead-branches.trigger
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout active integration branch
+        uses: actions/checkout@v4
+
+      - name: Delete superseded feature and consolidation branches
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          branches=(
+            agent/advanced-stream-options
+            agent/apollo-capabilities
+            agent/auto-tune
+            agent/benchmark-core
+            agent/benchmark-export
+            agent/ci-feature-integration
+            agent/consolidate-prs
+            agent/consolidation-trigger
+            agent/consolidation-trigger-2
+            agent/consolidation-trigger-3
+            agent/consolidation-trigger-4
+            agent/consolidation-trigger-5
+            agent/consolidation-trigger-6
+            agent/custom-stream-settings
+            agent/performance-lite
+            agent/quick-stream-menu
+            agent/scaling-modes
+            agent/switch-motion-options
+            agent/test-infrastructure
+            agent/zoom-pan
+          )
+
+          for branch in "${branches[@]}"; do
+            if git ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
+              echo "Deleting $branch"
+              git push origin --delete "$branch"
+            else
+              echo "Already absent: $branch"
+            fi
+          done
+
+          echo "Preserved: master"
+          echo "Preserved: agent/artemis-switch-integration"
