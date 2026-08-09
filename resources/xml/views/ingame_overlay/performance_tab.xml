@@ -14,7 +14,7 @@
             paddingRight="@style/brls/tab_details/padding_right"
             paddingBottom="@style/brls/tab_details/padding_bottom"
             paddingLeft="@style/brls/tab_details/padding_left">
-            <brls:Header title="Artemis Switch Performance"/>
+            <brls:Header title="@i18n/artemis/performance/title"/>
             <brls:DetailCell id="stream_profile"/>
             <brls:DetailCell id="network"/>
             <brls:DetailCell id="receive_latency"/>
@@ -23,14 +23,14 @@
             <brls:DetailCell id="packet_loss"/>
             <brls:DetailCell id="rendered_fps"/>
             <brls:DetailCell id="queue_depth"/>
-            <brls:Header title="Benchmark" paddingTop="60" lineTop="1px"/>
+            <brls:Header title="@i18n/artemis/performance/benchmark" paddingTop="60" lineTop="1px"/>
             <brls:DetailCell id="benchmark_summary"/>
             <brls:DetailCell id="benchmark_action"/>
             <brls:DetailCell id="benchmark_save"/>
             <brls:Header title="Auto Tune" paddingTop="60" lineTop="1px"/>
             <brls:DetailCell id="auto_tune_summary"/>
             <brls:DetailCell id="auto_tune_action"/>
-            <brls:Header title="Actions" paddingTop="60" lineTop="1px"/>
+            <brls:Header title="@i18n/artemis/performance/actions" paddingTop="60" lineTop="1px"/>
             <brls:DetailCell id="refresh"/>
         </brls:Box>
     </brls:ScrollingFrame>
