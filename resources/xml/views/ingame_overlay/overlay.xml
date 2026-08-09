@@ -1,13 +1,13 @@
 <brls:Box id="backplate" width="auto" height="auto" backgroundColor="@theme/brls/backdrop">
     <brls:AppletFrame id="applet" width="80%" height="auto" backgroundColor="@theme/brls/background">
         <brls:TabFrame>
-            <brls:Tab label="Options">
+            <brls:Tab label="@i18n/artemis/overlay/options">
                 <OptionsTab />
             </brls:Tab>
-            <brls:Tab label="Performance">
+            <brls:Tab label="@i18n/artemis/overlay/performance">
                 <PerformanceTab />
             </brls:Tab>
-            <brls:Tab label="Disconnect">
+            <brls:Tab label="@i18n/artemis/overlay/disconnect">
                 <LogoutTab />
             </brls:Tab>
         </brls:TabFrame>
