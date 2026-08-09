@@ -31,20 +31,47 @@ int main() {
     assert(json.find("\"width\": 1920") != std::string::npos);
     assert(json.find("\"codec\": \"HEVC\"") != std::string::npos);
     assert(json.find("\"stability_score\": 98.7000") != std::string::npos);
+    assert(json.find("\"runtime\"") != std::string::npos);
+
+    SwitchRuntimeMetadata runtime;
+    runtime.platform = "Nintendo Switch";
+    runtime.operationMode = "docked";
+    runtime.batteryPercent = 83;
+    runtime.batteryChargingKnown = true;
+    runtime.batteryCharging = true;
+    runtime.cpuClockHz = 1785000000u;
+    runtime.gpuClockHz = 614000000u;
+    runtime.memoryClockHz = 1862000000u;
+
+    const std::string switchJson = BenchmarkExport::toJson(profile, summary, runtime);
+    assert(switchJson.find("\"operation_mode\": \"docked\"") != std::string::npos);
+    assert(switchJson.find("\"battery_percent\": 83") != std::string::npos);
+    assert(switchJson.find("\"battery_charging_enabled\": true") != std::string::npos);
+    assert(switchJson.find("\"cpu_clock_hz\": 1785000000") != std::string::npos);
+    assert(switchJson.find("\"gpu_clock_hz\": 614000000") != std::string::npos);
+    assert(switchJson.find("\"memory_clock_hz\": 1862000000") != std::string::npos);
 
     ExportProfile escapedProfile = profile;
     escapedProfile.codec = "HEVC\"test\nvalue";
-    const std::string escapedJson = BenchmarkExport::toJson(escapedProfile, summary);
+    const std::string escapedJson = BenchmarkExport::toJson(escapedProfile, summary, runtime);
     assert(escapedJson.find("HEVC\\\"test\\nvalue") != std::string::npos);
 
     const std::string header = BenchmarkExport::csvHeader();
     assert(header.find("bitrate_kbps") != std::string::npos);
+    assert(header.find("cpu_clock_hz") != std::string::npos);
     assert(header.back() == '\n');
 
     escapedProfile.codec = "HEVC,custom";
-    const std::string row = BenchmarkExport::toCsvRow(escapedProfile, summary);
+    const std::string row = BenchmarkExport::toCsvRow(escapedProfile, summary, runtime);
     assert(row.find("1920,1080,60,20000,2,\"HEVC,custom\"") == 0);
+    assert(row.find("Nintendo Switch,docked,83,true,1785000000,614000000,1862000000") !=
+           std::string::npos);
     assert(row.back() == '\n');
+
+    SwitchRuntimeMetadata unknownCharging = runtime;
+    unknownCharging.batteryChargingKnown = false;
+    const std::string unknownJson = BenchmarkExport::toJson(profile, summary, unknownCharging);
+    assert(unknownJson.find("\"battery_charging_enabled\": null") != std::string::npos);
 
     const auto temp = std::filesystem::temp_directory_path() / "artemis-switch-export-test";
     std::error_code error;
@@ -57,6 +84,7 @@ int main() {
     assert(std::filesystem::exists(paths->json));
     assert(std::filesystem::exists(paths->csv));
     assert(readAll(paths->json).find("98.7000") != std::string::npos);
+    assert(readAll(paths->json).find("\"runtime\"") != std::string::npos);
     assert(readAll(paths->csv).find("width,height,fps") == 0);
 
     std::filesystem::remove_all(temp, error);
