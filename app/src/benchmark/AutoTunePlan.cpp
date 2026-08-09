@@ -3,9 +3,10 @@
 namespace artemis::benchmark {
 namespace {
 AutoTuneStep step(int width, int height, int bitrateKbps, int decoderThreads,
+                  const char* codec = "HEVC",
                   int warmupSeconds = 3, int benchmarkSeconds = 10) {
     AutoTuneStep result;
-    result.profile = {width, height, 60, bitrateKbps, decoderThreads, "HEVC"};
+    result.profile = {width, height, 60, bitrateKbps, decoderThreads, codec};
     result.warmupSeconds = warmupSeconds;
     result.benchmarkSeconds = benchmarkSeconds;
     return result;
@@ -13,23 +14,30 @@ AutoTuneStep step(int width, int height, int bitrateKbps, int decoderThreads,
 }
 
 std::vector<AutoTuneStep> AutoTunePlan::quickSwitchPlan() {
+    // Start with the manually validated Switch OLED region. The previous plan
+    // started at 15 Mbps, which skipped the low-latency 5-7 Mbps window entirely.
     return {
-        step(1280, 720, 15000, 2),
-        step(1920, 1080, 15000, 2),
-        step(1920, 1080, 20000, 2),
-        step(1920, 1080, 25000, 2),
-        step(1920, 1080, 30000, 2),
-        step(1920, 1080, 20000, 4),
+        step(1280, 720, 5000, 2),
+        step(1280, 720, 6000, 2),
+        step(1280, 720, 7000, 2),
+        step(1280, 720, 8000, 2),
+        step(1280, 720, 10000, 2),
+        step(1920, 1080, 7000, 2),
     };
 }
 
 std::vector<AutoTuneStep> AutoTunePlan::extendedSwitchPlan() {
     auto result = quickSwitchPlan();
-    result.push_back(step(1280, 720, 20000, 2));
-    result.push_back(step(1920, 1080, 35000, 2));
-    result.push_back(step(1920, 1080, 40000, 2));
-    result.push_back(step(1920, 1080, 25000, 3));
-    result.push_back(step(1920, 1080, 25000, 4));
+
+    // Codec crossover tests help distinguish a bitrate/network cliff from a
+    // decoder cost. Keep the high end bounded because latency, not throughput,
+    // is the optimization target on Switch.
+    result.push_back(step(1280, 720, 5000, 2, "H264"));
+    result.push_back(step(1280, 720, 7000, 2, "H264"));
+    result.push_back(step(1280, 720, 10000, 2, "H264"));
+    result.push_back(step(1920, 1080, 10000, 2));
+    result.push_back(step(1920, 1080, 12000, 2));
+    result.push_back(step(1280, 720, 7000, 4));
     return result;
 }
 
