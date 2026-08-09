@@ -3,6 +3,8 @@
 [![Unit Tests](https://github.com/antoinebou12/Artemis-Switch/actions/workflows/unit-tests.yml/badge.svg?branch=agent%2Fartemis-switch-integration)](https://github.com/antoinebou12/Artemis-Switch/actions/workflows/unit-tests.yml)
 [![Feature & Integration CI](https://github.com/antoinebou12/Artemis-Switch/actions/workflows/feature-integration-ci.yml/badge.svg?branch=agent%2Fartemis-switch-integration)](https://github.com/antoinebou12/Artemis-Switch/actions/workflows/feature-integration-ci.yml)
 [![All Builds](https://github.com/antoinebou12/Artemis-Switch/actions/workflows/all-builds.yml/badge.svg?branch=agent%2Fartemis-switch-integration)](https://github.com/antoinebou12/Artemis-Switch/actions/workflows/all-builds.yml)
+[![Release CD](https://github.com/antoinebou12/Artemis-Switch/actions/workflows/release.yml/badge.svg)](https://github.com/antoinebou12/Artemis-Switch/actions/workflows/release.yml)
+[![Latest Release](https://img.shields.io/github/v/release/antoinebou12/Artemis-Switch?display_name=tag&sort=semver)](https://github.com/antoinebou12/Artemis-Switch/releases)
 [![Platform](https://img.shields.io/badge/platform-Nintendo%20Switch-E60012)](#nintendo-switch)
 [![C++20](https://img.shields.io/badge/C%2B%2B-20-00599C)](CMakeLists.txt)
 [![Languages](https://img.shields.io/badge/UI-English%20%7C%20Fran%C3%A7ais-4c8bf5)](#localization)
@@ -13,7 +15,7 @@
 It keeps the existing Moonlight-Switch architecture instead of replacing it: **Borealis UI, Moonlight/GameStream, FFmpeg/NVDEC, deko3d, Joy-Con input, Sunshine compatibility, and the existing post-processing path remain the foundation.**
 
 > [!IMPORTANT]
-> Artemis Switch is under active development. PR #15 contains the current consolidated implementation. Features marked **Device validation** are implemented in code but still need a green Nintendo Switch build and real-hardware verification before a release is tagged.
+> Artemis Switch is under active development. PR #15 contains the current consolidated implementation. Features marked **Device validation** are implemented in code but still need a green Nintendo Switch build and real-hardware verification before the first stable release is tagged.
 
 ## Project status
 
@@ -33,7 +35,8 @@ It keeps the existing Moonlight-Switch architecture instead of replacing it: **B
 | Apollo capability detection | 🟡 Partial | Conservative detection with Sunshine-safe fallback |
 | Apollo virtual display / commands / clipboard | ⏳ Planned | Only verified Apollo protocol operations will be added |
 | French Artemis UI | ✅ Integrated | Artemis settings, overlay tabs and Performance UI use Borealis i18n |
-| CI | 🟡 In progress | Unit, sanitizer, localization and cross-feature integration gates are defined |
+| CI | 🟡 In progress | Unit, sanitizer, localization, release-contract and cross-feature gates are defined |
+| Release CD | ✅ Integrated | `v*` tags build/test/publish NRO, ELF, source bundles and SHA-256 checksums |
 
 ## Features
 
@@ -148,29 +151,60 @@ French currently covers the Artemis settings page, presentation/motion options, 
 
 | Gate | Purpose |
 |---|---|
-| **Unit Tests** | Portable C++20 policy, statistics, export and geometry tests |
+| **Unit Tests** | Portable C++20 policy, statistics, export, stream-profile and geometry tests |
 | **ASan + UBSan** | Memory and undefined-behavior checks for the portable feature suite |
-| **Localization validation** | Parses the English and French `main.json` dictionaries before compilation |
+| **Localization contract** | Every Artemis key referenced by C++/XML must exist in both English and French |
+| **Release contract** | CI verifies the CD workflow still requires NRO, ELF, source archives and checksums |
+| **Release package dry run** | Builds and inspects `.tar.gz` and `.zip` source bundles before any release tag |
 | **Feature & Integration CI** | Builds/runs the consolidated unit suite plus cross-feature integration tests |
 | **All Builds** | Existing platform build matrix, including the real Nintendo Switch `.nro` / `.elf` build |
+| **Release CD** | Re-runs quality gates and Switch build before publishing a `v*` GitHub Release |
 
-The live badges at the top target the active `agent/artemis-switch-integration` branch while PR #15 is under development.
+Additional regression coverage includes benchmark counter reset/NaN/queue-fault behavior, 4:3 Fit/Fill presentation, extreme Zoom/Pan clamping, and minimum/maximum stream-profile normalization.
+
+The development badges at the top target the active `agent/artemis-switch-integration` branch while PR #15 is under development.
+
+## Automatic releases
+
+`.github/workflows/release.yml` implements GitHub release CD.
+
+### Dry run
+
+Use **Actions → Release Artemis Switch → Run workflow** on a branch. A manual run executes the release quality gate, creates the real Switch NRO/ELF artifacts, and validates source packaging, but it **does not publish a GitHub Release**.
+
+### Publish a release
+
+After the desired commit is merged and validated, create and push a version tag such as:
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+The tag workflow will only publish after Feature & Integration CI and the Nintendo Switch build succeed.
+
+Every tagged release receives:
+
+| Asset | Purpose |
+|---|---|
+| `Artemis-Switch.nro` | Installable Nintendo Switch homebrew binary |
+| `Artemis-Switch.elf` | Debug/symbol build artifact |
+| `Artemis-Switch-X.Y.Z-source.tar.gz` | Source bundle including checked-out submodule contents |
+| `Artemis-Switch-X.Y.Z-source.zip` | ZIP variant of the source bundle |
+| `SHA256SUMS.txt` | SHA-256 checksums for all release artifacts |
+| GitHub auto-generated source archives | Standard GitHub tag source links |
+
+Tags containing a suffix such as `v0.1.0-beta.1` are automatically published as **pre-releases**. Re-running a tag workflow refreshes assets with `--clobber` instead of creating duplicate releases.
 
 ## Installation
 
-There is no release-ready package yet. Development builds currently inherit the Moonlight-Switch build target/file name.
+When a release is available, download `Artemis-Switch.nro` from the GitHub Releases page and place it on the SD card, for example:
 
-1. Build `Moonlight.nro` using the Switch toolchain.
-2. Copy it to your SD card, for example:
+```text
+sdmc:/switch/Artemis-Switch/Artemis-Switch.nro
+```
 
-   ```text
-   sdmc:/switch/Artemis-Switch/Artemis-Switch.nro
-   ```
-
-   Renaming the generated `.nro` is fine for the development build.
-
-3. Launch hbmenu using **Title Redirection / full RAM mode**.
-4. Start Artemis Switch.
+Launch hbmenu using **Title Redirection / full RAM mode**, then start Artemis Switch.
 
 ## Build
 
@@ -190,9 +224,13 @@ cmake -B build/switch -DCMAKE_BUILD_TYPE=Release -DPLATFORM_SWITCH=ON -DUSE_DEKO
 cmake --build build/switch --target Moonlight.nro --parallel
 ```
 
+CI copies the upstream build outputs to the release-facing names `Artemis-Switch.nro` and `Artemis-Switch.elf`.
+
 ### Portable tests
 
 ```bash
+python tests/i18n_consistency_test.py
+python tests/release_contract_test.py
 cmake -S tests -B build/tests -DCMAKE_BUILD_TYPE=Debug
 cmake --build build/tests --parallel
 ctest --test-dir build/tests --output-on-failure
