@@ -224,6 +224,8 @@ Artemis is Switch-first. Desktop and other ports keep Sunshine/GameStream stream
 
 See **[docs/OTHER_PLATFORMS.md](docs/OTHER_PLATFORMS.md)** for flags, build sketches, and links to Linux packaging docs.
 
+Larger community asks (AV1, NIS/SGSR/FSR upscalers, Apollo restart/reset) are scoped in **[docs/FEATURE_ROADMAP.md](docs/FEATURE_ROADMAP.md)**.
+
 ### Cross-feature integration tests
 
 ```bash
