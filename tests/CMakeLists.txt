@@ -155,6 +155,13 @@ add_artemis_test(stats_overlay_layout_test
     app/src/features/ui/StatsOverlayLayout.cpp
     app/src/features/ui)
 
+add_executable(upscaling_mode_select_test
+    "${REPO_ROOT}/tests/upscaling_mode_select_test.cpp")
+target_include_directories(upscaling_mode_select_test PRIVATE
+    "${REPO_ROOT}/app/src/features/video")
+target_compile_features(upscaling_mode_select_test PRIVATE cxx_std_20)
+add_test(NAME upscaling_mode_select_test COMMAND upscaling_mode_select_test)
+
 add_executable(display_coordinate_mapper_test
     "${REPO_ROOT}/tests/display_coordinate_mapper_test.cpp"
     "${REPO_ROOT}/app/src/features/video/DisplayCoordinateMapper.cpp"

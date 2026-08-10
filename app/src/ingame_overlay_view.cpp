@@ -14,6 +14,7 @@
 #include "streaming_input_overlay.hpp"
 #include "button_selecting_dialog.hpp"
 #include "UpscalingSupport.hpp"
+#include "features/video/UpscalingModeSelect.hpp"
 #include "video/VideoScaleStore.hpp"
 #include "features/input/ControllerTopology.hpp"
 #include "features/input/ControllerDiagnostics.hpp"
@@ -747,18 +748,29 @@ OptionsTab::OptionsTab(StreamingView* streamView) : streamView(streamView) {
             ditheringStrengthToSliderProgress(ditheringStrength));
         updateDitheringControls(Settings::instance().dithering());
 
+upscalingButton->removeFromSuperView(true);
 #if defined(PLATFORM_APPLE) && !defined(PLATFORM_TVOS)
-        upscalingButton->removeFromSuperView(true);
+        constexpr bool kMetalFxChoices = true;
         upscalingModeButton->init(
             "settings/upscaling"_i18n,
             {"hints/off"_i18n, "MetalFX", "FSR1"},
-            (int)Settings::instance().upscaling_mode(),
-            [](int value) { Settings::instance().set_upscaling_mode((UpscalingMode)value); });
+            artemis::video::upscaling_selector_index(
+                (int)Settings::instance().upscaling_mode(), kMetalFxChoices),
+            [](int value) {
+                Settings::instance().set_upscaling_mode((UpscalingMode)
+                    artemis::video::upscaling_mode_from_selector(value, true));
+            });
 #else
-        upscalingModeButton->removeFromSuperView(true);
-        upscalingButton->init(
-            "settings/upscaling"_i18n, Settings::instance().upscaling(),
-            [](bool value) { Settings::instance().set_upscaling(value); });
+        constexpr bool kMetalFxChoices = false;
+        upscalingModeButton->init(
+            "settings/upscaling"_i18n,
+            {"hints/off"_i18n, "FSR1"},
+            artemis::video::upscaling_selector_index(
+                (int)Settings::instance().upscaling_mode(), kMetalFxChoices),
+            [](int value) {
+                Settings::instance().set_upscaling_mode((UpscalingMode)
+                    artemis::video::upscaling_mode_from_selector(value, false));
+            });
 #endif
         rcasButton->init(
             "settings/rcas_sharpening"_i18n, Settings::instance().rcas(),
