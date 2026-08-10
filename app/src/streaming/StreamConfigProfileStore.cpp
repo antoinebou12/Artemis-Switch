@@ -22,7 +22,12 @@ namespace {
 
 std::filesystem::path storePath() {
     return std::filesystem::path(Settings::instance().working_dir()) /
-           "artemis_profiles.json";
+           profileStoreFilename();
+}
+
+std::filesystem::path legacyStorePath() {
+    return std::filesystem::path(Settings::instance().working_dir()) /
+           legacyProfileStoreFilename();
 }
 
 const char* scaleModeToString(artemis::video::ScaleMode mode) {
@@ -712,7 +717,24 @@ void StreamConfigProfileStore::reload() {
     m_loaded = true;
 
     json_error_t error{};
-    json_t* root = json_load_file(storePath().string().c_str(), 0, &error);
+    const auto primary = storePath();
+    json_t* root = json_load_file(primary.string().c_str(), 0, &error);
+    bool migratedFromLegacy = false;
+    if (!root || !json_is_object(root)) {
+        if (root)
+            json_decref(root);
+        root = nullptr;
+        const auto legacy = legacyStorePath();
+        std::error_code ec;
+        if (std::filesystem::exists(legacy, ec)) {
+            root = json_load_file(legacy.string().c_str(), 0, &error);
+            migratedFromLegacy = root && json_is_object(root);
+            if (!migratedFromLegacy && root) {
+                json_decref(root);
+                root = nullptr;
+            }
+        }
+    }
     if (!root || !json_is_object(root)) {
         if (root)
             json_decref(root);
@@ -752,6 +774,8 @@ void StreamConfigProfileStore::reload() {
     if (m_activeProfileId.empty() || !get(m_activeProfileId))
         m_activeProfileId =
             m_profiles.empty() ? std::string{} : m_profiles.front().id;
+    if (migratedFromLegacy)
+        save();
 }
 
 bool StreamConfigProfileStore::save() const {

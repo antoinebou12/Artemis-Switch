@@ -6,6 +6,12 @@
 
 namespace artemis::streaming {
 
+inline const char* profileStoreFilename() { return "profile.json"; }
+
+inline const char* legacyProfileStoreFilename() {
+    return "artemis_profiles.json";
+}
+
 inline int normalizeProfileHeight(int height) {
     constexpr int allowed[] = {360, 480, 720, 1080};
     int best = 720;

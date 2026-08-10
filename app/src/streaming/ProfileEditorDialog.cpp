@@ -11,14 +11,6 @@ using namespace brls::literals;
 namespace artemis::streaming {
 namespace {
 
-brls::Header* addHeader(brls::Box* content, const std::string& title) {
-    auto* header = new brls::Header();
-    header->setTitle(title);
-    header->setMarginTop(24);
-    content->addView(header);
-    return header;
-}
-
 brls::DetailCell* addDetail(brls::Box* content, const std::string& title,
                             const std::string& detail) {
     auto* cell = new brls::DetailCell();
@@ -104,8 +96,8 @@ void openProfileEditor(const std::string& profileId,
     }
 
     auto* outer = new brls::Box(brls::Axis::COLUMN);
-    outer->setWidth(900);
-    outer->setHeight(620);
+    outer->setWidth(820);
+    outer->setHeight(520);
 
     auto* scroll = new brls::ScrollingFrame();
     scroll->setGrow(1.0f);
@@ -128,8 +120,6 @@ void openProfileEditor(const std::string& profileId,
             "artemis/settings/profile_name"_i18n, "", 40, draft->name, 0);
         return true;
     });
-
-    addHeader(content, "artemis/settings/profile_section_video"_i18n);
 
     auto* resCell =
         addDetail(content, "settings/resolution"_i18n, heightLabel(draft->resolutionHeight));
@@ -232,30 +222,6 @@ void openProfileEditor(const std::string& profileId,
             draft->preventPacketLoss,
             [draft](bool v) { draft->preventPacketLoss = v; });
 
-    auto* decoderCell = addDetail(content, "settings/decoder_threads"_i18n,
-                                  std::to_string(draft->decoderThreads));
-    decoderCell->registerClickAction([draft, decoderCell](brls::View*) {
-        const std::vector<std::string> options = {"0", "2", "3", "4"};
-        int selected = 3;
-        for (size_t i = 0; i < options.size(); ++i) {
-            if (std::stoi(options[i]) == draft->decoderThreads)
-                selected = static_cast<int>(i);
-        }
-        auto* dropdown = new brls::Dropdown(
-            "settings/decoder_threads"_i18n, options,
-            [draft, decoderCell](int index) {
-                constexpr int values[] = {0, 2, 3, 4};
-                if (index >= 0 && index < 4)
-                    draft->decoderThreads = values[index];
-                decoderCell->setDetailText(
-                    std::to_string(draft->decoderThreads));
-            },
-            selected);
-        brls::Application::pushActivity(new brls::Activity(dropdown));
-        return true;
-    });
-
-    addHeader(content, "artemis/settings/profile_section_presentation"_i18n);
     auto* scaleCell = addDetail(content, "artemis/settings/video_scale_mode"_i18n,
                                 scaleLabel(draft->scaleMode));
     scaleCell->registerClickAction([draft, scaleCell](brls::View*) {
@@ -315,12 +281,6 @@ void openProfileEditor(const std::string& profileId,
         return true;
     });
 
-    addBool(content, "settings/dithering"_i18n, draft->dithering,
-            [draft](bool v) { draft->dithering = v; });
-    addBool(content, "settings/rcas_sharpening"_i18n, draft->rcas,
-            [draft](bool v) { draft->rcas = v; });
-
-    addHeader(content, "artemis/settings/profile_section_audio"_i18n);
     auto* audioCell =
         addDetail(content, "settings/stream_audio_configuration"_i18n,
                   draft->streamAudioConfiguration == STREAM_AUDIO_51_SURROUND
@@ -345,139 +305,6 @@ void openProfileEditor(const std::string& profileId,
             [draft](bool v) { draft->playAudioOnPc = v; });
     addBool(content, "settings/usops"_i18n, draft->sops,
             [draft](bool v) { draft->sops = v; });
-    addBool(content, "settings/terminate_app_on_disconnect"_i18n,
-            draft->terminateAppOnDisconnect,
-            [draft](bool v) { draft->terminateAppOnDisconnect = v; });
-
-    addHeader(content, "artemis/settings/profile_section_keyboard"_i18n);
-    auto* kbType = addDetail(content, "settings/keyboard_type"_i18n,
-                             draft->keyboardType == FULLSIZED
-                                 ? "Full"
-                                 : (draft->keyboardType == NUMPAD ? "Numpad"
-                                                                  : "Compact"));
-    kbType->registerClickAction([draft, kbType](brls::View*) {
-        const std::vector<std::string> options = {"Compact", "Full", "Numpad"};
-        int selected = draft->keyboardType == FULLSIZED ? 1
-                       : draft->keyboardType == NUMPAD  ? 2
-                                                        : 0;
-        auto* dropdown = new brls::Dropdown(
-            "settings/keyboard_type"_i18n, options,
-            [draft, kbType, options](int index) {
-                draft->keyboardType =
-                    index == 1 ? FULLSIZED : (index == 2 ? NUMPAD : COMPACT);
-                kbType->setDetailText(options[static_cast<size_t>(index)]);
-            },
-            selected);
-        brls::Application::pushActivity(new brls::Activity(dropdown));
-        return true;
-    });
-    auto* kbFingers =
-        addDetail(content, "settings/keyboard_fingers"_i18n,
-                  draft->keyboardFingers <= 0
-                      ? "hints/off"_i18n
-                      : std::to_string(draft->keyboardFingers));
-    kbFingers->registerClickAction([draft, kbFingers](brls::View*) {
-        const std::vector<std::string> options = {"3", "4", "5", "hints/off"_i18n};
-        int selected = draft->keyboardFingers <= 0 ? 3
-                       : draft->keyboardFingers == 4 ? 1
-                       : draft->keyboardFingers == 5 ? 2
-                                                     : 0;
-        auto* dropdown = new brls::Dropdown(
-            "settings/keyboard_fingers"_i18n, options,
-            [draft, kbFingers](int index) {
-                draft->keyboardFingers =
-                    index == 3 ? 0 : (index == 0 ? 3 : (index == 1 ? 4 : 5));
-                kbFingers->setDetailText(
-                    draft->keyboardFingers <= 0
-                        ? "hints/off"_i18n
-                        : std::to_string(draft->keyboardFingers));
-            },
-            selected);
-        brls::Application::pushActivity(new brls::Activity(dropdown));
-        return true;
-    });
-
-    addHeader(content, "artemis/settings/profile_section_mouse"_i18n);
-    addBool(content, "settings/touchscreen_mouse_mode"_i18n,
-            draft->touchscreenMouseMode,
-            [draft](bool v) { draft->touchscreenMouseMode = v; });
-    addBool(content, "settings/swap_mouse_keys"_i18n, draft->swapMouseKeys,
-            [draft](bool v) { draft->swapMouseKeys = v; });
-    addBool(content, "settings/swap_mouse_scroll"_i18n, draft->swapMouseScroll,
-            [draft](bool v) { draft->swapMouseScroll = v; });
-    addBool(content, "settings/swap_mouse_sticks"_i18n, draft->swapMouseSticks,
-            [draft](bool v) { draft->swapMouseSticks = v; });
-    auto* mouseSpeed = addDetail(
-        content, "settings/mouse_speed"_i18n,
-        fmt::format("{:.1f}x",
-                    0.1f + (draft->mouseSpeedMultiplier / 100.f) * 1.9f));
-    mouseSpeed->registerClickAction([draft, mouseSpeed](brls::View*) {
-        brls::Application::getImeManager()->openForNumber(
-            [draft, mouseSpeed](long number) {
-                draft->mouseSpeedMultiplier =
-                    std::clamp(static_cast<int>(number), 0, 100);
-                mouseSpeed->setDetailText(fmt::format(
-                    "{:.1f}x",
-                    0.1f + (draft->mouseSpeedMultiplier / 100.f) * 1.9f));
-            },
-            "settings/mouse_speed"_i18n, "0 - 100", 3,
-            std::to_string(draft->mouseSpeedMultiplier), "", "", 0);
-        return true;
-    });
-
-    addHeader(content, "artemis/settings/profile_section_controller"_i18n);
-    addBool(content, "settings/swap_ui"_i18n, draft->swapUiKeys,
-            [draft](bool v) { draft->swapUiKeys = v; });
-    addBool(content, "settings/swap_stick_to_dpad"_i18n, draft->swapStickToDpad,
-            [draft](bool v) { draft->swapStickToDpad = v; });
-    auto* dzL = addDetail(
-        content, "settings/deadzone/stick_left"_i18n,
-        fmt::format("{}%", static_cast<int>(draft->deadzoneLeft * 100.f)));
-    dzL->registerClickAction([draft, dzL](brls::View*) {
-        brls::Application::getImeManager()->openForNumber(
-            [draft, dzL](long number) {
-                draft->deadzoneLeft =
-                    std::clamp(static_cast<int>(number), 0, 90) / 100.f;
-                dzL->setDetailText(fmt::format(
-                    "{}%", static_cast<int>(draft->deadzoneLeft * 100.f)));
-            },
-            "settings/deadzone/stick_left"_i18n, "0 - 90", 2,
-            std::to_string(static_cast<int>(draft->deadzoneLeft * 100.f)), "",
-            "", 0);
-        return true;
-    });
-    auto* dzR = addDetail(
-        content, "settings/deadzone/stick_right"_i18n,
-        fmt::format("{}%", static_cast<int>(draft->deadzoneRight * 100.f)));
-    dzR->registerClickAction([draft, dzR](brls::View*) {
-        brls::Application::getImeManager()->openForNumber(
-            [draft, dzR](long number) {
-                draft->deadzoneRight =
-                    std::clamp(static_cast<int>(number), 0, 90) / 100.f;
-                dzR->setDetailText(fmt::format(
-                    "{}%", static_cast<int>(draft->deadzoneRight * 100.f)));
-            },
-            "settings/deadzone/stick_right"_i18n, "0 - 90", 2,
-            std::to_string(static_cast<int>(draft->deadzoneRight * 100.f)), "",
-            "", 0);
-        return true;
-    });
-    auto* rumble = addDetail(
-        content, "settings/rumble_force"_i18n,
-        fmt::format("{}%", static_cast<int>(draft->rumbleForce * 100.f)));
-    rumble->registerClickAction([draft, rumble](brls::View*) {
-        brls::Application::getImeManager()->openForNumber(
-            [draft, rumble](long number) {
-                draft->rumbleForce =
-                    std::clamp(static_cast<int>(number), 0, 100) / 100.f;
-                rumble->setDetailText(fmt::format(
-                    "{}%", static_cast<int>(draft->rumbleForce * 100.f)));
-            },
-            "settings/rumble_force"_i18n, "0 - 100", 3,
-            std::to_string(static_cast<int>(draft->rumbleForce * 100.f)), "", "",
-            0);
-        return true;
-    });
 
     scroll->setContentView(content);
     outer->addView(scroll);

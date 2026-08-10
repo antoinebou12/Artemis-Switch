@@ -1,18 +1,23 @@
 #include "StreamConfigProfileNormalize.hpp"
 
 #include <cassert>
+#include <cstring>
 
 using namespace artemis::streaming;
 
 int main() {
+    assert(std::strcmp(profileStoreFilename(), "profile.json") == 0);
+    assert(std::strcmp(legacyProfileStoreFilename(),
+                       "artemis_profiles.json") == 0);
+
     assert(normalizeProfileHeight(360) == 360);
     assert(normalizeProfileHeight(480) == 480);
     assert(normalizeProfileHeight(720) == 720);
     assert(normalizeProfileHeight(1080) == 1080);
     assert(normalizeProfileHeight(700) == 720);
     assert(normalizeProfileHeight(400) == 360);
-    assert(normalizeProfileHeight(900) == 1080);
-    assert(normalizeProfileHeight(0) == 720);
+    assert(normalizeProfileHeight(900) == 720);
+    assert(normalizeProfileHeight(0) == 360);
     assert(normalizeProfileHeight(-10) == 360);
 
     ProfileNormalizeInput profile;

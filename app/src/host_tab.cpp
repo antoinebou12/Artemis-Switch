@@ -12,6 +12,8 @@
 #include "main_tabs_view.hpp"
 #include "streaming/HostProfileKey.hpp"
 #include "streaming/HostStreamProfileUi.hpp"
+#include "streaming/ProfileEditorDialog.hpp"
+#include "streaming/StreamConfigProfileStore.hpp"
 
 using namespace brls::literals;
 
@@ -37,13 +39,6 @@ HostTab::HostTab(const Host& host) : host(host) {
 
     reloadHost();
 
-    streamProfile->setText("host/stream_profile"_i18n);
-    refreshStreamProfileLabel();
-    streamProfile->registerClickAction([this](View*) {
-        openProfilePicker();
-        return true;
-    });
-
     registerAction("host/rename"_i18n, ControllerButton::BUTTON_START,
                    [this](View* view) {
                        std::string title = this->host.hostname;
@@ -66,11 +61,19 @@ HostTab::HostTab(const Host& host) : host(host) {
                        return true;
                    });
 
-    registerAction("host/manage_profile"_i18n, ControllerButton::BUTTON_X,
+    registerAction("host/edit_profile"_i18n, ControllerButton::BUTTON_Y,
                    [this](View*) {
                        if (state != AVAILABLE)
                            return true;
-                       openProfileManage();
+                       quickEditProfile();
+                       return true;
+                   });
+
+    registerAction("host/delete_profile"_i18n, ControllerButton::BUTTON_X,
+                   [this](View*) {
+                       if (state != AVAILABLE)
+                           return true;
+                       quickDeleteProfile();
                        return true;
                    });
 
@@ -144,27 +147,46 @@ HostTab::HostTab(const Host& host) : host(host) {
     });
 }
 
-void HostTab::refreshStreamProfileLabel() {
-    streamProfile->setDetailText(artemis::streaming::profile_detail_label(
-        artemis::streaming::host_profile_key(host)));
-}
-
-void HostTab::openProfilePicker() {
-    artemis::streaming::open_host_profile_picker(
-        artemis::streaming::host_profile_key(host),
-        [this] { refreshStreamProfileLabel(); });
-}
-
 void HostTab::createProfileForHost() {
-    artemis::streaming::open_create_host_profile(
-        artemis::streaming::host_profile_key(host),
-        [this] { refreshStreamProfileLabel(); });
+    const auto key = artemis::streaming::host_profile_key(host);
+    brls::sync([key] {
+        artemis::streaming::openProfileEditor({}, key, [] {});
+    });
 }
 
-void HostTab::openProfileManage() {
-    artemis::streaming::open_manage_host_profile(
-        artemis::streaming::host_profile_key(host),
-        [this] { refreshStreamProfileLabel(); });
+void HostTab::quickEditProfile() {
+    const auto key = artemis::streaming::host_profile_key(host);
+    const auto selected =
+        artemis::streaming::StreamConfigProfileStore::instance().selectedForHost(
+            key);
+    brls::sync([key, selected] {
+        if (selected.empty()) {
+            artemis::streaming::openProfileEditor({}, key, [] {});
+        } else {
+            artemis::streaming::openProfileEditor(selected, key, [] {});
+        }
+    });
+}
+
+void HostTab::quickDeleteProfile() {
+    const auto key = artemis::streaming::host_profile_key(host);
+    const auto selected =
+        artemis::streaming::StreamConfigProfileStore::instance().selectedForHost(
+            key);
+    if (selected.empty()) {
+        showError("host/manage_profile_none"_i18n);
+        return;
+    }
+    brls::sync([key, selected] {
+        auto* confirm = new brls::Dialog("host/delete_profile_message"_i18n);
+        confirm->addButton("common/cancel"_i18n, [] {});
+        confirm->addButton("common/remove"_i18n, [key, selected] {
+            auto& store = artemis::streaming::StreamConfigProfileStore::instance();
+            store.remove(selected);
+            store.clearSelectedForHost(key);
+        });
+        confirm->open();
+    });
 }
 
 void HostTab::reloadHost() {
@@ -173,6 +195,7 @@ void HostTab::reloadHost() {
     header->setSubtitle(host_subtitle(host));
     connect->setText("host/wait"_i18n);
     setActionAvailable(ControllerButton::BUTTON_RB, false);
+    setActionAvailable(ControllerButton::BUTTON_Y, false);
     setActionAvailable(ControllerButton::BUTTON_X, false);
 
     ASYNC_RETAIN
@@ -190,6 +213,7 @@ void HostTab::reloadHost() {
                 connect->setText("host/connect"_i18n);
                 state = AVAILABLE;
                 setActionAvailable(ControllerButton::BUTTON_RB, true);
+                setActionAvailable(ControllerButton::BUTTON_Y, true);
                 setActionAvailable(ControllerButton::BUTTON_X, true);
             } else {
                 header->setTitle("host/status"_i18n + ": " +
@@ -197,6 +221,7 @@ void HostTab::reloadHost() {
                 connect->setText("host/wake_up"_i18n);
                 state = UNAVAILABLE;
                 setActionAvailable(ControllerButton::BUTTON_RB, false);
+                setActionAvailable(ControllerButton::BUTTON_Y, false);
                 setActionAvailable(ControllerButton::BUTTON_X, false);
             }
         });

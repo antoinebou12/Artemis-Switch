@@ -29,12 +29,6 @@
     <brls:BooleanCell id="forward_motion"/>
     <brls:BooleanCell id="console_motion_fallback"/>
 
-    <brls:Header title="@i18n/artemis/settings/profiles" paddingTop="60" lineTop="1px"/>
-    <brls:DetailCell id="default_profile"/>
-    <brls:DetailCell id="manage_profiles"/>
-    <brls:DetailCell id="export_profiles"/>
-    <brls:DetailCell id="import_profiles"/>
-
     <brls:Header title="@i18n/settings/vpn" paddingTop="60" lineTop="1px"/>
     <brls:BooleanCell id="wireguard_enabled"/>
     <brls:DetailCell id="wireguard_config_path"/>

@@ -2,8 +2,6 @@
 
 #include "Settings.hpp"
 #include "helper.hpp"
-#include "streaming/ProfileEditorDialog.hpp"
-#include "streaming/StreamConfigProfileStore.hpp"
 #include "streaming/StreamProfileStore.hpp"
 
 #if __has_include("features/stream/AdvancedStreamOptionsStore.hpp")
@@ -49,7 +47,6 @@
 #include <algorithm>
 #include <array>
 #include <cstdlib>
-#include <filesystem>
 #include <fmt/format.h>
 #include <vector>
 
@@ -361,31 +358,6 @@ ArtemisSettingsTab::ArtemisSettingsTab() {
             ? "settings/easytier_status_stub"_i18n
             : "settings/easytier_status_off"_i18n);
 
-    defaultProfile->setText("artemis/settings/default_profile"_i18n);
-    refreshDefaultProfileLabel();
-    defaultProfile->registerClickAction([this](View*) {
-        openDefaultProfilePicker();
-        return true;
-    });
-    manageProfiles->setText("artemis/settings/manage_profiles"_i18n);
-    manageProfiles->setDetailText("artemis/settings/manage_profiles_hint"_i18n);
-    manageProfiles->registerClickAction([this](View*) {
-        openManageProfiles();
-        return true;
-    });
-    exportProfiles->setText("artemis/settings/export_profiles"_i18n);
-    exportProfiles->setDetailText("artemis/settings/export_profiles_hint"_i18n);
-    exportProfiles->registerClickAction([this](View*) {
-        exportProfilesAction();
-        return true;
-    });
-    importProfiles->setText("artemis/settings/import_profiles"_i18n);
-    importProfiles->setDetailText("artemis/settings/import_profiles_hint"_i18n);
-    importProfiles->registerClickAction([this](View*) {
-        importProfilesAction();
-        return true;
-    });
-
     refreshValues();
 }
 
@@ -469,128 +441,4 @@ void ArtemisSettingsTab::editBitrate() {
         "artemis/settings/exact_bitrate_title"_i18n,
         "artemis/settings/exact_bitrate_hint"_i18n, 3,
         std::to_string(currentMbps), "", "", 0);
-}
-
-void ArtemisSettingsTab::refreshDefaultProfileLabel() {
-    auto& store = artemis::streaming::StreamConfigProfileStore::instance();
-    const auto id = store.activeProfileId();
-    if (auto profile = store.get(id))
-        defaultProfile->setDetailText(profile->name);
-    else
-        defaultProfile->setDetailText("host/stream_profile_global"_i18n);
-}
-
-void ArtemisSettingsTab::openDefaultProfilePicker() {
-    auto& store = artemis::streaming::StreamConfigProfileStore::instance();
-    const auto& profiles = store.list();
-    std::vector<std::string> options;
-    options.reserve(profiles.size());
-    int selected = 0;
-    const auto activeId = store.activeProfileId();
-    for (size_t i = 0; i < profiles.size(); ++i) {
-        options.push_back(profiles[i].name);
-        if (profiles[i].id == activeId)
-            selected = static_cast<int>(i);
-    }
-    if (options.empty())
-        return;
-
-    auto* dropdown = new Dropdown(
-        "artemis/settings/default_profile"_i18n, options,
-        [this](int index) {
-            auto& store =
-                artemis::streaming::StreamConfigProfileStore::instance();
-            const auto& profiles = store.list();
-            if (index < 0 || index >= static_cast<int>(profiles.size()))
-                return;
-            store.setActiveProfileId(profiles[static_cast<size_t>(index)].id);
-            store.applyToSettings(profiles[static_cast<size_t>(index)].id);
-            refreshDefaultProfileLabel();
-            refreshValues();
-        },
-        selected);
-    Application::pushActivity(new Activity(dropdown));
-}
-
-void ArtemisSettingsTab::openManageProfiles() {
-    auto& store = artemis::streaming::StreamConfigProfileStore::instance();
-    const auto& profiles = store.list();
-    std::vector<std::string> options;
-    options.reserve(profiles.size() + 1);
-    for (const auto& profile : profiles) {
-        options.push_back(fmt::format("{} ({}p {}fps)", profile.name,
-                                      profile.resolutionHeight, profile.fps));
-    }
-    options.push_back("artemis/settings/create_profile"_i18n);
-
-    auto* dropdown = new Dropdown(
-        "artemis/settings/manage_profiles"_i18n, options,
-        [this](int index) {
-            auto& store =
-                artemis::streaming::StreamConfigProfileStore::instance();
-            const auto profiles = store.list();
-            if (index == static_cast<int>(profiles.size())) {
-                artemis::streaming::openProfileEditor(
-                    {}, {}, [this] { refreshDefaultProfileLabel(); });
-                return;
-            }
-            if (index < 0 || index >= static_cast<int>(profiles.size()))
-                return;
-            const auto profile = profiles[static_cast<size_t>(index)];
-            auto* dialog = new Dialog(profile.name);
-            dialog->addButton("common/edit"_i18n, [this, id = profile.id] {
-                artemis::streaming::openProfileEditor(
-                    id, {}, [this] { refreshDefaultProfileLabel(); });
-            });
-            dialog->addButton("artemis/settings/duplicate_profile"_i18n,
-                              [this, profile] {
-                                  artemis::streaming::StreamConfigProfileStore::
-                                      instance()
-                                          .duplicate(profile.id, {});
-                                  refreshDefaultProfileLabel();
-                              });
-            dialog->addButton("common/remove"_i18n, [this, id = profile.id] {
-                auto* confirm =
-                    new Dialog("host/delete_profile_message"_i18n);
-                confirm->addButton("common/cancel"_i18n, [] {});
-                confirm->addButton("common/remove"_i18n, [this, id] {
-                    artemis::streaming::StreamConfigProfileStore::instance()
-                        .remove(id);
-                    refreshDefaultProfileLabel();
-                });
-                confirm->open();
-            });
-            dialog->addButton("common/close"_i18n, [] {});
-            dialog->open();
-        },
-        0);
-    Application::pushActivity(new Activity(dropdown));
-}
-
-void ArtemisSettingsTab::exportProfilesAction() {
-    const auto path =
-        std::filesystem::path(Settings::instance().working_dir()) /
-        "artemis_profiles_export.json";
-    if (artemis::streaming::StreamConfigProfileStore::instance().exportJson(
-            path.string())) {
-        showAlert(fmt::format("{} {}", "artemis/settings/export_profiles_done"_i18n,
-                              path.string()));
-    } else {
-        showError("artemis/settings/export_profiles_error"_i18n);
-    }
-}
-
-void ArtemisSettingsTab::importProfilesAction() {
-    const auto path =
-        std::filesystem::path(Settings::instance().working_dir()) /
-        "artemis_profiles_export.json";
-    std::string error;
-    if (artemis::streaming::StreamConfigProfileStore::instance().importJson(
-            path.string(), true, &error)) {
-        showAlert("artemis/settings/import_profiles_done"_i18n);
-        refreshDefaultProfileLabel();
-    } else {
-        showError(error.empty() ? "artemis/settings/import_profiles_error"_i18n
-                                : error);
-    }
 }

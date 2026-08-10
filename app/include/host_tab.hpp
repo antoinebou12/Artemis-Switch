@@ -19,7 +19,6 @@ class HostTab : public brls::Box {
     void reloadHost();
 
     BRLS_BIND(brls::DetailCell, connect, "connect");
-    BRLS_BIND(brls::DetailCell, streamProfile, "stream_profile");
     BRLS_BIND(brls::DetailCell, remove, "remove");
     BRLS_BIND(brls::Header, header, "header");
 
@@ -29,8 +28,7 @@ class HostTab : public brls::Box {
     uint64_t wakeRequestGeneration = 0;
     uint64_t canceledWakeRequestGeneration = 0;
 
-    void refreshStreamProfileLabel();
-    void openProfilePicker();
     void createProfileForHost();
-    void openProfileManage();
+    void quickEditProfile();
+    void quickDeleteProfile();
 };
