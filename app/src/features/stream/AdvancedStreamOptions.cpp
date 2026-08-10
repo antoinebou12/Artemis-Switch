@@ -1,15 +1,15 @@
 #include "AdvancedStreamOptions.hpp"
 
 #include <algorithm>
-#include <array>
 #include <cmath>
 
 namespace artemis::stream {
 
-std::vector<int> availableFrameRates(const AdvancedStreamOptions& options) {
-    if (options.unlockAllFrameRates)
-        return {30, 40, 60, 90, 120};
-    return {30, 40, 60};
+std::vector<int> availableFrameRates(const AdvancedStreamOptions&) {
+    // Keep the complete profile list visible. 90/120 FPS are explicit user
+    // choices rather than a second hidden/unlock setting that duplicates the
+    // frame-rate selector.
+    return {30, 40, 60, 90, 120};
 }
 
 int normalizeFrameRate(int requestedFps, const AdvancedStreamOptions& options) {
