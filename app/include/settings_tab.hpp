@@ -24,6 +24,7 @@ class SettingsTab : public brls::Box {
     BRLS_BIND(brls::SelectorCell, upscalingMode, "upscaling_mode");
     BRLS_BIND(BooleanSliderCell, rcas, "rcas");
     BRLS_BIND(brls::SelectorCell, fps, "fps");
+    BRLS_BIND(brls::SelectorCell, appLocale, "app_locale");
     BRLS_BIND(brls::SelectorCell, codec, "codec");
     BRLS_BIND(brls::BooleanCell, requestHdr, "request_hdr");
     BRLS_BIND(brls::SelectorCell, decoder, "decoder");
@@ -48,6 +49,7 @@ class SettingsTab : public brls::Box {
     BRLS_BIND(brls::SelectorCell, mouseInputTime, "mouse_input_time");
     BRLS_BIND(brls::DetailCell, mouseInputButtons, "mouse_input_buttons");
     BRLS_BIND(brls::SelectorCell, keyboardType, "keyboard_type");
+    BRLS_BIND(brls::SelectorCell, keyboardLocale, "keyboard_locale");
     BRLS_BIND(brls::SelectorCell, keyboardFingers, "keyboard_fingers");
     BRLS_BIND(brls::BooleanCell, volumeAmplification, "volume_amplification");
     BRLS_BIND(brls::BooleanCell, touchscreenMouseMode, "touchscreen_mouse_mode");

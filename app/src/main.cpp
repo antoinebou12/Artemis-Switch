@@ -38,6 +38,7 @@ unsigned int sceLibcHeapSize             = 24 * 1024 * 1024;
 
 #include "DiscoverManager.hpp"
 #include "MoonlightSession.hpp"
+#include "Settings.hpp"
 #include "SwitchMoonlightSessionDecoderAndRenderProvider.hpp"
 
 
@@ -119,6 +120,11 @@ int main(int argc, char* argv[]) {
     // Set log level
     // We recommend to use INFO for real apps
     brls::Logger::setLogLevel(brls::LogLevel::LOG_DEBUG);
+
+    // Apply persisted UI language before Borealis loads translations.
+    const auto appLocale = Settings::peek_app_locale();
+    brls::Platform::APP_LOCALE_DEFAULT =
+        appLocale == "auto" ? brls::LOCALE_AUTO : appLocale;
 
     // Init the app and i18n
     if (!brls::Application::init()) {

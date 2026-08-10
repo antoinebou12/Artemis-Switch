@@ -1,4 +1,5 @@
 #include "Settings.hpp"
+#include "../features/i18n/AppLocalePreference.hpp"
 #include <jansson.h>
 #include <algorithm>
 #include <cstring>
@@ -146,6 +147,41 @@ bool Settings::has_any_favorite() {
     return std::any_of(m_hosts.begin(), m_hosts.end(), [&](const auto &item) {
         return !item.favorites.empty();
     });
+}
+
+void Settings::set_app_locale(const std::string& locale) {
+    m_app_locale = artemis::i18n::normalize_app_locale(locale);
+}
+
+std::string Settings::peek_app_locale() {
+    for (const auto& path : artemis::i18n::settings_path_candidates()) {
+        if (!fs::exists(path)) {
+            continue;
+        }
+
+        json_t* root = json_load_file(path.c_str(), 0, nullptr);
+        if (!root || json_typeof(root) != JSON_OBJECT) {
+            if (root) {
+                json_decref(root);
+            }
+            continue;
+        }
+
+        std::string locale = "auto";
+        if (json_t* settings = json_object_get(root, "settings")) {
+            if (json_t* appLocale = json_object_get(settings, "app_locale")) {
+                if (json_typeof(appLocale) == JSON_STRING) {
+                    locale = artemis::i18n::normalize_app_locale(
+                        json_string_value(appLocale));
+                }
+            }
+        }
+
+        json_decref(root);
+        return locale;
+    }
+
+    return "auto";
 }
 
 void Settings::load() {
@@ -417,6 +453,22 @@ void Settings::load() {
                 }
             }
 
+            if (json_t* app_locale = json_object_get(settings, "app_locale")) {
+                if (json_typeof(app_locale) == JSON_STRING) {
+                    m_app_locale = artemis::i18n::normalize_app_locale(
+                        json_string_value(app_locale));
+                }
+            }
+
+            if (json_t* keyboard_locale = json_object_get(settings, "keyboard_locale")) {
+                if (json_typeof(keyboard_locale) == JSON_INTEGER) {
+                    m_keyboard_locale = static_cast<int>(json_integer_value(keyboard_locale));
+                    if (m_keyboard_locale < 0) {
+                        m_keyboard_locale = 0;
+                    }
+                }
+            }
+
             if (json_t* overlay_system_button = json_object_get(settings, "overlay_system_button")) {
                 if (json_typeof(overlay_system_button) == JSON_INTEGER) {
                     m_overlay_system_button = (ButtonOverrideType) json_integer_value(overlay_system_button);
@@ -570,6 +622,8 @@ void Settings::save() {
             json_object_set_new(settings, "current_mapping_layout", json_integer(m_current_mapping_layout));
             json_object_set_new(settings, "keyboard_type", json_integer(m_keyboard_type));
             json_object_set_new(settings, "keyboard_fingers", json_integer(m_keyboard_fingers));
+            json_object_set_new(settings, "app_locale", json_string(m_app_locale.c_str()));
+            json_object_set_new(settings, "keyboard_locale", json_integer(m_keyboard_locale));
             json_object_set_new(settings, "overlay_system_button", json_integer((int)m_overlay_system_button));
             json_object_set_new(settings, "guide_system_button", json_integer((int)m_guide_system_button));
 
