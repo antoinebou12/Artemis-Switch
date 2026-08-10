@@ -44,9 +44,7 @@ MoonlightInputManager::MoonlightInputManager() {
             if (!inputEnabled) return;
 
             if (offset.x != 0 || offset.y != 0) {
-                float multiplier =
-                        (float) Settings::instance().get_mouse_speed_multiplier() / 100.f *
-                        1.5f + 0.5f;
+                float multiplier = Settings::instance().mouse_speed_scale();
 
                 if (!this->inputDropped) {
                     sendRelativeMouseMove(
@@ -171,8 +169,12 @@ void MoonlightInputManager::sendDesktopMouseScroll(brls::Point scroll) {
 }
 
 void MoonlightInputManager::sendRelativeMouseMove(brls::Point offset) {
-    desktopMouseRemainder.x += offset.x;
-    desktopMouseRemainder.y += offset.y;
+    const auto rotation =
+        artemis::video::DisplayTransformStore::instance().get().rotation;
+    const auto transformed = artemis::video::localVectorToStream(
+        {offset.x, offset.y}, rotation);
+    desktopMouseRemainder.x += transformed.x;
+    desktopMouseRemainder.y += transformed.y;
 
     short deltaX = static_cast<short>(std::trunc(desktopMouseRemainder.x));
     short deltaY = static_cast<short>(std::trunc(desktopMouseRemainder.y));
@@ -214,6 +216,9 @@ void MoonlightInputManager::handleRumble(unsigned short controller,
         return;
     }
 
+    artemis::input::ControllerDiagnostics::instance().recordRumble(
+        controller, lowFreqMotor, highFreqMotor, steadyNowMs());
+
     float rumbleMultiplier = Settings::instance().get_rumble_force();
 
     rumbleCache[controller].lowFreqMotor = lowFreqMotor * rumbleMultiplier;
@@ -248,6 +253,33 @@ void MoonlightInputManager::handleRumbleTriggers(uint16_t controllerNumber,
         rumbleCache[controllerNumber].rightTriggerMotor);
 }
 
+void MoonlightInputManager::sampleDiagnostics() {
+    const auto reportedControllers = brls::Application::getPlatform()
+                                         ->getInputManager()
+                                         ->getControllersConnectedCount();
+    const int controllersCount =
+        artemis::input::clampControllerCount(reportedControllers);
+
+    for (int i = 0; i < controllersCount; i++) {
+        GamepadState gamepadState = getControllerState(i, false);
+        const bool handheld =
+#ifdef __SWITCH__
+            i == 0 && appletGetOperationMode() == AppletOperationMode_Handheld;
+#else
+            false;
+#endif
+        artemis::input::ControllerDiagnostics::instance().recordController(
+            i, true, handheld ? "Handheld" : "Controller",
+            static_cast<uint16_t>(gamepadState.buttonFlags),
+            gamepadState.leftTrigger, gamepadState.rightTrigger,
+            gamepadState.leftStickX, gamepadState.leftStickY,
+            gamepadState.rightStickX, gamepadState.rightStickY);
+    }
+
+    artemis::input::ControllerDiagnostics::instance().disconnectFrom(
+        controllersCount);
+}
+
 void MoonlightInputManager::dropInput() {
     if (inputDropped)
         return;
@@ -258,6 +290,7 @@ void MoonlightInputManager::dropInput() {
     pendingHorizontalScrollEvents = 0;
     desktopScrollAxis = DesktopScrollAxis::None;
     lastDesktopScrollEvent = {};
+    motionFallbackGate.reset();
 
     bool res = true;
     // Drop gamepad state
@@ -448,6 +481,18 @@ void MoonlightInputManager::handleControllers(bool specialKey) {
         // Touch/mouse assist belongs to the primary player only. Other local
         // controllers must continue sending independent input.
         GamepadState gamepadState = getControllerState(i, specialKey && i == 0);
+        const bool handheld =
+#ifdef __SWITCH__
+            i == 0 && appletGetOperationMode() == AppletOperationMode_Handheld;
+#else
+            false;
+#endif
+        artemis::input::ControllerDiagnostics::instance().recordController(
+            i, true, handheld ? "Handheld" : "Controller",
+            static_cast<uint16_t>(gamepadState.buttonFlags),
+            gamepadState.leftTrigger, gamepadState.rightTrigger,
+            gamepadState.leftStickX, gamepadState.leftStickY,
+            gamepadState.rightStickX, gamepadState.rightStickY);
 
         if (topologyChanged || !gamepadState.is_equal(lastGamepadStates[i])) {
             lastGamepadStates[i] = gamepadState;
@@ -460,6 +505,9 @@ void MoonlightInputManager::handleControllers(bool specialKey) {
                 brls::Logger::info("StreamingView: error sending input data");
         }
     }
+
+    artemis::input::ControllerDiagnostics::instance().disconnectFrom(
+        controllersCount);
 
     lastControllerCount = controllersCount;
 }
@@ -480,8 +528,12 @@ void MoonlightInputManager::handleInput(bool ignoreTouch) {
     std::vector<brls::RawTouchState> states;
     brls::Application::getPlatform()->getInputManager()->updateTouchStates(&states);
 
-    //Do not use gamepad for mouse controll assist if touchscreen mode enabled
-    bool specialKey = !ignoreTouch && !Settings::instance().touchscreen_mouse_mode() && states.size() == 1;
+    const auto pointer = artemis::input::InputSettingsStore::instance().pointer();
+    const bool trackpadMode = artemis::input::isTrackpadMode(pointer.mode);
+
+    // Controller mouse assist belongs to the touchpad modes. A physical mouse
+    // remains independent and is handled below for every pointer mode.
+    bool specialKey = !ignoreTouch && trackpadMode && states.size() == 1;
 
     handleControllers(specialKey);
 
@@ -497,7 +549,7 @@ void MoonlightInputManager::handleInput(bool ignoreTouch) {
     static MouseStateS lastMouseState;
 
     MouseStateS mouseState;
-    if (!Settings::instance().touchscreen_mouse_mode()) {
+    if (trackpadMode) {
         mouseState = {
                 .scroll_y = stickScrolling,
                 .l_pressed = (specialKey && controller.buttons[brls::BUTTON_RT]) || mouse.leftButton,
@@ -558,19 +610,18 @@ void MoonlightInputManager::handleInput(bool ignoreTouch) {
         LiSendScrollEvent(mouseState.scroll_y > 0 ? 1 : -1);
     }
 
-    if (!Settings::instance().touchscreen_mouse_mode()) {
+    if (trackpadMode) {
         // Do not process touch events, useful if onscreen keyboard is presented
         if (ignoreTouch) { return; }
 
         if (panStatus.has_value()) {
-            float multiplier =
-                    Settings::instance().get_mouse_speed_multiplier() / 100.f * 1.5f +
-                    0.5f;
-            LiSendMouseMoveEvent(-panStatus->delta.x * multiplier,
-                                 -panStatus->delta.y * multiplier);
+            const float legacyMultiplier = Settings::instance().mouse_speed_scale();
+            sendRelativeMouseMove({
+                -panStatus->delta.x * legacyMultiplier * pointer.sensitivityX,
+                -panStatus->delta.y * legacyMultiplier * pointer.sensitivityY});
             panStatus.reset();
         }
-    } else {
+    } else if (pointer.mode == artemis::input::PointerMode::MultiTouch) {
         uint8_t eventType;
 
         auto touches = brls::Application::currentTouchState;
@@ -599,13 +650,21 @@ void MoonlightInputManager::handleInput(bool ignoreTouch) {
                 activeTouchIDs.erase(touch.fingerId);
             }
 
-            if (LiSendTouchEvent(eventType, touch.fingerId, touch.position.x / (float) Application::contentWidth,
-                                 touch.position.y / (float) Application::contentHeight, 0, 0, 0, LI_ROT_UNKNOWN) ==
+            const auto mapped =
+                artemis::video::DisplayCoordinateMapper::instance().localToStream(
+                {touch.position.x / static_cast<float>(Application::contentWidth),
+                 touch.position.y / static_cast<float>(Application::contentHeight)});
+            if (!mapped)
+                continue;
+            if (LiSendTouchEvent(eventType, touch.fingerId, mapped->x, mapped->y,
+                                 0, 0, 0, LI_ROT_UNKNOWN) ==
                 LI_ERR_UNSUPPORTED && i == 0) {
                 // Fallback to move cursor and click if touch unsupported
                 if (touch.phase != TouchPhase::NONE) {
-                    LiSendMousePositionEvent(touch.position.x, touch.position.y, Application::contentWidth,
-                                             Application::contentHeight);
+                    LiSendMousePositionEvent(
+                        mapped->x * Application::contentWidth,
+                        mapped->y * Application::contentHeight,
+                        Application::contentWidth, Application::contentHeight);
                 }
                 if (touch.phase == TouchPhase::START) {
                     LiSendMouseButtonEvent(BUTTON_ACTION_PRESS, BUTTON_MOUSE_LEFT);
@@ -614,6 +673,38 @@ void MoonlightInputManager::handleInput(bool ignoreTouch) {
                     LiSendMouseButtonEvent(BUTTON_ACTION_RELEASE, BUTTON_MOUSE_LEFT);
                 }
             }
+        }
+    } else if (artemis::input::isAbsoluteMode(pointer.mode) && !ignoreTouch) {
+        auto touches = brls::Application::currentTouchState;
+        for (const auto& touch : touches) {
+            if (touch.view && touch.view->hasParent() &&
+                dynamic_cast<StreamingView*>(touch.view->getParent()) == nullptr)
+                continue;
+
+            const float nx = touch.position.x / (float) Application::contentWidth;
+            const float ny = touch.position.y / (float) Application::contentHeight;
+            if (nx < pointer.region.left || nx > pointer.region.right ||
+                ny < pointer.region.top || ny > pointer.region.bottom)
+                continue;
+
+            if (touch.phase != TouchPhase::NONE) {
+                const auto mapped =
+                    artemis::video::DisplayCoordinateMapper::instance()
+                        .localToStream({nx, ny});
+                if (!mapped)
+                    continue;
+                LiSendMousePositionEvent(
+                    mapped->x * Application::contentWidth,
+                    mapped->y * Application::contentHeight,
+                    Application::contentWidth, Application::contentHeight);
+            }
+            const int button = pointer.mode == artemis::input::PointerMode::AbsoluteSwapped
+                                   ? BUTTON_MOUSE_RIGHT
+                                   : BUTTON_MOUSE_LEFT;
+            if (touch.phase == TouchPhase::START && pointer.tapToClick)
+                LiSendMouseButtonEvent(BUTTON_ACTION_PRESS, button);
+            else if (touch.phase == TouchPhase::END && pointer.tapToClick)
+                LiSendMouseButtonEvent(BUTTON_ACTION_RELEASE, button);
         }
     }
 }
@@ -648,19 +739,36 @@ bool MoonlightInputManager::moveActiveWindowToDisplay(bool moveRight) {
     const auto direction = moveRight
         ? artemis::input::DisplayDirection::Right
         : artemis::input::DisplayDirection::Left;
-    const auto events = artemis::input::moveActiveWindowShortcut(direction);
+    const short arrow = direction == artemis::input::DisplayDirection::Right
+                            ? artemis::input::VirtualKeyRightArrow
+                            : artemis::input::VirtualKeyLeftArrow;
+    return sendKeyboardShortcut({artemis::input::VirtualKeyLeftWindows,
+                                 artemis::input::VirtualKeyLeftShift, arrow});
+}
 
-    bool sent = true;
-    for (const auto& event : events) {
-        // Supplying no modifier mask keeps the Win key compatible with older
-        // GameStream hosts. The reliable key-down sequence itself holds the
-        // modifiers, and the final events always release them.
-        sent &= LiSendKeyboardEvent(
-                    event.virtualKey,
-                    event.pressed ? KEY_ACTION_DOWN : KEY_ACTION_UP,
-                    0) == 0;
+bool MoonlightInputManager::sendKeyboardShortcut(const std::vector<short>& keys) {
+    const auto events = artemis::input::shortcutEvents(keys);
+    if (events.empty()) return false;
+
+    std::vector<short> pressed;
+    pressed.reserve(keys.size());
+    for (const short key : keys) {
+        if (LiSendKeyboardEvent(key, KEY_ACTION_DOWN, 0) != 0) {
+            for (auto it = pressed.rbegin(); it != pressed.rend(); ++it)
+                LiSendKeyboardEvent(*it, KEY_ACTION_UP, 0);
+            return false;
+        }
+        pressed.push_back(key);
     }
-    return sent;
+
+    // Keep the chord down long enough for the host to observe it, then always
+    // release in reverse order. dropInput() provides the disconnect/failure
+    // safety net if the delayed callback cannot run.
+    brls::delay(50, [pressed] {
+        for (auto it = pressed.rbegin(); it != pressed.rend(); ++it)
+            LiSendKeyboardEvent(*it, KEY_ACTION_UP, 0);
+    });
+    return true;
 }
 
 short MoonlightInputManager::glfwKeyToVKKey(BrlsKeyboardScancode key) {

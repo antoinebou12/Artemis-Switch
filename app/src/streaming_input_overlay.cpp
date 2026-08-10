@@ -93,10 +93,7 @@ void StreamingInputOverlay::draw(NVGcontext* vg, float x, float y, float width,
             y = 0;
 
         if (x != 0 || y != 0) {
-            float multiplier =
-                Settings::instance().get_mouse_speed_multiplier() / 100.f *
-                    1.5f +
-                0.5f;
+            float multiplier = Settings::instance().mouse_speed_scale();
             LiSendMouseMoveEvent(x * multiplier, y * multiplier);
         }
 

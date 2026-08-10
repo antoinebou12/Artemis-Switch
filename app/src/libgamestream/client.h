@@ -23,6 +23,8 @@
 #include "xml.h"
 #include <Limelight.h>
 #include <stdbool.h>
+#include <cstdint>
+#include <vector>
 
 #define MIN_SUPPORTED_GFE_VERSION 3
 #define MAX_SUPPORTED_GFE_VERSION 7
@@ -36,12 +38,19 @@ typedef struct _SERVER_DATA {
     bool paired;
     bool supports4K;
     int currentGame;
+    std::string currentGameUuid;
     int serverMajorVersion;
     std::string gsVersion;
     std::string hostname;
     SERVER_INFORMATION serverInfo;
     unsigned short httpPort;
     unsigned short httpsPort;
+    bool virtualDisplayCapable = false;
+    bool virtualDisplayDriverReady = false;
+    uint32_t permission = 0;
+    bool hasApolloPermissionField = false;
+    std::vector<std::string> serverCommands;
+    bool isApollo() const;
     bool isSunshine() const;
 } SERVER_DATA, *PSERVER_DATA;
 
@@ -50,8 +59,21 @@ std::string gs_error();
 
 int gs_init(PSERVER_DATA server, const std::string address);
 int gs_app_boxart(PSERVER_DATA server, int app_id, Data* out);
-int gs_start_app(PSERVER_DATA server, PSTREAM_CONFIGURATION config, int appId, bool sops, bool localaudio, int gamepad_mask);
+struct APOLLO_LAUNCH_OPTIONS {
+    bool virtualDisplay = false;
+    std::string appUuid;
+    int width = 0;
+    int height = 0;
+    int refreshRate = 0;
+};
+
+int gs_start_app(PSERVER_DATA server, PSTREAM_CONFIGURATION config, int appId,
+                 bool sops, bool localaudio, int gamepad_mask,
+                 const APOLLO_LAUNCH_OPTIONS* apolloOptions = nullptr);
 int gs_applist(PSERVER_DATA server, PAPP_LIST* app_list);
 int gs_unpair(PSERVER_DATA server);
 int gs_pair(PSERVER_DATA server, char* pin);
 int gs_quit_app(PSERVER_DATA server);
+int gs_clipboard_get(PSERVER_DATA server, std::string* text, long* httpStatus = nullptr);
+int gs_clipboard_set(PSERVER_DATA server, const std::string& text,
+                     long* httpStatus = nullptr);

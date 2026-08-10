@@ -1,6 +1,8 @@
 #pragma once
 
 #include <string>
+#include <cstdint>
+#include <vector>
 
 namespace artemis::host {
 
@@ -10,9 +12,13 @@ struct HostCapabilities {
     HostKind kind = HostKind::Unknown;
     bool standardGameStream = true;
     bool virtualDisplay = false;
+    bool virtualDisplayDriverReady = false;
     bool serverCommands = false;
     bool clipboardSync = false;
     bool inputOnly = false;
+    bool permissionAdvertised = false;
+    uint32_t permissions = 0;
+    std::vector<std::string> serverCommandList;
     std::string detectionReason;
 };
 
@@ -28,6 +34,11 @@ public:
     static HostCapabilities standardSunshine();
     static HostCapabilities apollo();
     static HostCapabilities detect(const HostMetadata& metadata);
+    static HostCapabilities fromApolloServerInfo(
+        bool virtualDisplayCapable, bool virtualDisplayDriverReady,
+        bool permissionAdvertised, uint32_t permissions,
+        std::vector<std::string> serverCommands,
+        bool currentAppHasUuid);
 };
 
 } // namespace artemis::host

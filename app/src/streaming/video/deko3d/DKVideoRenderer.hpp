@@ -46,6 +46,10 @@ class DKVideoRenderer : public IVideoRenderer {
     int m_frame_height = 0;
     int m_screen_width = 0;
     int m_screen_height = 0;
+    float m_present_x = 0.0f;
+    float m_present_y = 0.0f;
+    float m_present_width = 0.0f;
+    float m_present_height = 0.0f;
 
     brls::SwitchVideoContext* vctx = nullptr;
     dk::Device dev;
@@ -144,6 +148,7 @@ class DKVideoRenderer : public IVideoRenderer {
     float m_artemis_pan_x = 0.0f;
     float m_artemis_pan_y = 0.0f;
     bool m_artemis_force_full_range = false;
+    int m_artemis_rotation = 0;
 
     VideoRenderStats m_video_render_stats_progress = {};
     VideoRenderStats m_video_render_stats_cache = {};

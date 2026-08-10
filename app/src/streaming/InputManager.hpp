@@ -12,6 +12,7 @@
 #include <borealis.hpp>
 #include <chrono>
 #include <optional>
+#include <vector>
 
 // Moonlight ready gamepad
 struct GamepadState {
@@ -53,6 +54,8 @@ class MoonlightInputManager : public Singleton<MoonlightInputManager> {
     MoonlightInputManager();
     void dropInput();
     void handleInput(bool ignoreTouch = false);
+    // Sample pads into ControllerDiagnostics without requiring stream focus.
+    void sampleDiagnostics();
     void handleRumble(unsigned short controller, unsigned short lowFreqMotor, unsigned short highFreqMotor);
     void handleRumbleTriggers(unsigned short controller, unsigned short lowFreqMotor, unsigned short highFreqMotor);
     void updateTouchScreenPanDelta(brls::PanGestureStatus panStatus);
@@ -60,6 +63,7 @@ class MoonlightInputManager : public Singleton<MoonlightInputManager> {
     void setInputEnabled(bool enabled) { inputEnabled = enabled; }
     static void leftMouseClick();
     static void rightMouseClick();
+    static bool sendKeyboardShortcut(const std::vector<short>& keys);
     static bool moveActiveWindowToDisplay(bool moveRight);
 
   private:

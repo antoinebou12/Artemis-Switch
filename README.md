@@ -44,7 +44,7 @@ It keeps the existing Moonlight-Switch architecture instead of replacing it: **B
 |---|---|
 | Custom resolution | Persistent width / height override used by `MoonlightSession` |
 | Exact bitrate | 1–100 Mbps configuration saved for the next stream connection |
-| Frame rates | 30 / 40 / 60 FPS plus gated 90 / 120 FPS options |
+| Frame rates | 30 / 40 / 60 / 90 / 120 FPS (always available) |
 | Video codecs | H.264 and HEVC, using the existing decoder path |
 | Presentation | Fit, Fill, Stretch, Zoom and Pan on the Switch deko3d path |
 | Full range | Host color-range negotiation plus Switch-side deko3d conversion |
@@ -245,6 +245,14 @@ See [`docs/ARTEMIS_SWITCH_INTEGRATION_PLAN.md`](docs/ARTEMIS_SWITCH_INTEGRATION_
 ## Upstream and credits
 
 Artemis Switch is based on [XITRIX/Moonlight-Switch](https://github.com/XITRIX/Moonlight-Switch), which is part of the wider [Moonlight Game Streaming](https://github.com/moonlight-stream) ecosystem.
+
+It integrates with:
+
+| Project | Role | Link |
+|---|---|---|
+| [ClassicOldSong/Apollo](https://github.com/ClassicOldSong/Apollo) | Sunshine-fork host with virtual display and server commands | Host |
+| [ClassicOldSong/moonlight-android](https://github.com/ClassicOldSong/moonlight-android) | Artemis Android (Moonlight Noir) client | Reference client |
+| [LizardByte/Sunshine](https://github.com/LizardByte/Sunshine) | Standard GameStream host compatibility baseline | Host |
 
 Major upstream components remain central to the project: Moonlight common code, Sunshine/GameStream compatibility, Borealis, FFmpeg/NVDEC, deko3d and libnx. Artemis/Apollo behavior is added only where it maps cleanly to the native Switch client.
 

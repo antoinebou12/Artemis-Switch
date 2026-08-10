@@ -18,15 +18,20 @@
  */
 
 #include "Data.hpp"
+#include <vector>
 #pragma once
 
 typedef struct _APP_LIST {
     char* name;
+    char* uuid;
     int id;
+    int server_order;
     struct _APP_LIST* next;
 } APP_LIST, *PAPP_LIST;
 
 int xml_search(const Data& data, const std::string node, int* result);
 int xml_search(const Data& data, const std::string node, std::string* result);
+int xml_search_all(const Data& data, const std::string node,
+                   std::vector<std::string>* results);
 int xml_applist(const Data& data, PAPP_LIST* app_list);
 int xml_status(const Data& data);

@@ -7,19 +7,24 @@ using artemis::stream::availableFrameRates;
 using artemis::stream::normalizeFrameRate;
 
 int main() {
-    AdvancedStreamOptions locked;
-    assert((availableFrameRates(locked) == std::vector<int>{30, 40, 60}));
-    assert(normalizeFrameRate(90, locked) == 60);
+    AdvancedStreamOptions options;
+    assert((availableFrameRates(options) ==
+            std::vector<int>{30, 40, 60, 90, 120}));
+    assert(normalizeFrameRate(90, options) == 90);
+    assert(normalizeFrameRate(92, options) == 90);
+    assert(normalizeFrameRate(118, options) == 120);
 
-    AdvancedStreamOptions unlocked;
-    unlocked.unlockAllFrameRates = true;
-    assert((availableFrameRates(unlocked) == std::vector<int>{30, 40, 60, 90, 120}));
-    assert(normalizeFrameRate(92, unlocked) == 90);
-    assert(normalizeFrameRate(118, unlocked) == 120);
+    // Legacy unlock flag must not change the exposed list.
+    options.unlockAllFrameRates = false;
+    assert((availableFrameRates(options) ==
+            std::vector<int>{30, 40, 60, 90, 120}));
+    options.unlockAllFrameRates = true;
+    assert((availableFrameRates(options) ==
+            std::vector<int>{30, 40, 60, 90, 120}));
 
-    unlocked.forceFullRangeVideo = true;
-    unlocked.preventPacketLoss = true;
-    assert(unlocked.forceFullRangeVideo);
-    assert(unlocked.preventPacketLoss);
+    options.forceFullRangeVideo = true;
+    options.preventPacketLoss = true;
+    assert(options.forceFullRangeVideo);
+    assert(options.preventPacketLoss);
     return 0;
 }

@@ -95,11 +95,13 @@ void KeyboardView::createNumpadLayout() {
     winButton->setWidth(120);
     fourthRow->addView(winButton);
 
+    fourthRow->addView(createLocaleSelectorButton(80));
+
     ButtonView* spaceButton = new ButtonView(this);
     spaceButton->setKey(VK_SPACE);
     spaceButton->charLabel->setFontSize(21);
     spaceButton->setMargins(4, 4, 4, 4);
-    spaceButton->setWidth(464);
+    spaceButton->setWidth(384);
     fourthRow->addView(spaceButton);
 
     ButtonView* ctrlButton = new ButtonView(this);

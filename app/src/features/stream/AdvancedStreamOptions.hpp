@@ -5,6 +5,7 @@
 namespace artemis::stream {
 
 struct AdvancedStreamOptions {
+    // Kept for backward-compatible JSON load; ignored by availableFrameRates().
     bool unlockAllFrameRates = false;
     bool forceFullRangeVideo = false;
     bool preventPacketLoss = false;

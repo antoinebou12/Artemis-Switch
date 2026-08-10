@@ -15,6 +15,7 @@
 #include "button_selecting_dialog.hpp"
 #include "mapping_layout_editor.hpp"
 #include "UpscalingSupport.hpp"
+#include "features/input/InputSettingsStore.hpp"
 #include <cmath>
 #include <iomanip>
 #include <sstream>
@@ -246,6 +247,7 @@ SettingsTab::SettingsTab() {
         "30",
         "40",
         "60",
+        "90",
         "120",
     };
 #endif
@@ -262,7 +264,8 @@ SettingsTab::SettingsTab() {
         GET_SETTINGS(fps, 30, 0);
         GET_SETTINGS(fps, 40, 1);
         GET_SETTINGS(fps, 60, 2);
-        GET_SETTINGS(fps, 120, 3);
+        GET_SETTINGS(fps, 90, 3);
+        GET_SETTINGS(fps, 120, 4);
 #endif
         DEFAULT;
     }
@@ -278,7 +281,8 @@ SettingsTab::SettingsTab() {
             SET_SETTING(0, set_fps(30));
             SET_SETTING(1, set_fps(40));
             SET_SETTING(2, set_fps(60));
-            SET_SETTING(3, set_fps(120));
+            SET_SETTING(3, set_fps(90));
+            SET_SETTING(4, set_fps(120));
 #endif
             DEFAULT;
         }
@@ -719,6 +723,9 @@ SettingsTab::SettingsTab() {
                                Settings::instance().touchscreen_mouse_mode(),
                                [this](bool value) {
                                    Settings::instance().set_touchscreen_mouse_mode(value);
+                                   auto pointer = artemis::input::InputSettingsStore::instance().pointer();
+                                   pointer.mode = artemis::input::pointerModeFromLegacyTouchscreen(value);
+                                   artemis::input::InputSettingsStore::instance().setPointer(pointer);
                                });
 
     swapMouseKeys->init("settings/swap_mouse_keys"_i18n,
@@ -736,13 +743,19 @@ SettingsTab::SettingsTab() {
     float mouseProgress =
         (Settings::instance().get_mouse_speed_multiplier() / 100.0f);
     mouseSpeedSlider->getProgressEvent()->subscribe([this](float value) {
-        float multiplier = value * 1.5f + 0.5f;
+        Settings::instance().set_mouse_speed_multiplier(int(value * 100));
         std::stringstream stream;
-        stream << std::fixed << std::setprecision(1) << multiplier;
-        mouseSpeedHeader->setSubtitle("x" + stream.str());
-        Settings::instance().set_mouse_speed_multiplier(value * 100);
+        stream << std::fixed << std::setprecision(1)
+               << Settings::instance().mouse_speed_scale();
+        mouseSpeedHeader->setSubtitle(stream.str() + "x");
     });
     mouseSpeedSlider->setProgress(mouseProgress);
+    {
+        std::stringstream stream;
+        stream << std::fixed << std::setprecision(1)
+               << Settings::instance().mouse_speed_scale();
+        mouseSpeedHeader->setSubtitle(stream.str() + "x");
+    }
 
     writeLog->init("settings/debugging_view"_i18n,
                    Settings::instance().write_log(), [](bool value) {

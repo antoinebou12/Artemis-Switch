@@ -75,6 +75,11 @@ add_artemis_test(host_keyboard_shortcuts_test
     app/src/features/input/HostKeyboardShortcuts.cpp
     app/src/features/input)
 
+add_artemis_test(pointer_settings_test
+    tests/pointer_settings_test.cpp
+    app/src/features/input/PointerSettings.cpp
+    app/src/features/input)
+
 add_artemis_test(quick_stream_menu_test
     tests/quick_stream_menu_test.cpp
     app/src/features/ui/QuickStreamMenu.cpp
@@ -84,3 +89,48 @@ add_artemis_test(zoom_pan_state_test
     tests/zoom_pan_state_test.cpp
     app/src/features/video/ZoomPanState.cpp
     app/src/features/video)
+
+add_artemis_test(display_transform_test
+    tests/display_transform_test.cpp
+    app/src/features/video/DisplayTransform.cpp
+    app/src/features/video)
+
+add_artemis_test(apollo_host_options_test
+    tests/apollo_host_options_test.cpp
+    app/src/features/apollo/ApolloHostOptions.cpp
+    app/src/features/apollo)
+
+add_artemis_test(controller_diagnostics_test
+    tests/controller_diagnostics_test.cpp
+    app/src/features/input/ControllerDiagnostics.cpp
+    app/src/features/input)
+
+add_executable(renderer_presentation_policy_test
+    "${REPO_ROOT}/tests/renderer_presentation_policy_test.cpp"
+    "${REPO_ROOT}/app/src/features/video/RendererPresentationPolicy.cpp"
+    "${REPO_ROOT}/app/src/features/video/DisplayTransform.cpp"
+    "${REPO_ROOT}/app/src/video/VideoScale.cpp")
+target_include_directories(renderer_presentation_policy_test PRIVATE
+    "${REPO_ROOT}/app/src/features/video"
+    "${REPO_ROOT}/app/src/video")
+target_compile_features(renderer_presentation_policy_test PRIVATE cxx_std_20)
+add_test(NAME renderer_presentation_policy_test
+         COMMAND renderer_presentation_policy_test)
+
+add_artemis_test(touch_control_profile_test
+    tests/touch_control_profile_test.cpp
+    app/src/features/input/TouchControlProfile.cpp
+    app/src/features/input)
+
+add_executable(display_coordinate_mapper_test
+    "${REPO_ROOT}/tests/display_coordinate_mapper_test.cpp"
+    "${REPO_ROOT}/app/src/features/video/DisplayCoordinateMapper.cpp"
+    "${REPO_ROOT}/app/src/features/video/RendererPresentationPolicy.cpp"
+    "${REPO_ROOT}/app/src/features/video/DisplayTransform.cpp"
+    "${REPO_ROOT}/app/src/video/VideoScale.cpp")
+target_include_directories(display_coordinate_mapper_test PRIVATE
+    "${REPO_ROOT}/app/src/features/video"
+    "${REPO_ROOT}/app/src/video")
+target_compile_features(display_coordinate_mapper_test PRIVATE cxx_std_20)
+add_test(NAME display_coordinate_mapper_test
+         COMMAND display_coordinate_mapper_test)

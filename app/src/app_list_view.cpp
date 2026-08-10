@@ -29,6 +29,26 @@ AppListView::AppListView(const Host& host) : host(host) {
     getAppletFrameItem()->setHintView(hintView);
 
     container->setHideHighlight(true);
+    auto* webConfig = new DetailCell();
+    webConfig->setText("host/web_config"_i18n);
+    webConfig->setDetailText("host/web_config_hint"_i18n);
+    webConfig->title->setSingleLine(true);
+    webConfig->detail->setSingleLine(true);
+    webConfig->registerClickAction([this](View*) {
+        const std::string address = this->host.preferred_address();
+        if (address.empty()) {
+            showError("host/web_config_no_address"_i18n);
+            return true;
+        }
+        const std::string url = "https://" + address + ":47990/";
+        Application::getPlatform()->openBrowser(url);
+        auto* dialog = new Dialog("host/web_config_message"_i18n + "\n\n" + url);
+        dialog->addButton("common/close"_i18n, [] {});
+        dialog->open();
+        return true;
+    });
+    container->addView(webConfig);
+
     gridView = new GridView();
     container->addView(gridView);
     loader = new LoadingOverlay(this);
@@ -146,20 +166,18 @@ void AppListView::updateAppList() {
 
                         if (result.isSuccess()) {
                             AppInfoList sortedApps = result.value();
-                            std::sort(
-                                sortedApps.begin(), sortedApps.end(),
-                                [this, currentGame](const AppInfo& l, const AppInfo& r) {
-                                    int lScore = 0;
-                                    int rScore = 0;
-
-                                    if (l.app_id == currentGame) lScore+=2;
-                                    if (Settings::instance().is_favorite(this->host, l.app_id)) lScore+=1;
-
-                                    if (r.app_id == currentGame) rScore+=2;
-                                    if (Settings::instance().is_favorite(this->host, r.app_id)) rScore+=1;
-
-                                    return lScore > rScore;
-                                });
+                            const auto server = GameStreamClient::instance().server_data(host);
+                            if (!server.isApollo()) {
+                                std::stable_sort(
+                                    sortedApps.begin(), sortedApps.end(),
+                                    [this, currentGame](const AppInfo& l, const AppInfo& r) {
+                                        const int lScore = (l.app_id == currentGame ? 2 : 0) +
+                                            (Settings::instance().is_favorite(this->host, l.app_id) ? 1 : 0);
+                                        const int rScore = (r.app_id == currentGame ? 2 : 0) +
+                                            (Settings::instance().is_favorite(this->host, r.app_id) ? 1 : 0);
+                                        return lScore > rScore;
+                                    });
+                            }
 
                             for (const AppInfo& app : sortedApps) {
                                 if (app.app_id == currentGame)

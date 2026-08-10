@@ -24,8 +24,22 @@
                 marginTop="8"
                 marginBottom="16"/>
             <brls:DetailCell id="receive_latency"/>
+            <brls:DetailCell id="decode_latency"/>
+            <brls:DetailCell id="render_latency"/>
             <brls:DetailCell id="packet_loss"/>
+            <brls:DetailCell id="host_fps"/>
+            <brls:DetailCell id="received_fps"/>
+            <brls:DetailCell id="decoded_fps"/>
             <brls:DetailCell id="rendered_fps"/>
+            <brls:DetailCell id="frame_queue"/>
+            <brls:DetailCell id="gpu_render"/>
+            <brls:DetailCell id="presentation"/>
+            <brls:Header title="@i18n/artemis/performance/switch_runtime" paddingTop="60" lineTop="1px"/>
+            <brls:DetailCell id="operation_mode"/>
+            <brls:DetailCell id="cpu_clock"/>
+            <brls:DetailCell id="gpu_clock"/>
+            <brls:DetailCell id="memory_clock"/>
+            <brls:DetailCell id="battery"/>
             <brls:Header title="@i18n/artemis/performance/benchmark" paddingTop="60" lineTop="1px"/>
             <brls:DetailCell id="benchmark_summary"/>
             <brls:DetailCell id="benchmark_action"/>

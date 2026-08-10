@@ -1,0 +1,105 @@
+diff --git a/src/ControlStream.c b/src/ControlStream.c
+--- a/src/ControlStream.c
++++ b/src/ControlStream.c
+@@ -137,9 +137,10 @@
+ #define IDX_TERMINATION 7
+ #define IDX_HDR_INFO 8
+ #define IDX_RUMBLE_TRIGGER_DATA 9
+ #define IDX_SET_MOTION_EVENT 10
+ #define IDX_SET_RGB_LED 11
+-#define IDX_DS_ADAPTIVE_TRIGGERS 12
++#define IDX_EXEC_SERVER_CMD 12
++#define IDX_DS_ADAPTIVE_TRIGGERS 13
+ 
+ #define CONTROL_STREAM_TIMEOUT_SEC 10
+ #define CONTROL_STREAM_LINGER_TIMEOUT_SEC 2
+@@ -157,6 +158,8 @@
+     -1,     // Rumble triggers (unused)
+     -1,     // Set motion event (unused)
+     -1,     // Set RGB LED (unused)
++    -1,     // Execute Server Command (unused)
++    -1,     // Set Adaptive Triggers (unused)
+ };
+ static const short packetTypesGen4[] = {
+     0x0606, // Request IDR frame
+@@ -171,6 +174,8 @@
+     -1,     // Rumble triggers (unused)
+     -1,     // Set motion event (unused)
+     -1,     // Set RGB LED (unused)
++    -1,     // Execute Server Command (unused)
++    -1,     // Set Adaptive Triggers (unused)
+ };
+ static const short packetTypesGen5[] = {
+     0x0305, // Start A
+@@ -185,6 +190,8 @@
+     -1,     // Rumble triggers (unused)
+     -1,     // Set motion event (unused)
+     -1,     // Set RGB LED (unused)
++    -1,     // Execute Server Command (unused)
++    -1,     // Set Adaptive Triggers (unused)
+ };
+ static const short packetTypesGen7[] = {
+     0x0305, // Start A
+@@ -199,6 +206,8 @@
+     -1,     // Rumble triggers (unused)
+     -1,     // Set motion event (unused)
+     -1,     // Set RGB LED (unused)
++    -1,     // Execute Server Command (unused)
++    -1,     // Set Adaptive Triggers (unused)
+ };
+ static const short packetTypesGen7Enc[] = {
+     0x0302, // Request IDR frame
+@@ -213,6 +222,7 @@
+     0x5500, // Rumble triggers (Sunshine protocol extension)
+     0x5501, // Set motion event (Sunshine protocol extension)
+     0x5502, // Set RGB LED (Sunshine protocol extension)
++    0x3000, // Execute Server Command (Apollo protocol extension)
+     0x5503, // Set Adaptive Triggers (Sunshine protocol extension)
+ };
+ 
+@@ -2084,3 +2094,15 @@
+     *metadata = hdrMetadata;
+     return true;
+ }
++
++int LiSendExecServerCmd(uint8_t cmdId) {
++    uint8_t payload[4] = {cmdId, 0, 0, 0};
++    if (packetTypes == NULL || packetTypes[IDX_EXEC_SERVER_CMD] < 0)
++        return LI_ERR_UNSUPPORTED;
++    return sendMessageAndForget(packetTypes[IDX_EXEC_SERVER_CMD],
++                                sizeof(payload), payload,
++                                CTRL_CHANNEL_SERVERCTL,
++                                ENET_PACKET_FLAG_RELIABLE, false)
++               ? 0
++               : -1;
++}
+diff --git a/src/Limelight-internal.h b/src/Limelight-internal.h
+--- a/src/Limelight-internal.h
++++ b/src/Limelight-internal.h
+@@ -59,8 +59,9 @@
+ #define CTRL_CHANNEL_KEYBOARD     0x02
+ #define CTRL_CHANNEL_MOUSE        0x03
+ #define CTRL_CHANNEL_PEN          0x04
+ #define CTRL_CHANNEL_TOUCH        0x05
+ #define CTRL_CHANNEL_UTF8         0x06
++#define CTRL_CHANNEL_SERVERCTL    0x08 // Apollo server-control extension
+ #define CTRL_CHANNEL_GAMEPAD_BASE 0x10 // 0x10 to 0x1F by controller index
+ #define CTRL_CHANNEL_SENSOR_BASE  0x20 // 0x20 to 0x2F by controller index
+ #define CTRL_CHANNEL_COUNT        0x30
+diff --git a/src/Limelight.h b/src/Limelight.h
+--- a/src/Limelight.h
++++ b/src/Limelight.h
+@@ -566,8 +566,13 @@
+ // protocol statistics. This function will fail if the current GFE version does not use
+ // ENet for the control stream (very old versions), or if the ENet peer is not connected.
+ // This function may only be called between LiStartConnection() and LiStopConnection().
+ bool LiGetEstimatedRttInfo(uint32_t* estimatedRtt, uint32_t* estimatedRttVariance);
+ 
++// Sends an Apollo server command by its zero-based advertised index.
++// Returns LI_ERR_UNSUPPORTED when the active protocol generation does not
++// advertise the Apollo command packet type.
++int LiSendExecServerCmd(uint8_t cmdId);
++
+ // This function queues a relative mouse move event to be sent to the remote server.
+ int LiSendMouseMoveEvent(short deltaX, short deltaY);
+ 

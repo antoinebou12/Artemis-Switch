@@ -27,6 +27,22 @@ enum HTTPRequestTimeout : long {
     HTTPRequestTimeoutLong = 120
 };
 
+enum class HTTPMethod { Get, Post };
+
+struct HTTPRequestOptions {
+    HTTPMethod method = HTTPMethod::Get;
+    std::string body;
+    std::string contentType;
+    size_t maxResponseBytes = 4 * 1024 * 1024;
+    bool sensitive = false;
+};
+
+struct HTTPResponseInfo {
+    long status = 0;
+    bool responseTooLarge = false;
+};
+
 int http_init(const std::string& key_directory);
 int http_request(const std::string& url, Data* data, HTTPRequestTimeout timeout);
-
+int http_request(const std::string& url, Data* data, HTTPRequestTimeout timeout,
+                 const HTTPRequestOptions& options, HTTPResponseInfo* response);

@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - agent/artemis-switch-integration
+      - feature/**
   pull_request:
     branches:
       - main

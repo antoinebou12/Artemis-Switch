@@ -63,6 +63,12 @@ bool _SERVER_DATA::isSunshine() const {
     return AppVersionQuad[3] < 0;
 }
 
+bool _SERVER_DATA::isApollo() const {
+    return virtualDisplayCapable || virtualDisplayDriverReady ||
+           hasApolloPermissionField || !serverCommands.empty() ||
+           !currentGameUuid.empty();
+}
+
 static int load_serverinfo(PSERVER_DATA server, bool https) {
     int ret = GS_INVALID;
     char url[4096];
@@ -70,6 +76,7 @@ static int load_serverinfo(PSERVER_DATA server, bool https) {
     std::string currentGameText;
     std::string stateText;
     std::string httpsPortText;
+    std::string optionalText;
 
     // Modern GFE versions don't allow serverinfo to be fetched over HTTPS
     // if the client is not already paired. Since we can't pair without
@@ -129,6 +136,26 @@ static int load_serverinfo(PSERVER_DATA server, bool https) {
 
     if (xml_search(data, "mac", &server->mac) != GS_OK)
         goto cleanup;
+
+    // Apollo extensions are optional. Their absence is the authoritative
+    // Sunshine fallback and must never make standard server-info fail.
+    xml_search(data, "currentgameuuid", &server->currentGameUuid);
+    if (xml_search(data, "VirtualDisplayCapable", &optionalText) == GS_OK)
+        server->virtualDisplayCapable = optionalText == "true" || optionalText == "1";
+    optionalText.clear();
+    if (xml_search(data, "VirtualDisplayDriverReady", &optionalText) == GS_OK)
+        server->virtualDisplayDriverReady = optionalText == "true" || optionalText == "1";
+    optionalText.clear();
+    if (xml_search(data, "Permission", &optionalText) == GS_OK && !optionalText.empty()) {
+        try {
+            server->permission = static_cast<uint32_t>(std::stoul(optionalText, nullptr, 0));
+            server->hasApolloPermissionField = true;
+        } catch (...) {
+            server->permission = 0;
+            server->hasApolloPermissionField = false;
+        }
+    }
+    xml_search_all(data, "ServerCommand", &server->serverCommands);
 
     // These fields are present on all version of GFE that this client
     // supports
@@ -485,7 +512,8 @@ int gs_app_boxart(PSERVER_DATA server, int app_id, Data* out) {
 }
 
 int gs_start_app(PSERVER_DATA server, STREAM_CONFIGURATION* config, int appId,
-                 bool sops, bool localaudio, int gamepad_mask) {
+                 bool sops, bool localaudio, int gamepad_mask,
+                 const APOLLO_LAUNCH_OPTIONS* apolloOptions) {
     int ret = GS_OK;
     std::string result;
 
@@ -501,6 +529,28 @@ int gs_start_app(PSERVER_DATA server, STREAM_CONFIGURATION* config, int appId,
     int rikeyid = 0;
 
     Data data;
+
+    std::string apolloQuery;
+    if (apolloOptions && server->isApollo()) {
+        if (apolloOptions->virtualDisplay) {
+            if (!server->virtualDisplayCapable) {
+                gs_set_error("Apollo virtual display is not supported by this host");
+                return GS_NOT_SUPPORTED_4K;
+            }
+            if (!server->virtualDisplayDriverReady) {
+                gs_set_error("Apollo virtual display driver is not ready; install or enable the driver on the host");
+                return GS_WRONG_STATE;
+            }
+            apolloQuery += "&virtualDisplay=1";
+        }
+        if (!apolloOptions->appUuid.empty())
+            apolloQuery += "&uuid=" + apolloOptions->appUuid;
+        if (apolloOptions->width > 0 && apolloOptions->height > 0)
+            apolloQuery += "&resolution=" + std::to_string(apolloOptions->width) +
+                           "x" + std::to_string(apolloOptions->height);
+        if (apolloOptions->refreshRate > 0)
+            apolloQuery += "&refreshRate=" + std::to_string(apolloOptions->refreshRate);
+    }
 
     if (server->currentGame == 0) {
         int channelCounnt =
@@ -519,12 +569,14 @@ int gs_start_app(PSERVER_DATA server, STREAM_CONFIGURATION* config, int appId,
                  server->serverInfo.address, server->httpsPort, unique_id.c_str(), appId,
                  config->width, config->height, fps, sops, rand.hex().bytes(),
                  rikeyid, localaudio, (mask << 16) + channelCounnt,
-                 gamepad_mask, gamepad_mask, LiGetLaunchUrlQueryParameters());
+                 gamepad_mask, gamepad_mask,
+                 (std::string(LiGetLaunchUrlQueryParameters()) + apolloQuery).c_str());
     } else {
         snprintf(url, sizeof(url),
                  "https://%s:%u/resume?uniqueid=%s&rikey=%s&rikeyid=%d%s",
                  server->serverInfo.address, server->httpsPort, unique_id.c_str(),
-                 rand.hex().bytes(), rikeyid, LiGetLaunchUrlQueryParameters());
+                 rand.hex().bytes(), rikeyid,
+                 (std::string(LiGetLaunchUrlQueryParameters()) + apolloQuery).c_str());
     }
 
     if ((ret = http_request(url, &data, HTTPRequestTimeoutLong)) == GS_OK) {
@@ -580,6 +632,70 @@ int gs_quit_app(PSERVER_DATA server) {
 
 exit:
     return ret;
+}
+
+namespace {
+constexpr uint32_t ApolloPermissionClipboardSet = 0x00010000;
+constexpr uint32_t ApolloPermissionClipboardRead = 0x00020000;
+constexpr size_t ApolloClipboardLimit = 64 * 1024;
+}
+
+int gs_clipboard_get(PSERVER_DATA server, std::string* text, long* httpStatus) {
+    if (!server || !text || !server->isApollo()) {
+        gs_set_error("Clipboard is unsupported by this host");
+        return GS_NOT_SUPPORTED_4K;
+    }
+    if (server->hasApolloPermissionField &&
+        (server->permission & ApolloPermissionClipboardRead) == 0) {
+        gs_set_error("Apollo denied clipboard read permission");
+        return GS_WRONG_STATE;
+    }
+    char url[4096];
+    snprintf(url, sizeof(url), "https://%s:%u/actions/clipboard?type=text",
+             server->serverInfo.address, server->httpsPort);
+    Data data;
+    HTTPRequestOptions options;
+    options.maxResponseBytes = ApolloClipboardLimit;
+    options.sensitive = true;
+    HTTPResponseInfo response;
+    const int result = http_request(url, &data, HTTPRequestTimeoutMedium,
+                                    options, &response);
+    if (httpStatus) *httpStatus = response.status;
+    if (result != GS_OK) return result;
+    *text = std::string(reinterpret_cast<const char*>(data.bytes()), data.size());
+    return GS_OK;
+}
+
+int gs_clipboard_set(PSERVER_DATA server, const std::string& text,
+                     long* httpStatus) {
+    if (!server || !server->isApollo()) {
+        gs_set_error("Clipboard is unsupported by this host");
+        return GS_NOT_SUPPORTED_4K;
+    }
+    if (text.size() > ApolloClipboardLimit) {
+        gs_set_error("Clipboard text exceeds the 64 KiB limit");
+        return GS_INVALID;
+    }
+    if (server->hasApolloPermissionField &&
+        (server->permission & ApolloPermissionClipboardSet) == 0) {
+        gs_set_error("Apollo denied clipboard upload permission");
+        return GS_WRONG_STATE;
+    }
+    char url[4096];
+    snprintf(url, sizeof(url), "https://%s:%u/actions/clipboard?type=text",
+             server->serverInfo.address, server->httpsPort);
+    Data data;
+    HTTPRequestOptions options;
+    options.method = HTTPMethod::Post;
+    options.body = text;
+    options.contentType = "text/plain; charset=utf-8";
+    options.maxResponseBytes = 4096;
+    options.sensitive = true;
+    HTTPResponseInfo response;
+    const int result = http_request(url, &data, HTTPRequestTimeoutMedium,
+                                    options, &response);
+    if (httpStatus) *httpStatus = response.status;
+    return result;
 }
 
 int gs_init(PSERVER_DATA server, const std::string address) {

@@ -10,6 +10,7 @@
 #include <chrono>
 #include <cmath>
 #include <libretro-common/retro_timers.h>
+#include <algorithm>
 
 using namespace brls;
 
@@ -323,4 +324,24 @@ void KeyboardView::changeLang(int lang) {
     Settings::instance().set_keyboard_locale(lang);
     Settings::instance().save();
     KeyboardView::shiftUpdated.fire();
+}
+
+ButtonView* KeyboardView::createLocaleSelectorButton(float width) {
+    auto* button = new ButtonView(this);
+    button->charLabel->setText("\ue01d");
+    button->charLabel->setFontSize(21);
+    button->setMargins(4, 4, 4, 4);
+    button->setWidth(width);
+    button->event = [this] {
+        std::vector<std::string> names;
+        names.reserve(locales.size());
+        std::transform(locales.begin(), locales.end(), std::back_inserter(names),
+                       [](const KeyboardLocale& locale) { return locale.name; });
+        auto* dropdown = new Dropdown(
+            "settings/select_language"_i18n, names,
+            [this](int selected) { changeLang(selected); },
+            Settings::instance().get_keyboard_locale());
+        Application::pushActivity(new Activity(dropdown));
+    };
+    return button;
 }

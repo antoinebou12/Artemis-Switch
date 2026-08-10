@@ -14,9 +14,11 @@
 
     <brls:Header title="@i18n/artemis/settings/frame_rate_video" paddingTop="60" lineTop="1px"/>
     <brls:SelectorCell id="frame_rate"/>
-    <brls:BooleanCell id="unlock_high_fps"/>
     <brls:BooleanCell id="force_full_range"/>
     <brls:BooleanCell id="prevent_packet_loss"/>
+
+    <brls:Header title="@i18n/artemis/settings/resolution_presets" paddingTop="60" lineTop="1px"/>
+    <brls:SelectorCell id="resolution_preset"/>
 
     <brls:Header title="@i18n/artemis/settings/presentation" paddingTop="60" lineTop="1px"/>
     <brls:SelectorCell id="scale_mode"/>

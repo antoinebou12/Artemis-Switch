@@ -25,6 +25,9 @@
                 
             <brls:DetailCell
                 id="connect"/>
+
+            <brls:DetailCell
+                id="host_web_config"/>
                 
             <brls:DetailCell
                 id="remove"

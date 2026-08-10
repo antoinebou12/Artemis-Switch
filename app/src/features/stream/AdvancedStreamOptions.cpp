@@ -6,10 +6,9 @@
 
 namespace artemis::stream {
 
-std::vector<int> availableFrameRates(const AdvancedStreamOptions& options) {
-    if (options.unlockAllFrameRates)
-        return {30, 40, 60, 90, 120};
-    return {30, 40, 60};
+std::vector<int> availableFrameRates(const AdvancedStreamOptions& /*options*/) {
+    // Always expose the full Switch stream profile set (no unlock gate).
+    return {30, 40, 60, 90, 120};
 }
 
 int normalizeFrameRate(int requestedFps, const AdvancedStreamOptions& options) {

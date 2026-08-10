@@ -16,13 +16,11 @@
             paddingLeft="@style/brls/tab_details/padding_left">
             <brls:Header title="@i18n/artemis/overlay/quick_actions"/>
             <brls:DetailCell id="quick_keyboard"/>
-            <brls:DetailCell id="quick_move_window"/>
-            <brls:DetailCell id="quick_display"/>
-            <brls:DetailCell id="quick_controllers"/>
+            <brls:DetailCell id="quick_move_left"/>
+            <brls:DetailCell id="quick_move_right"/>
+            <brls:DetailCell id="quick_host_shortcuts"/>
+            <brls:DetailCell id="quick_server_commands"/>
             <brls:DetailCell id="quick_mouse"/>
-            <brls:DetailCell id="quick_touch"/>
-            <brls:DetailCell id="quick_disconnect"/>
-            <brls:DetailCell id="quick_quit_host"/>
         </brls:Box>
     </brls:ScrollingFrame>
 </brls:Box>
