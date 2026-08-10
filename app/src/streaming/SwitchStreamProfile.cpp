@@ -19,7 +19,7 @@ bool validFps(int fps) {
 }
 
 bool validCodec(const std::string& codec) {
-    return codec == "H264" || codec == "HEVC" || codec == "H265";
+    return codec == "H264" || codec == "HEVC" || codec == "H265" || codec == "AV1";
 }
 
 int nearestFps(int requested) {
@@ -51,7 +51,7 @@ ValidationResult SwitchStreamProfile::validate(const StreamProfile& profile) {
     if (!validDecoderThreads(profile.decoderThreads))
         fail("decoder threads must be 0, 2, 3, or 4");
     if (!validCodec(profile.codec))
-        fail("codec must be H264 or HEVC");
+        fail("codec must be H264, HEVC, or AV1");
 
     return result;
 }

@@ -223,6 +223,7 @@
         "host_not_found": "Host PC not found...",
         "ip_not_obtained": "Can't obtain IP address...",
         "stream_start": "Failed to start stream...",
+        "av1_decoder_unavailable": "AV1 is experimental and could not be opened.\n\nThis build has no hardware AV1 decode on Switch. Use H.264 or HEVC, or enable a software AV1 decoder.",
         "unknown_error": "Unknown problem has been occured..."
     },
     "forwarder": {

@@ -174,7 +174,9 @@ artemis::benchmark::ExportProfile exportProfile() {
     profile.fps = Settings::instance().fps();
     profile.bitrateKbps = Settings::instance().bitrate();
     profile.decoderThreads = Settings::instance().decoder_threads();
-    profile.codec = Settings::instance().video_codec() == H264 ? "H264" : "HEVC";
+    profile.codec = Settings::instance().video_codec() == H264
+                        ? "H264"
+                        : (Settings::instance().video_codec() == AV1 ? "AV1" : "HEVC");
     return profile;
 }
 

@@ -344,6 +344,8 @@ SettingsTab::SettingsTab() {
         H264,
 #if !defined(__PSV__)
         H265,
+        // Experimental software AV1 — Switch has no hardware AV1 decode.
+        AV1,
 #endif
     };
 

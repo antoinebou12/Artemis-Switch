@@ -6,7 +6,14 @@
 #include "StreamProfileStore.hpp"
 #include "borealis.hpp"
 #include "../features/stream/AdvancedStreamOptionsStore.hpp"
+#include "../features/stream/VideoCodecFormats.hpp"
 #include <string.h>
+
+static_assert(artemis::stream::kVideoFormatH264 == VIDEO_FORMAT_H264);
+static_assert(artemis::stream::kVideoFormatH265 == VIDEO_FORMAT_H265);
+static_assert(artemis::stream::kVideoFormatH265Main10 == VIDEO_FORMAT_H265_MAIN10);
+static_assert(artemis::stream::kVideoFormatAv1Main8 == VIDEO_FORMAT_AV1_MAIN8);
+static_assert(artemis::stream::kVideoFormatAv1Main10 == VIDEO_FORMAT_AV1_MAIN10);
 
 // Moonlight-common-c explicitly negotiates encoder color range through
 // STREAM_CONFIGURATION::colorRange. Keep the existing MoonlightSession source

@@ -31,7 +31,13 @@ int main() {
     h265Alias = SwitchStreamProfile::normalized(h265Alias);
     assert(h265Alias.codec == "HEVC");
 
-    StreamProfile invalid{4000, 2000, 77, 250000, 9, "AV1"};
+    // Experimental AV1 is allowed as a stream profile codec.
+    StreamProfile av1{1280, 720, 60, 15000, 2, "AV1"};
+    assert(SwitchStreamProfile::validate(av1).valid);
+    av1 = SwitchStreamProfile::normalized(av1);
+    assert(av1.codec == "AV1");
+
+    StreamProfile invalid{4000, 2000, 77, 250000, 9, "VP9"};
     validation = SwitchStreamProfile::validate(invalid);
     assert(!validation.valid);
     assert(validation.errors.size() >= 6);
