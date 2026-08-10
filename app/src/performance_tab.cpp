@@ -4,6 +4,8 @@
 #include "MoonlightSession.hpp"
 #include "Settings.hpp"
 #include "features/performance/PerformanceLite.hpp"
+#include "features/stream/AdvancedStreamOptionsStore.hpp"
+#include "video/VideoScaleStore.hpp"
 
 #if __has_include("benchmark/BenchmarkRuntime.hpp")
 #include "benchmark/BenchmarkRuntime.hpp"
@@ -64,6 +66,25 @@ std::string configuredResolutionText() {
     )
         return fmt::format("{} ({}x{})", "settings/resolution_native"_i18n, width, height);
     return fmt::format("{}x{}", width, height);
+}
+
+std::string presentationText() {
+    const auto mode = artemis::video::VideoScaleStore::instance().get();
+    const char* scale = mode == artemis::video::ScaleMode::Fit ? "Fit"
+                      : mode == artemis::video::ScaleMode::Stretch ? "Stretch"
+                                                                   : "Fill";
+    const bool fullRange =
+        artemis::stream::AdvancedStreamOptionsStore::instance()
+            .get()
+            .forceFullRangeVideo;
+    return fmt::format("{} | {} range", scale, fullRange ? "Full" : "Limited");
+}
+
+std::string rendererTimingText(const VideoRenderStats& render) {
+    return fmt::format(
+        "Frame {:.2f} | Post {:.2f} | FSR {:.2f} | RCAS {:.2f} | Dither {:.2f} ms",
+        render.rendering_time, render.post_processing_time, render.upscaling_time,
+        render.sharpening_time, render.dithering_time);
 }
 
 #if ARTEMIS_HAS_BENCHMARK_EXPORT
@@ -288,13 +309,18 @@ void PerformanceTab::refresh() {
     network->setDetailText(lite.networkText);
     receiveLatency->setDetailText(lite.latencyText);
     decodeLatency->setDetailText(lite.decodeText);
-    renderLatency->setDetailText(fmt::format("{:.2f} ms", render.rendering_time));
+    renderLatency->setDetailText(rendererTimingText(render));
     packetLoss->setDetailText(lite.packetLossText);
     renderedFps->setDetailText(lite.fpsText);
-    queueDepth->setDetailText(fmt::format("{} / {} / {}",
+
+    const std::string gpuText = render.gpu_rendering_time > 0.0f
+        ? fmt::format(" | GPU {:.2f} ms", render.gpu_rendering_time)
+        : "";
+    queueDepth->setDetailText(fmt::format("{} / {} / {}{} | {}",
         AVFrameHolder::instance().getFrameQueueSize(),
         AVFrameHolder::instance().getFrameQueueTargetDepth(),
-        AVFrameHolder::instance().getFrameQueueCapacity()));
+        AVFrameHolder::instance().getFrameQueueCapacity(),
+        gpuText, presentationText()));
 
     const auto color = lite.healthy
         ? Application::getTheme()["brls/list/listItem_value_color"]
