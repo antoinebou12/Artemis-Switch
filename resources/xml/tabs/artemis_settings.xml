@@ -27,7 +27,7 @@
             <brls:BooleanCell id="remember_zoom_pan"/>
             <brls:DetailCell id="reset_zoom_pan"/>
 
-            <brls:Header title="Advanced network" paddingTop="60" lineTop="1px"/>
+            <brls:Header title="@i18n/settings/stream_settings" paddingTop="60" lineTop="1px"/>
             <brls:BooleanCell id="prevent_packet_loss"/>
 
             <brls:Header title="@i18n/artemis/settings/switch_motion" paddingTop="60" lineTop="1px"/>
