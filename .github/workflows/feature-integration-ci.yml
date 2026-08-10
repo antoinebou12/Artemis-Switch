@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - master
-      - agent/artemis-switch-integration
+      - agent/artemi-switch-display-filtering
   pull_request:
     branches:
       - master
@@ -15,7 +15,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: artemis-integration-${{ github.workflow }}-${{ github.ref }}
+  group: artemi-switch-integration-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -31,7 +31,7 @@ jobs:
           python -m json.tool resources/i18n/en-US/main.json > /dev/null
           python -m json.tool resources/i18n/fr/main.json > /dev/null
 
-      - name: Validate Artemis English/French translation coverage
+      - name: Validate English/French translation coverage
         run: python tests/i18n_consistency_test.py
 
       - name: Validate release/CD contract
@@ -68,20 +68,20 @@ jobs:
         shell: bash
         run: |
           chmod +x scripts/package-release-source.sh
-          scripts/package-release-source.sh v0.0.0-ci "$RUNNER_TEMP/artemis-release"
+          scripts/package-release-source.sh v0.0.0-ci "$RUNNER_TEMP/artemi-switch-release"
 
       - name: Inspect source packages
         shell: bash
         run: |
           set -euo pipefail
-          tarball="$RUNNER_TEMP/artemis-release/Artemis-Switch-0.0.0-ci-source.tar.gz"
-          zipfile="$RUNNER_TEMP/artemis-release/Artemis-Switch-0.0.0-ci-source.zip"
+          tarball="$RUNNER_TEMP/artemi-switch-release/artemi-switch-0.0.0-ci-source.tar.gz"
+          zipfile="$RUNNER_TEMP/artemi-switch-release/artemi-switch-0.0.0-ci-source.zip"
           test -s "$tarball"
           test -s "$zipfile"
-          tar -tzf "$tarball" | grep -q 'Artemis-Switch-0.0.0-ci/README.md$'
-          tar -tzf "$tarball" | grep -q 'Artemis-Switch-0.0.0-ci/SOURCE_INFO.txt$'
-          unzip -l "$zipfile" | grep -q 'Artemis-Switch-0.0.0-ci/README.md'
-          unzip -l "$zipfile" | grep -q 'Artemis-Switch-0.0.0-ci/SOURCE_INFO.txt'
+          tar -tzf "$tarball" | grep -q 'artemi-switch-0.0.0-ci/README.md$'
+          tar -tzf "$tarball" | grep -q 'artemi-switch-0.0.0-ci/SOURCE_INFO.txt$'
+          unzip -l "$zipfile" | grep -q 'artemi-switch-0.0.0-ci/README.md'
+          unzip -l "$zipfile" | grep -q 'artemi-switch-0.0.0-ci/SOURCE_INFO.txt'
 
   sanitizer-integration:
     name: ASan + UBSan integration
@@ -105,7 +105,7 @@ jobs:
         run: ctest --test-dir build/tests-sanitized --output-on-failure
 
   ci-summary:
-    name: Artemis CI summary
+    name: artemi-switch CI summary
     if: always()
     needs:
       - portable-integration
