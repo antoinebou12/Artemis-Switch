@@ -74,7 +74,7 @@ AppListView::AppListView(const Host& host) : host(host) {
     //     }, true);
     // #endif
 
-    registerAction("app_list/reload_app_list"_i18n, BUTTON_X,
+    registerAction("app_list/reload_app_list"_i18n, BUTTON_Y,
                    [this](View* view) {
                        this->updateAppList();
                        return true;
@@ -227,7 +227,7 @@ void AppListView::onLayout() {
 void AppListView::updateFavoriteAction(AppCell* cell, Host host, const AppInfo& app) {
     bool isFavorite = Settings::instance().is_favorite(host, app.app_id);
     cell->registerAction(
-        isFavorite ? "app_list/unstar"_i18n : "app_list/star"_i18n, BUTTON_Y,
+        isFavorite ? "app_list/unstar"_i18n : "app_list/star"_i18n, BUTTON_X,
         [this, cell, host, app](View* view) {
             bool isFavorite =
                 Settings::instance().is_favorite(host, app.app_id);
