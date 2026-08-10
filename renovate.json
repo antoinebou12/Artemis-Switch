@@ -1,23 +1,13 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
-    "config:recommended"
+    "config:best-practices"
   ],
   "dependencyDashboard": true,
   "timezone": "America/Toronto",
-  "schedule": [
-    "before 6am on monday"
-  ],
   "prConcurrentLimit": 5,
   "prHourlyLimit": 2,
   "packageRules": [
-    {
-      "description": "Group GitHub Actions updates",
-      "matchManagers": [
-        "github-actions"
-      ],
-      "groupName": "GitHub Actions"
-    },
     {
       "description": "Group non-major dependency updates",
       "matchUpdateTypes": [
@@ -29,11 +19,17 @@
       "groupName": "non-major dependencies"
     },
     {
-      "description": "Keep major dependency updates separate",
-      "matchUpdateTypes": [
-        "major"
+      "description": "Keep GitHub Actions updates together",
+      "matchManagers": [
+        "github-actions"
       ],
-      "groupName": null
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "pin",
+        "digest"
+      ],
+      "groupName": "GitHub Actions"
     }
   ]
 }
