@@ -19,9 +19,6 @@
 #include "features/input/InputSettingsStore.hpp"
 #include "features/video/UpscalingModeSelect.hpp"
 #include "keyboard_view.hpp"
-#if defined(__SWITCH__) && defined(ENABLE_WIREGUARD)
-#include "vpn/WireGuardManager.hpp"
-#endif
 #include <cmath>
 #include <iomanip>
 #include <sstream>
@@ -463,85 +460,6 @@ SettingsTab::SettingsTab() {
     pcAudio->init(
         "settings/paop"_i18n, Settings::instance().play_audio(),
         [](bool value) { Settings::instance().set_play_audio(value); });
-
-#if defined(__SWITCH__) && defined(ENABLE_WIREGUARD)
-    wireguardEnabled->init(
-        "settings/wireguard_enabled"_i18n,
-        Settings::instance().wireguard_enabled(), [this](bool value) {
-            Settings::instance().set_wireguard_enabled(value);
-            if (value) {
-                WireGuardManager::instance().enable_from_settings();
-            } else {
-                WireGuardManager::instance().disable();
-            }
-            wireguardStatus->setDetailText(
-                WireGuardManager::instance().status_text());
-        });
-
-    wireguardConfigPath->setText("settings/wireguard_config_path"_i18n);
-    wireguardConfigPath->setDetailText(
-        Settings::instance().wireguard_config_path().empty()
-            ? "sdmc:/switch/Moonlight-Switch/wg0.conf"
-            : Settings::instance().wireguard_config_path());
-    wireguardConfigPath->registerClickAction([this](View* view) {
-        const std::string current =
-            Settings::instance().wireguard_config_path();
-        Application::getPlatform()->getImeManager()->openForText(
-            [this](const std::string& text) {
-                Settings::instance().set_wireguard_config_path(text);
-                wireguardConfigPath->setDetailText(text);
-                if (Settings::instance().wireguard_enabled()) {
-                    WireGuardManager::instance().enable_from_settings();
-                    wireguardStatus->setDetailText(
-                        WireGuardManager::instance().status_text());
-                }
-            },
-            "settings/wireguard_config_path_title"_i18n, "", 120,
-            current.empty() ? "sdmc:/switch/Moonlight-Switch/wg0.conf" : current,
-            0);
-        return true;
-    });
-
-    wireguardStatus->setText("settings/wireguard_status"_i18n);
-    wireguardStatus->setDetailText(WireGuardManager::instance().status_text());
-#else
-    wireguardEnabled->removeFromSuperView(true);
-    wireguardConfigPath->removeFromSuperView(true);
-    wireguardStatus->removeFromSuperView(true);
-#endif
-
-    easytierEnabled->init(
-        "settings/easytier_enabled"_i18n,
-        Settings::instance().easytier_enabled(), [this](bool value) {
-            Settings::instance().set_easytier_enabled(value);
-            easytierStatus->setDetailText(
-                value ? "settings/easytier_status_stub"_i18n
-                      : "settings/easytier_status_off"_i18n);
-        });
-    easytierConfigPath->setText("settings/easytier_config_path"_i18n);
-    easytierConfigPath->setDetailText(
-        Settings::instance().easytier_config_path().empty()
-            ? "sdmc:/switch/Moonlight-Switch/easytier.toml"
-            : Settings::instance().easytier_config_path());
-    easytierConfigPath->registerClickAction([this](View*) {
-        const std::string current =
-            Settings::instance().easytier_config_path();
-        Application::getPlatform()->getImeManager()->openForText(
-            [this](const std::string& text) {
-                Settings::instance().set_easytier_config_path(text);
-                easytierConfigPath->setDetailText(text);
-            },
-            "settings/easytier_config_path_title"_i18n, "", 120,
-            current.empty() ? "sdmc:/switch/Moonlight-Switch/easytier.toml"
-                            : current,
-            0);
-        return true;
-    });
-    easytierStatus->setText("settings/easytier_status"_i18n);
-    easytierStatus->setDetailText(
-        Settings::instance().easytier_enabled()
-            ? "settings/easytier_status_stub"_i18n
-            : "settings/easytier_status_off"_i18n);
 
     streamAudioConfiguration->init(
         "settings/stream_audio_configuration"_i18n,

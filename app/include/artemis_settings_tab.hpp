@@ -33,6 +33,13 @@ private:
     BRLS_BIND(brls::BooleanCell, rememberZoomPan, "remember_zoom_pan");
     BRLS_BIND(brls::DetailCell, resetZoomPan, "reset_zoom_pan");
 
+    BRLS_BIND(brls::BooleanCell, wireguardEnabled, "wireguard_enabled");
+    BRLS_BIND(brls::DetailCell, wireguardConfigPath, "wireguard_config_path");
+    BRLS_BIND(brls::DetailCell, wireguardStatus, "wireguard_status");
+    BRLS_BIND(brls::BooleanCell, easytierEnabled, "easytier_enabled");
+    BRLS_BIND(brls::DetailCell, easytierConfigPath, "easytier_config_path");
+    BRLS_BIND(brls::DetailCell, easytierStatus, "easytier_status");
+
     brls::Event<int>::Subscription frameRateSubscription;
     bool hasFrameRateSubscription = false;
 };

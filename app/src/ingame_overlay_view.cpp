@@ -125,24 +125,6 @@ public:
         live->setGrow(1);
         addView(live);
 
-        auto* low = new brls::DetailCell();
-        low->setText("artemis/overlay/rumble_test_low"_i18n);
-        low->setDetailText("250 ms");
-        low->registerClickAction([this](brls::View*) {
-            pulseRumble(selectedSlot, 32767, 0);
-            return true;
-        });
-        addView(low);
-
-        auto* high = new brls::DetailCell();
-        high->setText("artemis/overlay/rumble_test_high"_i18n);
-        high->setDetailText("250 ms");
-        high->registerClickAction([this](brls::View*) {
-            pulseRumble(selectedSlot, 0, 32767);
-            return true;
-        });
-        addView(high);
-
         auto* both = new brls::DetailCell();
         both->setText("artemis/overlay/rumble_test_both"_i18n);
         both->setDetailText("artemis/overlay/rumble_test_both_hint"_i18n);
