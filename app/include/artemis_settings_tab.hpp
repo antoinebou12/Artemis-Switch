@@ -25,6 +25,7 @@ private:
 
     BRLS_BIND(brls::SelectorCell, scaleMode, "scale_mode");
     BRLS_BIND(brls::BooleanCell, forceFullRange, "force_full_range");
+    BRLS_BIND(brls::DetailCell, filterStatus, "filter_status");
     BRLS_BIND(brls::BooleanCell, rememberZoomPan, "remember_zoom_pan");
     BRLS_BIND(brls::DetailCell, resetZoomPan, "reset_zoom_pan");
 
