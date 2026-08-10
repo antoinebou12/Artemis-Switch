@@ -23,8 +23,8 @@
 #include <vector>
 
 // Reuse the proven Moonlight-Switch decoder mappings, descriptor handling,
-// FSR/RCAS/dithering resources, and statistics. Artemis owns only the final
-// presentation geometry so Fit/Fill/Stretch never switch renderer paths.
+// FSR/RCAS/dithering resources, and statistics. artemi-switch owns only the
+// final presentation geometry so Fit/Fill/Stretch never switch renderer paths.
 #define private public
 #define DKVideoRenderer LegacyDKVideoRenderer
 #include "DKVideoRendererLegacy.inc"
@@ -182,9 +182,11 @@ public:
 #ifdef SUPPORT_UPSCALING
         useDithering = Settings::instance().dithering() &&
                        Settings::instance().dithering_strength() > 0.0f;
-        useUpscaling = Settings::instance().upscaling() &&
-                       (destination.width > geometry.source.width + 0.5f ||
-                        destination.height > geometry.source.height + 0.5f);
+        // Reuse the legacy FSR eligibility rule because ensureUpscalingResources()
+        // allocates the FSR source image from that exact rule. Zoom/Pan can make
+        // the visible source smaller than the output, but that must not create a
+        // half-enabled FSR state without a source texture.
+        useUpscaling = Settings::instance().upscaling() && legacy.shouldUseUpscaling();
         useRcas = Settings::instance().rcas() &&
                   Settings::instance().rcas_strength() > 0.0f;
 
@@ -198,6 +200,17 @@ public:
             useDithering = false;
             useUpscaling = false;
             useRcas = false;
+        }
+
+        // Defensive guard: never report FSR active unless every resource needed
+        // by the EASU pass exists. This keeps Zoom/Pan and mode switches stable.
+        if (useUpscaling &&
+            (!legacy.sourceTargetHandle || !legacy.upscalingTargetHandle ||
+             legacy.sourceTextureId < 0 || !legacy.upscalingFragmentShader ||
+             !legacy.easuUniformBuffer)) {
+            brls::Logger::warning(
+                "artemi-switch: incomplete FSR resources, disabling FSR for this presentation state");
+            useUpscaling = false;
         }
 #endif
 
@@ -275,9 +288,7 @@ public:
         };
 
 #ifdef SUPPORT_UPSCALING
-        if (useUpscaling && legacy.sourceTargetHandle &&
-            legacy.upscalingTargetHandle && legacy.sourceTextureId >= 0 &&
-            legacy.upscalingFragmentShader && legacy.easuUniformBuffer) {
+        if (useUpscaling) {
             dk::ImageView sourceTarget{legacy.sourceTargetImage};
             legacy.cmdbuf.bindRenderTargets(&sourceTarget);
             setFullViewport(frame->width, frame->height);
