@@ -87,18 +87,77 @@ void KeyboardView::createLocales() {
     });
 
     locales.push_back(KeyboardLocale{
-        .name = "한국어",
+        .name = "한국어 (2벌식)",
         .localization = {
             {"Remove", "Remove"}, {"Esc", "Esc"}, {"0", ")"}, {"1", "!"}, {"2", "@"}, {"3", "#"}, {"4", "$"}, {"5", "%"}, {"6", "^"},
-            {"7", "&"}, {"8", "*"}, {"9", "("}, {"ㅁ", "ㅁ"}, {"ㅠ", "ㅠ"}, {"ㅊ", "ㅊ"}, {"ㅇ", "ㅇ"}, {"ㄷ", "ㄸ"}, {"ㄹ", "ㄹ"}, {"ㅎ", "ㅎ"},
-            {"ㅗ", "ㅗ"}, {"ㅑ", "ㅑ"}, {"ㅓ", "ㅓ"}, {"ㅏ", "ㅏ"}, {"ㅣ", "ㅣ"}, {"ㅡ", "ㅡ"}, {"ㅜ", "ㅜ"}, {"ㅐ", "ㅒ"}, {"ㅔ", "ㅖ"}, {"ㅂ", "ㅃ"},
-            {"ㄱ", "ㄲ"}, {"ㄴ", "ㄴ"}, {"ㅅ", "ㅆ"}, {"ㅕ", "ㅕ"}, {"ㅍ", "ㅍ"}, {"ㅈ", "ㅉ"}, {"ㅌ", "ㅌ"}, {"ㅛ", "ㅛ"}, {"ㅋ", "ㅋ"}, {"Return", "Return"}, {"Space", "Space"},
+            {"7", "&"}, {"8", "*"}, {"9", "("}, {"a", "A"}, {"b", "B"}, {"c", "C"}, {"d", "D"}, {"e", "E"}, {"f", "F"}, {"g", "G"},
+            {"h", "H"}, {"i", "I"}, {"j", "J"}, {"k", "K"}, {"l", "L"}, {"m", "M"}, {"n", "N"}, {"o", "O"}, {"p", "P"}, {"q", "Q"},
+            {"r", "R"}, {"s", "S"}, {"t", "T"}, {"u", "U"}, {"v", "V"}, {"w", "W"}, {"x", "X"}, {"y", "Y"}, {"z", "Z"}, {"Return", "Return"}, {"Space", "Space"},
             {"Ctrl", "Ctrl"}, {"Alt", "Alt"}, {"Shift", "Shift"}, {"Win", "Win"}, {".", ">"}, {",", "<"}, {"F1", "F1"}, {"F2", "F2"}, {"F3", "F3"}, {"F4", "F4"},
             {"F5", "F5"}, {"F6", "F6"}, {"F7", "F7"}, {"F8", "F8"}, {"F9", "F9"}, {"F10", "F10"}, {"F11", "F11"}, {"F12", "F12"}, {"Tab", "Tab"}, {"Delete", "Delete"},
             {";", ":"}, {"/", "?"}, {"`", "~"}, {"[", "{"}, {"\\", "|"}, {"]", "}"}, {"'", "\""}, {"-", "_"}, {"=", "+"}, {"\u2193", "\u2193"},
             {"\u2190", "\u2190"}, {"\u2192", "\u2192"}, {"\u2191", "\u2191"}, {"CapsLock", "CapsLock"},
-        }
+        },
+        .keyMapper = {}
     });
+
+    // Standard Korean 2-set (Dubeolsik) labels on QWERTY physical keys.
+    // See XITRIX/Moonlight-Switch#283.
+    {
+        auto& korean = locales.back();
+        korean.localization[VK_KEY_Q][0] = "ㅂ";
+        korean.localization[VK_KEY_Q][1] = "ㅃ";
+        korean.localization[VK_KEY_W][0] = "ㅈ";
+        korean.localization[VK_KEY_W][1] = "ㅉ";
+        korean.localization[VK_KEY_E][0] = "ㄷ";
+        korean.localization[VK_KEY_E][1] = "ㄸ";
+        korean.localization[VK_KEY_R][0] = "ㄱ";
+        korean.localization[VK_KEY_R][1] = "ㄲ";
+        korean.localization[VK_KEY_T][0] = "ㅅ";
+        korean.localization[VK_KEY_T][1] = "ㅆ";
+        korean.localization[VK_KEY_Y][0] = "ㅛ";
+        korean.localization[VK_KEY_Y][1] = "ㅛ";
+        korean.localization[VK_KEY_U][0] = "ㅕ";
+        korean.localization[VK_KEY_U][1] = "ㅕ";
+        korean.localization[VK_KEY_I][0] = "ㅑ";
+        korean.localization[VK_KEY_I][1] = "ㅑ";
+        korean.localization[VK_KEY_O][0] = "ㅐ";
+        korean.localization[VK_KEY_O][1] = "ㅒ";
+        korean.localization[VK_KEY_P][0] = "ㅔ";
+        korean.localization[VK_KEY_P][1] = "ㅖ";
+        korean.localization[VK_KEY_A][0] = "ㅁ";
+        korean.localization[VK_KEY_A][1] = "ㅁ";
+        korean.localization[VK_KEY_S][0] = "ㄴ";
+        korean.localization[VK_KEY_S][1] = "ㄴ";
+        korean.localization[VK_KEY_D][0] = "ㅇ";
+        korean.localization[VK_KEY_D][1] = "ㅇ";
+        korean.localization[VK_KEY_F][0] = "ㄹ";
+        korean.localization[VK_KEY_F][1] = "ㄹ";
+        korean.localization[VK_KEY_G][0] = "ㅎ";
+        korean.localization[VK_KEY_G][1] = "ㅎ";
+        korean.localization[VK_KEY_H][0] = "ㅗ";
+        korean.localization[VK_KEY_H][1] = "ㅗ";
+        korean.localization[VK_KEY_J][0] = "ㅓ";
+        korean.localization[VK_KEY_J][1] = "ㅓ";
+        korean.localization[VK_KEY_K][0] = "ㅏ";
+        korean.localization[VK_KEY_K][1] = "ㅏ";
+        korean.localization[VK_KEY_L][0] = "ㅣ";
+        korean.localization[VK_KEY_L][1] = "ㅣ";
+        korean.localization[VK_KEY_Z][0] = "ㅋ";
+        korean.localization[VK_KEY_Z][1] = "ㅋ";
+        korean.localization[VK_KEY_X][0] = "ㅌ";
+        korean.localization[VK_KEY_X][1] = "ㅌ";
+        korean.localization[VK_KEY_C][0] = "ㅊ";
+        korean.localization[VK_KEY_C][1] = "ㅊ";
+        korean.localization[VK_KEY_V][0] = "ㅍ";
+        korean.localization[VK_KEY_V][1] = "ㅍ";
+        korean.localization[VK_KEY_B][0] = "ㅠ";
+        korean.localization[VK_KEY_B][1] = "ㅠ";
+        korean.localization[VK_KEY_N][0] = "ㅜ";
+        korean.localization[VK_KEY_N][1] = "ㅜ";
+        korean.localization[VK_KEY_M][0] = "ㅡ";
+        korean.localization[VK_KEY_M][1] = "ㅡ";
+    }
 
     KeyboardLocale englishUk = locales.front();
     englishUk.name = "English (UK)";

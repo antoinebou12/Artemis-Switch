@@ -170,6 +170,9 @@
                 id="keyboard_type"/>
 
             <brls:SelectorCell
+                id="keyboard_locale"/>
+
+            <brls:SelectorCell
                 id="keyboard_fingers"/>
                 
             <brls:Header

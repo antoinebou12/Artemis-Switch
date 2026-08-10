@@ -228,6 +228,12 @@ void ButtonView::registerCallback() {
     addGestureRecognizer(tapRecognizer);
 }
 
+void KeyboardView::ensureLocales() {
+    if (locales.empty()) {
+        createLocales();
+    }
+}
+
 KeyboardView::KeyboardView(bool focusable)
     : Box(Axis::COLUMN), needFocus(focusable) {
     createLocales();

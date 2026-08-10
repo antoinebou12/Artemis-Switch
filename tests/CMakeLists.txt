@@ -130,6 +130,11 @@ add_artemis_test(touch_control_profile_test
     app/src/features/input/TouchControlProfile.cpp
     app/src/features/input)
 
+add_executable(korean_keyboard_layout_test
+    "${REPO_ROOT}/tests/korean_keyboard_layout_test.cpp")
+target_compile_features(korean_keyboard_layout_test PRIVATE cxx_std_20)
+add_test(NAME korean_keyboard_layout_test COMMAND korean_keyboard_layout_test)
+
 add_executable(display_coordinate_mapper_test
     "${REPO_ROOT}/tests/display_coordinate_mapper_test.cpp"
     "${REPO_ROOT}/app/src/features/video/DisplayCoordinateMapper.cpp"
