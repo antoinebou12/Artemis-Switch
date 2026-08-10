@@ -1,101 +1,132 @@
-# Artemis Switch integration plan
+# artemi-switch integration plan
 
-Artemis Switch is developed through a single consolidated integration branch and pull request rather than one PR per feature.
+`artemi-switch` keeps Moonlight-Switch's proven streaming stack and adds Switch-focused presentation, performance, and carefully gated Apollo integration. New controls are exposed only when their runtime path is real and testable.
 
-## Principles
+## UI placement rules
 
-- Reuse Moonlight-Switch's existing Borealis UI, `MoonlightSession`, input stack, NVDEC and deko3d paths.
-- Keep Sunshine/GameStream behavior as the safe default.
-- Enable Apollo-only behavior only after positive capability detection.
-- Keep portable policy/statistics and presentation geometry independently unit testable.
-- Require portable tests, sanitizer tests, cross-feature integration tests and the real Nintendo Switch build before release.
+### Quick Actions: essentials only
 
-## Consolidated feature set
+Quick Actions are intentionally short and session-focused:
 
-### Benchmark and diagnostics
+- keyboard
+- performance overlay
+- pointer/mouse mode
+- disconnect
+- quit host app when supported
 
-- live `MoonlightSession` telemetry sampling
-- receive/decode/render FPS and latency metrics
-- frame-queue fault counters
-- mean, median, P95 and P99 aggregation
-- Switch-oriented stability score
-- JSON/CSV benchmark export
-- Artemis Performance tab in the existing in-game overlay
-- benchmark runtime metadata for handheld/docked mode, battery level, charging-enabled state and best-effort read-only CPU/GPU/EMC clock rates
+Benchmark/test controls, image-filter tuning, rotation, virtual display, and other advanced configuration do **not** belong in Quick Actions.
 
-### Stream tuning
+### Options: live and diagnostic controls
 
-- persistent custom resolution
-- exact bitrate configuration
-- H.264/HEVC profile validation
-- 30/40/60/90/120 FPS policy
-- Auto Tune quick and extended benchmark plans
-- reconnect/warm-up/benchmark/rank/apply runtime
-- full-range preference applied both to Moonlight `STREAM_CONFIGURATION.colorRange` and Switch renderer conversion
+The in-stream Options page owns controls that are useful while a session is active:
 
-### UI and Switch controls
+- input and keyboard behavior
+- pointer/mouse behavior
+- audio and rumble
+- image filtering such as FSR, RCAS, and dithering
+- rotation once the renderer/input transform backend is complete
+- benchmark/test and debug controls under a dedicated Diagnostics section
 
-- native Artemis Borealis settings tab
-- existing in-game overlay reused for Quick Actions
-- keyboard, performance, benchmark, disconnect and quit-host actions
-- Fit / Fill / Stretch state and tested presentation geometry
-- Zoom/Pan persistence and tested source-crop geometry
-- Joy-Con / Pro Controller motion policy
-- console-motion fallback is shown as unavailable until the runtime exposes a distinct console IMU source
+### Settings: persistent stream configuration
 
-### Nintendo Switch runtime integration
+The main settings page is grouped by responsibility:
 
-- existing Moonlight-Switch deko3D renderer preserved as the compatibility implementation
-- normal `Fill` presentation continues through the existing renderer, including its existing NVDEC, FSR/RCAS/dithering and frame-stat paths
-- `Fit`, `Stretch`, Zoom/Pan and forced full-range video are connected to an Artemis deko3D direct-presentation path
-- Fit mode clears the full framebuffer and renders into a centered aspect-preserving viewport for black letterbox/pillarbox bars
-- Fill and Zoom/Pan use source UV cropping rather than resizing decoded frames on the CPU
-- forced full range requests `COLOR_RANGE_FULL` from the host and reuses the existing deko3D YUV full-range conversion matrices
-- the existing `LiSendControllerMotionEvent()` boundary is policy-gated without rewriting Moonlight-Switch's input implementation
-- console-IMU fallback remains capability-gated because the current Borealis controller sensor callback does not identify a distinct console motion source
-- Switch benchmark metadata uses read-only libnx services and never changes clocks
+1. **Stream profile**: resolution, exact bitrate, FPS, codec/decoder information.
+2. **Presentation**: Fit/Fill/Stretch, Full Range, filter status, Zoom/Pan persistence.
+3. **Advanced network**: experimental transport policies only.
+4. **Motion**: controller motion and safe console fallback policy.
 
-The first Artemis presentation milestone intentionally uses the direct deko3D path whenever Fit, Stretch, Zoom/Pan or forced full range is active. The untouched default Fill path retains the current FSR/RCAS/dithering pipeline. After real-device validation, the same presentation geometry can be propagated through the post-processing path so those effects remain available in every scale mode.
+The FPS selector always presents 30/40/60/90/120 FPS. There is no second “unlock high FPS” toggle.
 
-### Host capabilities
+### Pre-launch setup: Apollo virtual display
 
-- Sunshine-safe capability fallback
-- conservative Apollo detection
-- virtual-display/server-command/clipboard/input-only capability flags
+Virtual display is configured **before launching an app**, not from the in-stream Quick menu. The implementation must:
 
-## CI
+- appear only after positive Apollo virtual-display capability detection
+- default to Off
+- offer current profile, handheld, docked, portrait, and validated custom targets
+- check driver readiness before launch
+- add Apollo-only launch parameters only for Apollo hosts
+- leave Sunshine launch requests unchanged
+- use controlled reconnect + rollback for an active resolution change
 
-The consolidated PR uses:
+Until the Apollo launch/query backend is implemented and tested, no non-functional virtual-display control should be shown.
 
-1. `.github/workflows/unit-tests.yml` for portable C++ tests and sanitizers.
-2. `.github/workflows/feature-integration-ci.yml` for consolidated unit and cross-feature integration suites.
-3. `.github/workflows/all-builds.yml` as the real platform build matrix, including Nintendo Switch `.nro`/`.elf` validation.
+## Renderer and video filtering
 
-## Remaining deep integration and validation work
+Fit, Fill, Stretch, Zoom/Pan, and Full Range use one deko3d presentation path. Switching scale modes must not jump between unrelated renderer implementations.
 
-The main Switch presentation, motion, full-range negotiation and benchmark metadata hooks are now implemented in code. Remaining release work is:
+The unified path reuses Moonlight-Switch's existing:
 
-- obtain a green Nintendo Switch `.nro` / `.elf` build for the consolidated PR
-- boot and stream-test Fit / Fill / Stretch on real Switch hardware
-- validate Zoom/Pan direction, edges and persistence on-device
-- validate forced full-range output against known limited/full-range host content
-- verify that read-only CPU/GPU/EMC clock queries are permitted on the target homebrew environment; unavailable services intentionally export zero
-- propagate Artemis presentation geometry through the existing FSR/RCAS/dithering post-processing path after the direct path is proven stable
-- expose a distinct console-IMU fallback only if Borealis/libnx provides an unambiguous source separate from controller motion
-- map and implement verified Apollo virtual-display/server-command/clipboard operations
-- run benchmark/Auto Tune validation on real Switch hardware and tune scoring thresholds from collected data
+- NVDEC/NVTEGRA frame mappings
+- deko3d descriptor and command infrastructure
+- FSR/EASU resources
+- RCAS sharpening
+- dithering
+- renderer statistics
 
-## Release acceptance
+Presentation behavior:
 
-A release candidate should not be tagged until:
+- **Fit**: preserve aspect ratio and clear unused framebuffer regions to black.
+- **Fill**: crop source UVs to fill the output without CPU frame resizing.
+- **Stretch**: present the complete source over the full output viewport.
+- **Zoom/Pan**: crop the selected source region on the GPU.
+- **Full Range**: request `COLOR_RANGE_FULL` from the host and use full-range YUV conversion without disabling video filtering.
+
+Filter/resource allocation failure falls back to the same presentation geometry on the direct path rather than silently changing the selected scale mode.
+
+## Performance and diagnostics
+
+The Performance page should prioritize actionable live information without repeating the same profile in multiple rows. It includes:
+
+- configured resolution/FPS/codec
+- receive and decode latency
+- packet loss
+- rendered FPS
+- frame render time
+- post-process time
+- FSR time
+- RCAS time
+- dithering time
+- GPU render time when available
+- frame queue current/target/capacity
+- active Fit/Fill/Stretch mode
+- Full/Limited range state
+- benchmark and Auto Tune controls
+
+Benchmark/test actions remain under Performance/Diagnostics rather than Quick Actions.
+
+## Rotation
+
+Rotation belongs in Options, not Quick Actions. 0°, 90°, 180°, and 270° must share a single transform used by rendering, absolute input, relative vectors, cursor placement, Zoom/Pan, and virtual-control hit testing. Do not expose the selector until those mappings are implemented together.
+
+## Apollo capability work
+
+Apollo support remains capability-gated. Required backend work includes:
+
+- parse real server-info virtual-display capability/readiness fields
+- preserve app UUIDs and server ordering
+- virtual-display launch/resume parameters
+- Remote Input UUID handling
+- server commands
+- plain-text clipboard operations
+- permission-aware error handling
+
+Sunshine must receive no Apollo-only parameters.
+
+## CI and release acceptance
+
+Before release:
 
 - portable unit tests pass
-- ASan/UBSan tests pass
+- ASan/UBSan pass
+- localization contracts pass
 - cross-feature integration tests pass
-- Nintendo Switch build succeeds
-- the `.nro` boots through full-RAM hbmenu/title redirection
-- a real stream can start, stop, reconnect and exit safely
-- Fit / Fill / Stretch and Zoom/Pan are visually verified on the Switch
-- benchmark collection/export is validated on-device
-- Auto Tune can cancel and restore the original profile safely
-- Sunshine continues to work when Apollo features are unavailable
+- Nintendo Switch `.nro` / `.elf` build succeeds
+- Fit/Fill/Stretch are visually verified on hardware
+- Full Range is checked with known limited/full-range content
+- FSR/RCAS/dithering remain active in every presentation mode when enabled
+- scale changes do not flicker or expose stale framebuffer content
+- 90/120 FPS remain explicit profile choices
+- Sunshine streaming remains unchanged when Apollo features are unavailable
+- Apollo virtual display is not exposed until launch/readiness/rollback behavior is verified
