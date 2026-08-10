@@ -7,7 +7,13 @@
 
 #include "helper.hpp"
 
+#include "Settings.hpp"
+
 #include <utility>
+
+#ifdef __SWITCH__
+#include <switch.h>
+#endif
 
 using namespace brls;
 
@@ -20,6 +26,16 @@ void showAlert(std::string message, const std::function<void(void)>& cb) {
 
 void showError(const std::string& message, const std::function<void(void)>& cb) {
     showAlert("error/dialog_header"_i18n + "\n\n" + message, cb);
+}
+
+void requestAppRestart() {
+#ifdef __SWITCH__
+    const auto path = Settings::instance().launch_path();
+    if (!path.empty()) {
+        envSetNextLoad(path.c_str(), path.c_str());
+    }
+#endif
+    Application::quit();
 }
 
 brls::Dialog* createLoadingDialog(

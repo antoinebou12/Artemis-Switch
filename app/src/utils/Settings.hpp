@@ -289,6 +289,16 @@ class Settings : public Singleton<Settings> {
     void set_play_audio(bool play_audio) { m_play_audio = play_audio; }
     [[nodiscard]] bool play_audio() const { return m_play_audio; }
 
+    void set_wireguard_enabled(bool enabled) { m_wireguard_enabled = enabled; }
+    [[nodiscard]] bool wireguard_enabled() const { return m_wireguard_enabled; }
+
+    void set_wireguard_config_path(std::string path) {
+        m_wireguard_config_path = std::move(path);
+    }
+    [[nodiscard]] std::string wireguard_config_path() const {
+        return m_wireguard_config_path;
+    }
+
     void set_stream_audio_configuration(StreamAudioConfiguration config) {
         m_stream_audio_configuration = config;
     }
@@ -437,6 +447,8 @@ class Settings : public Singleton<Settings> {
     int m_frames_queue_size = 3;
     bool m_sops = false;
     bool m_play_audio = false;
+    bool m_wireguard_enabled = false;
+    std::string m_wireguard_config_path;
     StreamAudioConfiguration m_stream_audio_configuration = STREAM_AUDIO_STEREO;
     bool m_terminate_app_on_disconnect = false;
     bool m_write_log = false;

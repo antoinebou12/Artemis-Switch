@@ -24,7 +24,10 @@
             
             <brls:InputCell
                 id="hostIP"/>
-            
+
+            <brls:DetailCell
+                id="add_endpoint"/>
+
             <brls:DetailCell
                 id="connect"
                 lineTop="1px"

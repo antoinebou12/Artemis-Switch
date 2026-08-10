@@ -123,6 +123,11 @@ add_artemis_test(server_command_shortcuts_test
     app/src/features/apollo/ServerCommandShortcuts.cpp
     app/src/features/apollo)
 
+add_artemis_test(wireguard_config_test
+    tests/wireguard_config_test.cpp
+    app/src/vpn/WireGuardConfig.cpp
+    app/src/vpn)
+
 add_artemis_test(controller_diagnostics_test
     tests/controller_diagnostics_test.cpp
     app/src/features/input/ControllerDiagnostics.cpp

@@ -24,6 +24,21 @@ AddHostTab::AddHostTab() {
     hostIP->setPlaceholder("stream.example.com:47989");
     hostIP->setHint("192.168.1.109:47989");
 
+    addEndpoint->setText("host/add_endpoint"_i18n);
+    refreshExtraEndpointsDetail();
+    addEndpoint->registerClickAction([this](View* view) {
+        Application::getPlatform()->getImeManager()->openForText(
+            [this](const std::string& text) {
+                if (text.empty()) {
+                    return;
+                }
+                this->extraEndpoints.push_back(text);
+                this->refreshExtraEndpointsDetail();
+            },
+            "host/add_endpoint_title"_i18n, "", 80, "", 0);
+        return true;
+    });
+
     connect->setText("add_host/connect"_i18n);
     connect->registerClickAction([this](View* view) {
         Host host;
@@ -40,6 +55,9 @@ AddHostTab::AddHostTab() {
             host.address = inputAddress;
         }
         host.ensure_endpoints();
+        for (const auto& endpoint : extraEndpoints) {
+            host.add_endpoint("Custom", endpoint);
+        }
         connectHost(host);
         return true;
     });
@@ -60,6 +78,15 @@ AddHostTab::AddHostTab() {
                        return true;
                    });
     setActionAvailable(BUTTON_X, GameStreamClient::can_find_host());
+}
+
+void AddHostTab::refreshExtraEndpointsDetail() {
+    if (extraEndpoints.empty()) {
+        addEndpoint->setDetailText("add_host/extra_endpoints_none"_i18n);
+        return;
+    }
+    addEndpoint->setDetailText("add_host/extra_endpoints_count"_i18n + " (" +
+                               std::to_string(extraEndpoints.size()) + ")");
 }
 
 void AddHostTab::fillSearchBox(const GSResult<std::vector<Host>>& hostsRes) {

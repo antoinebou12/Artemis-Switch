@@ -19,6 +19,9 @@
 #include "features/input/InputSettingsStore.hpp"
 #include "features/video/UpscalingModeSelect.hpp"
 #include "keyboard_view.hpp"
+#if defined(__SWITCH__) && defined(ENABLE_WIREGUARD)
+#include "vpn/WireGuardManager.hpp"
+#endif
 #include <cmath>
 #include <iomanip>
 #include <sstream>
@@ -115,7 +118,7 @@ SettingsTab::SettingsTab() {
                             Settings::instance().set_app_locale(
                                 locales[static_cast<size_t>(index)].code);
                             Settings::instance().save();
-                            showAlert("settings/language_restart"_i18n);
+                            requestAppRestart();
                         });
     }
 
@@ -460,6 +463,52 @@ SettingsTab::SettingsTab() {
     pcAudio->init(
         "settings/paop"_i18n, Settings::instance().play_audio(),
         [](bool value) { Settings::instance().set_play_audio(value); });
+
+#if defined(__SWITCH__) && defined(ENABLE_WIREGUARD)
+    wireguardEnabled->init(
+        "settings/wireguard_enabled"_i18n,
+        Settings::instance().wireguard_enabled(), [this](bool value) {
+            Settings::instance().set_wireguard_enabled(value);
+            if (value) {
+                WireGuardManager::instance().enable_from_settings();
+            } else {
+                WireGuardManager::instance().disable();
+            }
+            wireguardStatus->setDetailText(
+                WireGuardManager::instance().status_text());
+        });
+
+    wireguardConfigPath->setText("settings/wireguard_config_path"_i18n);
+    wireguardConfigPath->setDetailText(
+        Settings::instance().wireguard_config_path().empty()
+            ? "sdmc:/switch/Moonlight-Switch/wg0.conf"
+            : Settings::instance().wireguard_config_path());
+    wireguardConfigPath->registerClickAction([this](View* view) {
+        const std::string current =
+            Settings::instance().wireguard_config_path();
+        Application::getPlatform()->getImeManager()->openForText(
+            [this](const std::string& text) {
+                Settings::instance().set_wireguard_config_path(text);
+                wireguardConfigPath->setDetailText(text);
+                if (Settings::instance().wireguard_enabled()) {
+                    WireGuardManager::instance().enable_from_settings();
+                    wireguardStatus->setDetailText(
+                        WireGuardManager::instance().status_text());
+                }
+            },
+            "settings/wireguard_config_path_title"_i18n, "", 120,
+            current.empty() ? "sdmc:/switch/Moonlight-Switch/wg0.conf" : current,
+            0);
+        return true;
+    });
+
+    wireguardStatus->setText("settings/wireguard_status"_i18n);
+    wireguardStatus->setDetailText(WireGuardManager::instance().status_text());
+#else
+    wireguardEnabled->removeFromSuperView(true);
+    wireguardConfigPath->removeFromSuperView(true);
+    wireguardStatus->removeFromSuperView(true);
+#endif
 
     streamAudioConfiguration->init(
         "settings/stream_audio_configuration"_i18n,

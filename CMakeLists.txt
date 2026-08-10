@@ -95,6 +95,15 @@ if (ENABLE_UPSCALING)
     endif ()
 endif ()
 
+option(ENABLE_WIREGUARD "Enable in-app WireGuard (wg-nx) support on Switch" OFF)
+if (ENABLE_WIREGUARD)
+    if (NOT PLATFORM_SWITCH)
+        message(FATAL_ERROR "ENABLE_WIREGUARD=ON is only supported on Switch")
+    endif ()
+    message(STATUS "Use ENABLE_WIREGUARD")
+    add_definitions(-DENABLE_WIREGUARD)
+endif ()
+
 set(CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH} "${EXTERN_PATH}/cmake")
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${EXTERN_PATH}/cmake")
 #find_package(PkgConfig REQUIRED)
@@ -316,6 +325,20 @@ elseif (PLATFORM_SWITCH)
             ${BOREALIS_LIBRARY}/lib/platforms/switch/switch_wrapper.c
             app/src/switch/wrapper.c
             )
+    if (ENABLE_WIREGUARD)
+        list(APPEND MAIN_SRC
+            app/src/vpn/WireGuardConfig.cpp
+            app/src/vpn/WireGuardManager.cpp
+        )
+        if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/switch/libwg_nx.a")
+            list(APPEND PLATFORM_LIBS
+                ${CMAKE_CURRENT_SOURCE_DIR}/lib/switch/libwg_nx.a)
+            message(STATUS "Linking external libwg_nx.a")
+        else ()
+            list(APPEND MAIN_SRC app/src/vpn/wg_nx_stub.cpp)
+            message(STATUS "Using built-in wg-nx stub (drop lib/switch/libwg_nx.a for real tunnel)")
+        endif ()
+    endif ()
 elseif (PLATFORM_PSV)
     # VitaSDK itself uses __psp2__, Borealis uses __PSV__, and
     # moonlight-common-c uses __vita__ for its Vita socket implementation.
@@ -581,6 +604,7 @@ target_compile_options(${PROJECT_NAME} PRIVATE
 if(PLATFORM_SWITCH)
     target_include_directories(${PROJECT_NAME} PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/lib/switch/include
+            ${CMAKE_CURRENT_SOURCE_DIR}/app/src
     )
 endif ()
 

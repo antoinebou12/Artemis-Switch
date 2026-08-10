@@ -123,22 +123,6 @@ HostTab::HostTab(const Host& host) : host(host) {
         return true;
     });
 
-    addEndpoint->setText("host/add_endpoint"_i18n);
-    addEndpoint->registerClickAction([this](View* view) {
-        Application::getPlatform()->getImeManager()->openForText(
-            [this](const std::string& text) {
-                if (text.empty()) {
-                    return;
-                }
-                this->host.add_endpoint("Custom", text);
-                Settings::instance().add_host(this->host);
-                header->setSubtitle(host_subtitle(this->host));
-                this->reloadHost();
-            },
-            "host/add_endpoint_title"_i18n, "", 80, "", 0);
-        return true;
-    });
-
     remove->registerClickAction([host](View* view) {
         auto* dialog = new Dialog("host/remove_message"_i18n);
         dialog->addButton("common/cancel"_i18n, [] {});

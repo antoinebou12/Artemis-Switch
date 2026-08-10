@@ -93,6 +93,19 @@
             <brls:BooleanCell
                 id="pcAudio"/>
 
+            <brls:Header
+                title="@i18n/settings/wireguard"
+                paddingTop="60"/>
+
+            <brls:BooleanCell
+                id="wireguard_enabled"/>
+
+            <brls:DetailCell
+                id="wireguard_config_path"/>
+
+            <brls:DetailCell
+                id="wireguard_status"/>
+
             <brls:SelectorCell
                 id="stream_audio_configuration"/>
 

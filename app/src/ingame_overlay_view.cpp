@@ -21,7 +21,6 @@
 #include "features/input/InputSettingsStore.hpp"
 #include "features/input/HostKeyboardShortcuts.hpp"
 #include "features/apollo/ApolloHostOptionsStore.hpp"
-#include "features/apollo/ServerCommandShortcuts.hpp"
 #include "features/video/DisplayTransformStore.hpp"
 #include "streaming/InputManager.hpp"
 #include "Limelight.h"
@@ -331,10 +330,9 @@ LogoutTab::LogoutTab(StreamingView* streamView) : streamView(streamView) {
 QuickTab::QuickTab(StreamingView* streamView) : streamView(streamView) {
     this->inflateFromXMLRes("xml/views/ingame_overlay/quick_tab.xml");
 
-    const std::array<DetailCell*, 8> quickRows = {
-        quickKeyboard,   quickMoveLeft,       quickMoveRight,
-        quickHostShortcuts, quickRestartServer, quickResetDisplay,
-        quickServerCommands, quickMouse};
+    const std::array<DetailCell*, 6> quickRows = {
+        quickKeyboard,       quickMoveLeft,       quickMoveRight,
+        quickHostShortcuts,  quickServerCommands, quickMouse};
     for (auto* row : quickRows) {
         row->title->setSingleLine(true);
         row->detail->setSingleLine(true);
@@ -406,58 +404,6 @@ QuickTab::QuickTab(StreamingView* streamView) : streamView(streamView) {
         (!server.hasApolloPermissionField ||
          (server.permission & serverCommandPermission) != 0) &&
         !server.serverCommands.empty();
-
-    const auto restartMatch = commandsAllowed
-        ? artemis::apollo::findAdvertisedServerCommand(
-              server.serverCommands,
-              artemis::apollo::ServerCommandShortcutKind::Restart)
-        : std::optional<artemis::apollo::MatchedServerCommand>{};
-    const auto resetMatch = commandsAllowed
-        ? artemis::apollo::findAdvertisedServerCommand(
-              server.serverCommands,
-              artemis::apollo::ServerCommandShortcutKind::ResetDisplay)
-        : std::optional<artemis::apollo::MatchedServerCommand>{};
-
-    const auto wireAdvertisedShortcut =
-        [this](DetailCell* cell, const std::string& title,
-               const std::optional<artemis::apollo::MatchedServerCommand>&
-                   match,
-               bool allowed) {
-            cell->setText(title);
-            if (!allowed) {
-                cell->setDetailText("artemis/overlay/apollo_only"_i18n);
-            } else if (match) {
-                cell->setDetailText(match->advertisedName);
-            } else {
-                cell->setDetailText(
-                    "artemis/overlay/command_not_advertised"_i18n);
-            }
-            cell->registerClickAction([this, cell, match, allowed](View*) {
-                if (!allowed || !match) {
-                    auto* dialog = new Dialog(
-                        allowed ? "artemis/overlay/command_not_advertised"_i18n
-                                : "artemis/overlay/apollo_only"_i18n);
-                    dialog->addButton("common/close"_i18n, [] {});
-                    dialog->open();
-                    return true;
-                }
-                if (match->index > UINT8_MAX)
-                    return true;
-                const bool sent =
-                    LiSendExecServerCmd(static_cast<uint8_t>(match->index)) ==
-                    0;
-                cell->setDetailText(sent ? "artemis/overlay/sent"_i18n
-                                         : "artemis/overlay/send_failed"_i18n);
-                return true;
-            });
-        };
-
-    wireAdvertisedShortcut(quickRestartServer,
-                           "artemis/overlay/restart_server"_i18n, restartMatch,
-                           commandsAllowed);
-    wireAdvertisedShortcut(quickResetDisplay,
-                           "artemis/overlay/reset_display"_i18n, resetMatch,
-                           commandsAllowed);
 
     quickServerCommands->setText("artemis/overlay/server_commands"_i18n);
     quickServerCommands->setDetailText(

@@ -404,6 +404,19 @@ void Settings::load() {
                 m_play_audio = json_typeof(play_audio) == JSON_TRUE;
             }
 
+            if (json_t* wireguard_enabled =
+                    json_object_get(settings, "wireguard_enabled")) {
+                m_wireguard_enabled = json_typeof(wireguard_enabled) == JSON_TRUE;
+            }
+
+            if (json_t* wireguard_config_path =
+                    json_object_get(settings, "wireguard_config_path")) {
+                if (json_typeof(wireguard_config_path) == JSON_STRING) {
+                    m_wireguard_config_path =
+                        json_string_value(wireguard_config_path);
+                }
+            }
+
             if (json_t* stream_audio_configuration =
                     json_object_get(settings, "stream_audio_configuration")) {
                 if (json_typeof(stream_audio_configuration) == JSON_INTEGER) {
@@ -692,6 +705,10 @@ void Settings::save() {
             json_object_set_new(settings, "use_hw_decoding", m_use_hw_decoding ? json_true() : json_false());
             json_object_set_new(settings, "sops", m_sops ? json_true() : json_false());
             json_object_set_new(settings, "play_audio", m_play_audio ? json_true() : json_false());
+            json_object_set_new(settings, "wireguard_enabled",
+                                m_wireguard_enabled ? json_true() : json_false());
+            json_object_set_new(settings, "wireguard_config_path",
+                                json_string(m_wireguard_config_path.c_str()));
             json_object_set_new(settings, "stream_audio_configuration",
                                 json_integer(m_stream_audio_configuration));
             json_object_set_new(settings, "terminate_app_on_disconnect",

@@ -8,6 +8,8 @@
 #pragma once
 
 #include <cstdint>
+#include <string>
+#include <vector>
 #include <borealis.hpp>
 #include "Settings.hpp"
 #include "GameStreamClient.hpp"
@@ -26,14 +28,17 @@ class AddHostTab : public brls::Box
     void connectHost(const Host& host);
     void fillSearchBox(const GSResult<std::vector<Host>>& hostsRes);
     void appendSearchHosts(const std::vector<Host>& hosts);
+    void refreshExtraEndpointsDetail();
     static void pauseSearching();
     static void startSearching();
     brls::Event<GSResult<std::vector<Host>>>::Subscription searchSubscription;
     uint64_t searchGeneration = 0;
+    std::vector<std::string> extraEndpoints;
 
     bool searchBoxIpExists(const std::string& ip);
     
     BRLS_BIND(brls::InputCell, hostIP, "hostIP");
+    BRLS_BIND(brls::DetailCell, addEndpoint, "add_endpoint");
     BRLS_BIND(brls::DetailCell, connect, "connect");
     BRLS_BIND(brls::Box, searchBox, "search_box");
     BRLS_BIND(brls::Box, loader, "loader");

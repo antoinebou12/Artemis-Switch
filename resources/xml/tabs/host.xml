@@ -30,9 +30,6 @@
                 id="host_web_config"/>
 
             <brls:DetailCell
-                id="add_endpoint"/>
-
-            <brls:DetailCell
                 id="remove"
                 lineTop="1px"
                 marginTop="24"/>
