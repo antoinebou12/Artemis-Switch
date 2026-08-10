@@ -23,43 +23,59 @@ jobs:
           submodules: recursive
           fetch-depth: 0
 
-      - name: Remove bundled fonts
-        run: rm -rf ./resources/font
+      - name: Build Nintendo Switch NRO and capture diagnostics
+        shell: bash
+        run: |
+          set +e
+          exec > >(tee /tmp/artemis-switch-build.log) 2>&1
 
-      - name: Remove conflicting enet package
-        run: dkp-pacman --noconfirm -R switch-enet
+          rm -rf ./resources/font
+          dkp-pacman --noconfirm -R switch-enet || true
 
-      - name: Configure (compatibility pass)
-        continue-on-error: true
-        run: cmake -B build/switch -DCMAKE_BUILD_TYPE=Release -DPLATFORM_SWITCH=ON -DUSE_DEKO3D=ON
+          cmake -B build/switch -DCMAKE_BUILD_TYPE=Release -DPLATFORM_SWITCH=ON -DUSE_DEKO3D=ON || true
+          cmake -B build/switch -DCMAKE_BUILD_TYPE=Release -DPLATFORM_SWITCH=ON -DUSE_DEKO3D=ON
+          configure_rc=$?
 
-      - name: Configure
-        run: cmake -B build/switch -DCMAKE_BUILD_TYPE=Release -DPLATFORM_SWITCH=ON -DUSE_DEKO3D=ON
+          build_rc=$configure_rc
+          if [ "$configure_rc" -eq 0 ]; then
+            cmake --build build/switch --target Moonlight.nro --parallel 8
+            build_rc=$?
+          fi
 
-      - name: Build Nintendo Switch NRO
-        run: cmake --build build/switch --target Moonlight.nro --parallel 8
+          if [ "$build_rc" -eq 0 ] && [ -s build/switch/Moonlight.nro ]; then
+            cp build/switch/Moonlight.nro /tmp/Artemis-Switch.nro
+          fi
 
-      - name: Commit NRO into dist and remove one-shot workflow
+          printf '%s\n' "$build_rc" > /tmp/artemis-switch-build.rc
+          exit 0
+
+      - name: Publish NRO or failure log to master
         shell: bash
         run: |
           set -euo pipefail
-          test -s build/switch/Moonlight.nro
-          cp build/switch/Moonlight.nro /tmp/Artemis-Switch.nro
 
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          # Restore files modified only for the container build, then replay this
-          # one-shot run on top of the newest master before publishing the binary.
+          rc="$(cat /tmp/artemis-switch-build.rc)"
           git reset --hard HEAD
           git pull --rebase origin master
 
           mkdir -p dist
-          cp /tmp/Artemis-Switch.nro dist/Artemis-Switch.nro
-          git add -f dist/Artemis-Switch.nro
+          if [ "$rc" = "0" ] && [ -s /tmp/Artemis-Switch.nro ]; then
+            cp /tmp/Artemis-Switch.nro dist/Artemis-Switch.nro
+            rm -f dist/Artemis-Switch-build.log dist/Artemis-Switch-build-status.txt
+            message="build: add Artemis Switch NRO to dist [skip ci]"
+          else
+            cp /tmp/artemis-switch-build.log dist/Artemis-Switch-build.log
+            printf 'Nintendo Switch build failed with exit code %s\n' "$rc" > dist/Artemis-Switch-build-status.txt
+            message="ci: record failed Artemis Switch build [skip ci]"
+          fi
+
           git rm .github/workflows/build-dist-once.yml
-          git commit -m "build: add Artemis Switch NRO to dist [skip ci]"
+          git add -f dist/Artemis-Switch.nro dist/Artemis-Switch-build.log dist/Artemis-Switch-build-status.txt 2>/dev/null || true
+          git commit -m "$message"
 
           git push origin HEAD:master || {
             git pull --rebase origin master
