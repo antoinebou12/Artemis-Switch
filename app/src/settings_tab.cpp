@@ -422,6 +422,15 @@ SettingsTab::SettingsTab() {
         "settings/paop"_i18n, Settings::instance().play_audio(),
         [](bool value) { Settings::instance().set_play_audio(value); });
 
+    streamAudioConfiguration->init(
+        "settings/stream_audio_configuration"_i18n,
+        {"settings/audio_stereo"_i18n, "settings/audio_51_surround"_i18n},
+        static_cast<int>(Settings::instance().stream_audio_configuration()),
+        [](int value) {
+            Settings::instance().set_stream_audio_configuration(
+                static_cast<StreamAudioConfiguration>(value));
+        });
+
     terminateAppOnDisconnect->init(
         "settings/terminate_app_on_disconnect"_i18n,
         Settings::instance().terminate_app_on_disconnect(), [](bool value) {

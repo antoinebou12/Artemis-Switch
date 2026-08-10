@@ -362,6 +362,14 @@ void Settings::load() {
                 m_play_audio = json_typeof(play_audio) == JSON_TRUE;
             }
 
+            if (json_t* stream_audio_configuration =
+                    json_object_get(settings, "stream_audio_configuration")) {
+                if (json_typeof(stream_audio_configuration) == JSON_INTEGER) {
+                    m_stream_audio_configuration = static_cast<StreamAudioConfiguration>(
+                        (int)json_integer_value(stream_audio_configuration));
+                }
+            }
+
             if (json_t* terminate_app_on_disconnect =
                     json_object_get(settings, "terminate_app_on_disconnect")) {
                 m_terminate_app_on_disconnect =
@@ -620,6 +628,8 @@ void Settings::save() {
             json_object_set_new(settings, "use_hw_decoding", m_use_hw_decoding ? json_true() : json_false());
             json_object_set_new(settings, "sops", m_sops ? json_true() : json_false());
             json_object_set_new(settings, "play_audio", m_play_audio ? json_true() : json_false());
+            json_object_set_new(settings, "stream_audio_configuration",
+                                json_integer(m_stream_audio_configuration));
             json_object_set_new(settings, "terminate_app_on_disconnect",
                                 m_terminate_app_on_disconnect ? json_true()
                                                              : json_false());

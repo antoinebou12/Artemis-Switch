@@ -34,6 +34,8 @@ class SettingsTab : public brls::Box {
     BRLS_BIND(brls::SelectorCell, audioBackend, "audio_backend");
     BRLS_BIND(brls::BooleanCell, optimal, "optimal");
     BRLS_BIND(brls::BooleanCell, pcAudio, "pcAudio");
+    BRLS_BIND(brls::SelectorCell, streamAudioConfiguration,
+              "stream_audio_configuration");
     BRLS_BIND(brls::BooleanCell, terminateAppOnDisconnect,
               "terminate_app_on_disconnect");
     BRLS_BIND(brls::BooleanCell, swapUi, "swap_ui");
