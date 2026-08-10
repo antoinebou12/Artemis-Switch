@@ -1,0 +1,55 @@
+name: Build Artemis Switch NRO into dist (one-shot)
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - .github/workflows/build-dist-once.yml
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-commit:
+    runs-on: ubuntu-latest
+    container:
+      image: docker://devkitpro/devkita64:latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Remove bundled fonts
+        run: rm -rf ./resources/font
+
+      - name: Remove conflicting enet package
+        run: dkp-pacman --noconfirm -R switch-enet
+
+      - name: Configure (compatibility pass)
+        continue-on-error: true
+        run: cmake -B build/switch -DCMAKE_BUILD_TYPE=Release -DPLATFORM_SWITCH=ON -DUSE_DEKO3D=ON
+
+      - name: Configure
+        run: cmake -B build/switch -DCMAKE_BUILD_TYPE=Release -DPLATFORM_SWITCH=ON -DUSE_DEKO3D=ON
+
+      - name: Build Nintendo Switch NRO
+        run: cmake --build build/switch --target Moonlight.nro --parallel 8
+
+      - name: Commit NRO into dist and remove one-shot workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s build/switch/Moonlight.nro
+          mkdir -p dist
+          cp build/switch/Moonlight.nro dist/Artemis-Switch.nro
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f dist/Artemis-Switch.nro
+          git rm .github/workflows/build-dist-once.yml
+          git commit -m "build: add Artemis Switch NRO to dist [skip ci]"
+          git push origin HEAD:master
