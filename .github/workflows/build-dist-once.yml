@@ -44,12 +44,24 @@ jobs:
         run: |
           set -euo pipefail
           test -s build/switch/Moonlight.nro
-          mkdir -p dist
-          cp build/switch/Moonlight.nro dist/Artemis-Switch.nro
+          cp build/switch/Moonlight.nro /tmp/Artemis-Switch.nro
+
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # Restore files modified only for the container build, then replay this
+          # one-shot run on top of the newest master before publishing the binary.
+          git reset --hard HEAD
+          git pull --rebase origin master
+
+          mkdir -p dist
+          cp /tmp/Artemis-Switch.nro dist/Artemis-Switch.nro
           git add -f dist/Artemis-Switch.nro
           git rm .github/workflows/build-dist-once.yml
           git commit -m "build: add Artemis Switch NRO to dist [skip ci]"
-          git push origin HEAD:master
+
+          git push origin HEAD:master || {
+            git pull --rebase origin master
+            git push origin HEAD:master
+          }
