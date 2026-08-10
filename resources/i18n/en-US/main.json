@@ -23,7 +23,8 @@
     },
     "add_host": {
         "connect": "Connect",
-        "host_ip": "Host IP",
+        "host_ip": "Host IP or hostname",
+        "invalid_address": "Enter an IP, hostname, or hostname:port",
         "manual": "Manual",
         "pair_postfix": " on your host device",
         "pair_prefix": "Pair up\n\nEnter ",

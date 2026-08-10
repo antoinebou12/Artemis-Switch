@@ -22,6 +22,7 @@
 #include "CryptoManager.hpp"
 #include "errors.h"
 #include "http.h"
+#include "../features/host/HostAddressParse.hpp"
 #include <Limelight.h>
 #include <borealis/core/logger.hpp>
 #include <errno.h>
@@ -699,19 +700,15 @@ int gs_clipboard_set(PSERVER_DATA server, const std::string& text,
 }
 
 int gs_init(PSERVER_DATA server, const std::string address) {
-    std::stringstream addressStream(address);
-    std::string segment;
-    std::vector<std::string> seglist;
+    const auto parsed = artemis::host::parse_host_address(address);
     unsigned short httpPort = 47989; // Default HTTP port
-
-    while(std::getline(addressStream, segment, ':'))
-    {
-       seglist.push_back(segment);
+    if (parsed.port.has_value()) {
+        httpPort = *parsed.port;
     }
 
-    // Override port if it presented
-    if (seglist.size() > 1) {
-        httpPort = atoi(seglist[1].c_str());
+    if (parsed.host.empty()) {
+        gs_set_error("Address is Empty");
+        return GS_FAILED;
     }
     
     if (!CryptoManager::load_cert_key_pair()) {
@@ -726,7 +723,7 @@ int gs_init(PSERVER_DATA server, const std::string address) {
     http_init(Settings::instance().key_dir());
 
     LiInitializeServerInformation(&server->serverInfo);
-    server->address = seglist[0];
+    server->address = parsed.host;
     server->serverInfo.address = server->address.c_str();
     server->httpPort = httpPort;
     server->httpsPort = 0; /* Populated by load_server_status() */

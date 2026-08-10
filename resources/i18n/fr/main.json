@@ -23,7 +23,8 @@
     },
     "add_host": {
         "connect": "Se connecter",
-        "host_ip": "IP de l'hôte",
+        "host_ip": "IP ou nom d'hôte",
+        "invalid_address": "Entrez une IP, un nom d'hôte ou nom:port",
         "manual": "Manuel",
         "pair_postfix": " sur la machine hôte",
         "pair_prefix": "Appairage\n\nEntrez ",
