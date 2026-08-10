@@ -84,3 +84,9 @@ add_artemi_test(zoom_pan_state_test
     tests/zoom_pan_state_test.cpp
     app/src/features/video/ZoomPanState.cpp
     app/src/features/video)
+
+add_executable(host_endpoints_test
+    "${REPO_ROOT}/tests/host_endpoints_test.cpp"
+)
+target_compile_features(host_endpoints_test PRIVATE cxx_std_20)
+add_test(NAME host_endpoints_test COMMAND host_endpoints_test)

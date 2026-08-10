@@ -78,6 +78,7 @@ AddHostTab::AddHostTab() {
         } else {
             host.address = inputAddress;
         }
+        host.ensure_endpoints();
         connectHost(host);
         return true;
     });

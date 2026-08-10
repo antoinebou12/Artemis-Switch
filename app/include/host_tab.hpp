@@ -19,6 +19,7 @@ class HostTab : public brls::Box {
     void reloadHost();
 
     BRLS_BIND(brls::DetailCell, connect, "connect");
+    BRLS_BIND(brls::DetailCell, addEndpoint, "add_endpoint");
     BRLS_BIND(brls::DetailCell, remove, "remove");
     BRLS_BIND(brls::Header, header, "header");
 
