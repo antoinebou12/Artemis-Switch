@@ -22,7 +22,7 @@ endfunction()
 add_artemis_test(benchmark_tests
     tests/benchmark_tests.cpp
     app/src/benchmark/BenchmarkAccumulator.cpp
-    app/src/benchmark)
+    app/src)
 
 add_executable(benchmark_export_tests
     "${REPO_ROOT}/tests/benchmark_export_tests.cpp"
@@ -73,6 +73,11 @@ add_artemis_test(advanced_stream_options_test
 add_artemis_test(switch_motion_policy_test
     tests/switch_motion_policy_test.cpp
     app/src/features/input/SwitchMotionPolicy.cpp
+    app/src/features/input)
+
+add_artemis_test(controller_topology_test
+    tests/controller_topology_test.cpp
+    app/src/features/input/ControllerTopology.cpp
     app/src/features/input)
 
 add_artemis_test(quick_stream_menu_test

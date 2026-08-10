@@ -1,6 +1,8 @@
 #if defined(PLATFORM_SWITCH) && defined(BOREALIS_USE_DEKO3D)
 
 #include "ArtemisDKVideoRenderer.hpp"
+#include "../../../video/VideoScale.hpp"
+#include "../../../video/VideoScaleStore.hpp"
 
 // Preload the dependencies used by the legacy source before temporarily
 // exposing its private implementation. This avoids leaking the private/public
@@ -38,8 +40,6 @@
 #include "../../../features/stream/AdvancedStreamOptionsStore.hpp"
 #include "../../../features/video/ZoomPanState.hpp"
 #include "../../../features/video/ZoomPanStore.hpp"
-#include "../../../video/VideoScale.hpp"
-#include "../../../video/VideoScaleStore.hpp"
 
 namespace {
 
@@ -118,7 +118,7 @@ public:
         const ScaleMode scaleMode = artemis::video::VideoScaleStore::instance().get();
         const auto zoomPan = artemis::video::normalizeZoomPan(
             artemis::video::ZoomPanStore::instance().get().state);
-        return scaleMode != ScaleMode::Fill ||
+        return !artemis::video::usesFilteredFullScreenPath(scaleMode) ||
                !nearlyEqual(zoomPan.zoom, 1.0f) ||
                !nearlyEqual(zoomPan.panX, 0.0f) ||
                !nearlyEqual(zoomPan.panY, 0.0f);

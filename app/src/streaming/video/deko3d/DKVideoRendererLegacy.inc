@@ -148,6 +148,14 @@ namespace
             return viewport;
         }
 
+        // Stretch keeps the complete decoded frame while still using the
+        // legacy post-processing chain. Fill continues to crop to the screen
+        // aspect ratio before FSR/RCAS/dithering presentation.
+        if (artemis::video::VideoScaleStore::instance().get() ==
+            artemis::video::ScaleMode::Stretch) {
+            return viewport;
+        }
+
         const float frameAspect = static_cast<float>(frameHeight) /
                                   static_cast<float>(frameWidth);
         const float screenAspect = static_cast<float>(screenHeight) /
@@ -940,6 +948,9 @@ void DKVideoRenderer::updateRenderState(int width, int height, AVFrame* frame) {
         m_screen_width != width || m_screen_height != height;
     const bool colorChanged =
         m_color_space != static_cast<int>(colorSpace) || m_color_full != colorFull;
+    const int artemisScaleMode = static_cast<int>(
+        artemis::video::VideoScaleStore::instance().get());
+    const bool scaleModeChanged = m_artemis_scale_mode != artemisScaleMode;
 #ifdef SUPPORT_UPSCALING
     const bool requestedDithering =
         Settings::instance().dithering() && frame->width > 0 && frame->height > 0 &&
@@ -960,6 +971,7 @@ void DKVideoRenderer::updateRenderState(int width, int height, AVFrame* frame) {
     const bool rcasChanged = m_rcas_requested != requestedRcas;
 
     if (!frameSizeChanged && !screenSizeChanged && !colorChanged &&
+        !scaleModeChanged &&
         !ditheringChanged && !upscalingChanged && !rcasChanged) {
         return;
     }
@@ -976,6 +988,7 @@ void DKVideoRenderer::updateRenderState(int width, int height, AVFrame* frame) {
 
     m_screen_width = width;
     m_screen_height = height;
+    m_artemis_scale_mode = artemisScaleMode;
     recordStaticCommands(frame);
 }
 

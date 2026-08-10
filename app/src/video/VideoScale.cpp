@@ -16,6 +16,10 @@ ScaleMode nextScaleMode(ScaleMode mode) {
     }
 }
 
+bool usesFilteredFullScreenPath(ScaleMode mode) {
+    return mode == ScaleMode::Fill || mode == ScaleMode::Stretch;
+}
+
 RectF VideoScale::destinationRect(float sourceWidth, float sourceHeight,
                                   float viewportWidth, float viewportHeight,
                                   ScaleMode mode) {

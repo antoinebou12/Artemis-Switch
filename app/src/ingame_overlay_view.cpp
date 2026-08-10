@@ -15,6 +15,7 @@
 #include "button_selecting_dialog.hpp"
 #include "UpscalingSupport.hpp"
 #include "video/VideoScaleStore.hpp"
+#include "features/input/ControllerTopology.hpp"
 
 #include <array>
 #include <cmath>
@@ -129,8 +130,8 @@ LogoutTab::LogoutTab(StreamingView* streamView) : streamView(streamView) {
 OptionsTab::OptionsTab(StreamingView* streamView) : streamView(streamView) {
     this->inflateFromXMLRes("xml/views/ingame_overlay/options_tab.xml");
 
-    const std::array<DetailCell*, 6> quickRows = {
-        quickKeyboard, quickDisplay, quickMouse, quickTouch,
+    const std::array<DetailCell*, 7> quickRows = {
+        quickKeyboard, quickDisplay, quickControllers, quickMouse, quickTouch,
         quickDisconnect, quickQuitHost};
     for (auto* row : quickRows) {
         row->title->setSingleLine(true);
@@ -153,6 +154,45 @@ OptionsTab::OptionsTab(StreamingView* streamView) : streamView(streamView) {
         quickDisplay->setDetailText(scaleModeText(mode));
         return true;
     });
+
+    const auto connectedControllerCount = [] {
+        const int reported = Application::getPlatform()
+                                 ->getInputManager()
+                                 ->getControllersConnectedCount();
+        return artemis::input::clampControllerCount(reported);
+    };
+    const auto controllerCountText = [connectedControllerCount] {
+        return std::to_string(connectedControllerCount()) + " / " +
+               std::to_string(artemis::input::MaxSupportedControllers);
+    };
+
+    quickControllers->setText("artemis/overlay/controllers"_i18n);
+    quickControllers->setDetailText(controllerCountText());
+    quickControllers->registerClickAction(
+        [this, connectedControllerCount, controllerCountText](View*) {
+            const auto players = artemis::input::connectedControllerPlayers(
+                connectedControllerCount());
+            std::string message =
+                "artemis/overlay/connected_controllers"_i18n;
+            message += "\n\n";
+            if (players.empty()) {
+                message += "artemis/overlay/no_controllers"_i18n;
+            } else {
+                for (std::size_t i = 0; i < players.size(); ++i) {
+                    if (i != 0)
+                        message += "\n";
+                    message += "artemis/overlay/player"_i18n + " " +
+                               std::to_string(players[i]) + " · " +
+                               "artemis/overlay/connected"_i18n;
+                }
+            }
+
+            quickControllers->setDetailText(controllerCountText());
+            auto* dialog = new Dialog(message);
+            dialog->addButton("common/close"_i18n, [] {});
+            dialog->open();
+            return true;
+        });
 
     quickMouse->setText("artemis/overlay/mouse_controls"_i18n);
     quickMouse->registerClickAction([this](View*) {

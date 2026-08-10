@@ -14,6 +14,7 @@
 
 #include "../features/input/SwitchMotionPolicy.hpp"
 #include "../features/input/SwitchMotionPolicyStore.hpp"
+#include "../features/input/ControllerTopology.hpp"
 
 // Keep Moonlight-Switch's existing input implementation and intercept only the
 // controller motion send boundary. This means mouse, keyboard, touch, rumble,

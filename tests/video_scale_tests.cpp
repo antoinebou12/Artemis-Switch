@@ -13,6 +13,9 @@ int main() {
     assert(nextScaleMode(ScaleMode::Fit) == ScaleMode::Fill);
     assert(nextScaleMode(ScaleMode::Fill) == ScaleMode::Stretch);
     assert(nextScaleMode(ScaleMode::Stretch) == ScaleMode::Fit);
+    assert(!usesFilteredFullScreenPath(ScaleMode::Fit));
+    assert(usesFilteredFullScreenPath(ScaleMode::Fill));
+    assert(usesFilteredFullScreenPath(ScaleMode::Stretch));
 
     const auto fit = VideoScale::destinationRect(1920, 1080, 1280, 800, ScaleMode::Fit);
     assert(near(fit.width, 1280.0f));

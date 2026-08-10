@@ -1,8 +1,8 @@
 # Artemis Switch
 
-[![Unit Tests](https://github.com/antoinebou12/Artemis-Switch/actions/workflows/unit-tests.yml/badge.svg?branch=agent%2Fartemis-switch-integration)](https://github.com/antoinebou12/Artemis-Switch/actions/workflows/unit-tests.yml)
-[![Feature & Integration CI](https://github.com/antoinebou12/Artemis-Switch/actions/workflows/feature-integration-ci.yml/badge.svg?branch=agent%2Fartemis-switch-integration)](https://github.com/antoinebou12/Artemis-Switch/actions/workflows/feature-integration-ci.yml)
-[![All Builds](https://github.com/antoinebou12/Artemis-Switch/actions/workflows/all-builds.yml/badge.svg?branch=agent%2Fartemis-switch-integration)](https://github.com/antoinebou12/Artemis-Switch/actions/workflows/all-builds.yml)
+[![Unit Tests](https://github.com/antoinebou12/Artemis-Switch/actions/workflows/unit-tests.yml/badge.svg?branch=main)](https://github.com/antoinebou12/Artemis-Switch/actions/workflows/unit-tests.yml)
+[![Feature & Integration CI](https://github.com/antoinebou12/Artemis-Switch/actions/workflows/feature-integration-ci.yml/badge.svg?branch=main)](https://github.com/antoinebou12/Artemis-Switch/actions/workflows/feature-integration-ci.yml)
+[![All Builds](https://github.com/antoinebou12/Artemis-Switch/actions/workflows/all-builds.yml/badge.svg?branch=main)](https://github.com/antoinebou12/Artemis-Switch/actions/workflows/all-builds.yml)
 [![Release CD](https://github.com/antoinebou12/Artemis-Switch/actions/workflows/release.yml/badge.svg)](https://github.com/antoinebou12/Artemis-Switch/actions/workflows/release.yml)
 [![Latest Release](https://img.shields.io/github/v/release/antoinebou12/Artemis-Switch?display_name=tag&sort=semver)](https://github.com/antoinebou12/Artemis-Switch/releases)
 [![Platform](https://img.shields.io/badge/platform-Nintendo%20Switch-E60012)](#nintendo-switch)
@@ -15,18 +15,19 @@
 It keeps the existing Moonlight-Switch architecture instead of replacing it: **Borealis UI, Moonlight/GameStream, FFmpeg/NVDEC, deko3d, Joy-Con input, Sunshine compatibility, and the existing post-processing path remain the foundation.**
 
 > [!IMPORTANT]
-> Artemis Switch is under active development. PR #15 contains the current consolidated implementation. Features marked **Device validation** are implemented in code but still need a green Nintendo Switch build and real-hardware verification before the first stable release is tagged.
+> Artemis Switch is under active development. Portable tests, local GitHub Actions jobs, and the Nintendo Switch release build are run before the `dist/nro` package is refreshed. Items explicitly marked **hardware validation** still need confirmation during a real Apollo/Sunshine stream.
 
 ## Project status
 
 | Area | Status | Current state |
 |---|---|---|
 | Standard Moonlight / Sunshine streaming | ✅ Available | Standard GameStream remains the compatibility path |
-| Switch NVDEC + deko3d | 🟡 Device validation | Existing renderer preserved; Artemis presentation path integrated |
-| Fit / Fill / Stretch | 🟡 Device validation | GPU viewport / UV presentation implemented |
+| Switch NVDEC + deko3d | ✅ Build tested | Existing renderer preserved; Artemis presentation path integrated |
+| Fit / Fill / Stretch | ✅ Build + unit tested | Fill and Stretch retain filtering; Fit uses a black letterbox viewport |
 | Zoom & Pan | 🟡 Device validation | GPU source crop with persistent state |
 | Full-range video | 🟡 Device validation | Requested from host and applied with deko3d full-range YUV conversion |
 | Joy-Con / Pro Controller motion | ✅ Integrated | Existing Moonlight motion forwarding is policy-gated |
+| Multiple controllers | ✅ Build + unit tested | Five-player active mask, hot-plug arrivals/releases and independent player input |
 | Console-motion fallback | ⛔ Disabled by default | libnx SevenSixAxis API can be detected, but console motion vectors are not mapped safely yet |
 | Live performance view | ✅ Integrated | Uses the existing in-game Borealis overlay |
 | Benchmark runtime | ✅ Integrated | Live sampling, P50/P95/P99, frame-queue faults, stability score |
@@ -35,7 +36,7 @@ It keeps the existing Moonlight-Switch architecture instead of replacing it: **B
 | Apollo capability detection | 🟡 Partial | Conservative detection with Sunshine-safe fallback |
 | Apollo virtual display / commands / clipboard | ⏳ Planned | Only verified Apollo protocol operations will be added |
 | French Artemis UI | ✅ Integrated | Artemis settings, overlay tabs and Performance UI use Borealis i18n |
-| CI | 🟡 In progress | Unit, sanitizer, localization, release-contract and cross-feature gates are defined |
+| CI | ✅ Integrated | Unit, sanitizer, localization, release-contract and cross-feature gates are defined |
 | Release CD | ✅ Integrated | `v*` tags build/test/publish NRO, ELF, source bundles and SHA-256 checksums |
 
 ## Features
@@ -54,7 +55,8 @@ It keeps the existing Moonlight-Switch architecture instead of replacing it: **B
 | Export | JSON + CSV files saved under the Artemis working directory |
 | Switch metadata | Handheld/docked mode, battery, charging state and best-effort read-only CPU/GPU/EMC clocks |
 | Auto Tune | Quick and extended profile sweeps with safe profile restore/cancel logic |
-| Quick Actions | Keyboard, performance, benchmark, disconnect and quit-host actions in the existing overlay |
+| Quick Actions | Keyboard, display, connected controllers, mouse, touch, disconnect and quit-host actions |
+| Controller list | Shows every currently connected local player in the in-game Options menu |
 | Host capabilities | Sunshine-safe defaults with conservative Apollo feature gating |
 
 ## Nintendo Switch
@@ -93,17 +95,17 @@ Sunshine / Apollo host
 
 ### deko3d presentation
 
-The normal compatibility **Fill** path keeps the existing Moonlight-Switch renderer behavior, including its NVDEC mappings and current FSR/RCAS/dithering pipeline.
+The full-screen **Fill** and **Stretch** paths keep the existing Moonlight-Switch renderer behavior, including NVDEC mappings and the FSR/RCAS/dithering pipeline.
 
 When Artemis presentation features are requested, the Switch renderer can use the tested presentation geometry directly:
 
 - **Fit:** preserve aspect ratio and clear unused framebuffer regions to black.
-- **Fill:** crop source UVs to fill the destination without CPU frame resizing.
-- **Stretch:** use the full destination viewport.
+- **Fill:** crop source UVs to fill the destination, then use the enabled filtering stages.
+- **Stretch:** preserve the full source, use the full destination, and use the enabled filtering stages.
 - **Zoom/Pan:** apply bounded GPU-side source cropping.
 - **Full range:** request full-range video from the host and use the corresponding deko3d YUV matrix.
 
-The first custom-presentation milestone intentionally bypasses FSR/RCAS/dithering outside the normal Fill path. After real-device validation, the same presentation geometry can be carried through the post-processing present pass.
+Fit and non-default Zoom/Pan require the direct destination-viewport path. Fill and Stretch use the complete filtered full-screen path.
 
 ### Motion sensors
 
@@ -151,7 +153,7 @@ French currently covers the Artemis settings page, presentation/motion options, 
 
 | Gate | Purpose |
 |---|---|
-| **Unit Tests** | Portable C++20 policy, statistics, export, stream-profile and geometry tests |
+| **Unit Tests** | Portable C++20 policy, controller-topology, statistics, export, stream-profile and geometry tests |
 | **ASan + UBSan** | Memory and undefined-behavior checks for the portable feature suite |
 | **Localization contract** | Every Artemis key referenced by C++/XML must exist in both English and French |
 | **Release contract** | CI verifies the CD workflow still requires NRO, ELF, source archives and checksums |
@@ -160,9 +162,7 @@ French currently covers the Artemis settings page, presentation/motion options, 
 | **All Builds** | Existing platform build matrix, including the real Nintendo Switch `.nro` / `.elf` build |
 | **Release CD** | Re-runs quality gates and Switch build before publishing a `v*` GitHub Release |
 
-Additional regression coverage includes benchmark counter reset/NaN/queue-fault behavior, 4:3 Fit/Fill presentation, extreme Zoom/Pan clamping, and minimum/maximum stream-profile normalization.
-
-The development badges at the top target the active `agent/artemis-switch-integration` branch while PR #15 is under development.
+Additional regression coverage includes the five-controller `0x1F` mask, controller-count clamping, benchmark counter reset/NaN/queue-fault behavior, 4:3 Fit/Fill presentation, filtered Fill/Stretch routing, extreme Zoom/Pan clamping, and minimum/maximum stream-profile normalization.
 
 ## Automatic releases
 
@@ -198,11 +198,13 @@ Tags containing a suffix such as `v0.1.0-beta.1` are automatically published as 
 
 ## Installation
 
-When a release is available, download `Artemis-Switch.nro` from the GitHub Releases page and place it on the SD card, for example:
+For the easiest local install, extract `dist/nro/Artemis-Switch-SD.zip` directly to the root of the Switch SD card. It creates:
 
 ```text
 sdmc:/switch/Artemis-Switch/Artemis-Switch.nro
 ```
+
+Alternatively, copy `dist/nro/Artemis-Switch.nro` to that path. The same instructions are included in `dist/nro/README-INSTALL.txt`. For published versions, the NRO is also available from GitHub Releases.
 
 Launch hbmenu using **Title Redirection / full RAM mode**, then start Artemis Switch.
 
@@ -252,9 +254,8 @@ Overclocking is outside Artemis Switch's automatic tuning scope. Auto Tune chang
 
 ## Known limitations before the first release
 
-- A green Nintendo Switch `.nro` / `.elf` build is required after the latest integration changes.
-- Fit / Fill / Stretch, Zoom/Pan and full-range output need visual verification on real Switch hardware.
-- Custom presentation still needs to be propagated through the existing FSR/RCAS/dithering post-processing pass after the direct path is validated.
+- Multiple simultaneous controllers need multiplayer confirmation against each supported host implementation; routing and topology are unit/build tested.
+- Fit, Zoom/Pan and full-range output still benefit from visual verification across different host resolutions.
 - Console-motion fallback remains disabled until the libnx console sensor vectors are mapped safely.
 - Apollo virtual-display, server-command and clipboard operations are not enabled until their client protocol behavior is verified.
 - Benchmark scoring and Auto Tune thresholds still need tuning from real Switch measurements.

@@ -81,6 +81,7 @@ class MoonlightInputManager : public Singleton<MoonlightInputManager> {
     std::chrono::steady_clock::time_point lastDesktopScrollEvent;
     bool inputDropped = false;
     bool inputEnabled = true;
+    int lastControllerCount = 0;
 
     brls::ControllerState mapController(brls::ControllerState controller);
     static short glfwKeyToVKKey(brls::BrlsKeyboardScancode key);
@@ -90,6 +91,4 @@ class MoonlightInputManager : public Singleton<MoonlightInputManager> {
 
     GamepadState getControllerState(int controllerNum, bool specialKey);
     void handleControllers(bool specialKey);
-
-    static short controllersToMap();
 };

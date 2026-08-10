@@ -262,21 +262,24 @@ void MoonlightInputManager::dropInput() {
     bool res = true;
     // Drop gamepad state
     GamepadState gamepadState;
-    auto controllersCount = brls::Application::getPlatform()
-                            ->getInputManager()
-                            ->getControllersConnectedCount();
-
-    if (controllersCount > GAMEPADS_MAX) {
-        brls::Logger::warning("Clamping controller count from {} to {} while dropping input", controllersCount, GAMEPADS_MAX);
-        controllersCount = GAMEPADS_MAX;
-    }
+    const auto reportedControllers = brls::Application::getPlatform()
+                                         ->getInputManager()
+                                         ->getControllersConnectedCount();
+    const int controllersCount = std::max(
+        artemis::input::clampControllerCount(reportedControllers),
+        lastControllerCount);
+    const short activeMask = static_cast<short>(
+        artemis::input::connectedControllerMask(reportedControllers));
 
     for (short i = 0; i < controllersCount; i++) {
         res &= LiSendMultiControllerEvent(
-                   i, controllersToMap(), gamepadState.buttonFlags,
+                   i, activeMask, gamepadState.buttonFlags,
                    gamepadState.leftTrigger, gamepadState.rightTrigger,
                    gamepadState.leftStickX, gamepadState.leftStickY,
                    gamepadState.rightStickX, gamepadState.rightStickY) == 0;
+        // The host now has a neutral state. Mirror that locally so any button
+        // still held when input resumes is sent again on the next frame.
+        lastGamepadStates[i] = {};
     }
 
     // Drop touchscreen mouse state
@@ -405,33 +408,49 @@ GamepadState MoonlightInputManager::getControllerState(int controllerNum,
 }
 
 void MoonlightInputManager::handleControllers(bool specialKey) {
-    static int lastControllerCount = 0;
-
-    auto controllersCount = brls::Application::getPlatform()
-                            ->getInputManager()
-                            ->getControllersConnectedCount();
-
-    if (controllersCount > GAMEPADS_MAX) {
-        brls::Logger::warning("Clamping controller count from {} to {} while handling input", controllersCount, GAMEPADS_MAX);
-        controllersCount = GAMEPADS_MAX;
+    const int reportedControllers = brls::Application::getPlatform()
+                                        ->getInputManager()
+                                        ->getControllersConnectedCount();
+    const int controllersCount =
+        artemis::input::clampControllerCount(reportedControllers);
+    if (controllersCount != reportedControllers) {
+        brls::Logger::warning(
+            "Clamping controller count from {} to {} while handling input",
+            reportedControllers, controllersCount);
     }
 
-    short mappedControllersCount = controllersToMap();
+    const short mappedControllersCount = static_cast<short>(
+        artemis::input::connectedControllerMask(controllersCount));
+    const bool topologyChanged = controllersCount != lastControllerCount;
+
+    if (topologyChanged) {
+        GamepadState releasedState;
+        for (int i = controllersCount; i < lastControllerCount; ++i) {
+            LiSendMultiControllerEvent(
+                i, mappedControllersCount, releasedState.buttonFlags,
+                releasedState.leftTrigger, releasedState.rightTrigger,
+                releasedState.leftStickX, releasedState.leftStickY,
+                releasedState.rightStickX, releasedState.rightStickY);
+            lastGamepadStates[i] = {};
+        }
+
+        for (int i = lastControllerCount; i < controllersCount; ++i) {
+            Logger::debug(
+                "StreamingView: controller #{} connected (mask 0x{:X})", i,
+                mappedControllersCount);
+            LiSendControllerArrivalEvent(
+                i, mappedControllersCount, LI_CTYPE_UNKNOWN, 0,
+                LI_CCAP_RUMBLE | LI_CCAP_ACCEL | LI_CCAP_GYRO);
+        }
+    }
 
     for (int i = 0; i < controllersCount; i++) {
-        GamepadState gamepadState = getControllerState(i, specialKey);
+        // Touch/mouse assist belongs to the primary player only. Other local
+        // controllers must continue sending independent input.
+        GamepadState gamepadState = getControllerState(i, specialKey && i == 0);
 
-        if (!gamepadState.is_equal(lastGamepadStates[i])) {
+        if (topologyChanged || !gamepadState.is_equal(lastGamepadStates[i])) {
             lastGamepadStates[i] = gamepadState;
-
-            if (lastControllerCount != controllersCount) {
-                lastControllerCount = controllersCount;
-                
-                for (int i = 0; i < controllersCount; i++) {
-                    Logger::debug("StreamingView: send features message for controller #{}", i);
-                    LiSendControllerArrivalEvent(i, mappedControllersCount, LI_CTYPE_UNKNOWN, 0, LI_CCAP_RUMBLE | LI_CCAP_ACCEL | LI_CCAP_GYRO);
-                }
-            }
 
             if (LiSendMultiControllerEvent(
                     i, mappedControllersCount, gamepadState.buttonFlags,
@@ -441,6 +460,8 @@ void MoonlightInputManager::handleControllers(bool specialKey) {
                 brls::Logger::info("StreamingView: error sending input data");
         }
     }
+
+    lastControllerCount = controllersCount;
 }
 
 void MoonlightInputManager::handleInput(bool ignoreTouch) {
@@ -594,23 +615,6 @@ void MoonlightInputManager::handleInput(bool ignoreTouch) {
                 }
             }
         }
-    }
-}
-
-short MoonlightInputManager::controllersToMap() {
-    switch (brls::Application::getPlatform()
-                ->getInputManager()
-                ->getControllersConnectedCount()) {
-    case 0:
-        return 0x0;
-    case 1:
-        return 0x1;
-    case 2:
-        return 0x3;
-    case 3:
-        return 0x7;
-    default:
-        return 0xF;
     }
 }
 

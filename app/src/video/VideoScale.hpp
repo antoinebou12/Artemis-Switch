@@ -6,6 +6,11 @@ enum class ScaleMode { Fit, Fill, Stretch };
 
 ScaleMode nextScaleMode(ScaleMode mode);
 
+// Fill and Stretch cover the full output surface, so they can use the
+// renderer's complete upscale/RCAS/dithering chain. Fit needs a letterboxed
+// destination viewport and remains on the direct presentation path.
+bool usesFilteredFullScreenPath(ScaleMode mode);
+
 struct RectF {
     float x = 0.0f;
     float y = 0.0f;
