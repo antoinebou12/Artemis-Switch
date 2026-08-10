@@ -1,4 +1,4 @@
-name: Release Artemis Switch
+name: Release artemi-switch
 
 on:
   push:
@@ -10,7 +10,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: artemis-release-${{ github.ref }}
+  group: artemi-switch-release-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -56,20 +56,20 @@ jobs:
         run: |
           version="${{ steps.version.outputs.version }}"
           safe_version="${version#v}"
-          tarball="dist/Artemis-Switch-${safe_version}-source.tar.gz"
-          zipfile="dist/Artemis-Switch-${safe_version}-source.zip"
+          tarball="dist/artemi-switch-${safe_version}-source.tar.gz"
+          zipfile="dist/artemi-switch-${safe_version}-source.zip"
           test -s "$tarball"
           test -s "$zipfile"
-          tar -tzf "$tarball" | grep -q "/README.md$"
-          tar -tzf "$tarball" | grep -q "/SOURCE_INFO.txt$"
+          tar -tzf "$tarball" | grep -q '/README.md$'
+          tar -tzf "$tarball" | grep -q '/SOURCE_INFO.txt$'
           unzip -l "$zipfile" | grep -q 'README.md'
           unzip -l "$zipfile" | grep -q 'SOURCE_INFO.txt'
 
       - name: Upload source packages
         uses: actions/upload-artifact@v4
         with:
-          name: Artemis-Switch-source
-          path: dist/Artemis-Switch-*-source.*
+          name: artemi-switch-source
+          path: dist/artemi-switch-*-source.*
           if-no-files-found: error
           retention-days: 14
 
@@ -88,19 +88,19 @@ jobs:
       - name: Download Nintendo Switch NRO
         uses: actions/download-artifact@v4
         with:
-          name: Artemis-Switch-nro
+          name: artemi-switch-nro
           path: dist
 
       - name: Download Nintendo Switch ELF
         uses: actions/download-artifact@v4
         with:
-          name: Artemis-Switch-elf
+          name: artemi-switch-elf
           path: dist
 
       - name: Download source packages
         uses: actions/download-artifact@v4
         with:
-          name: Artemis-Switch-source
+          name: artemi-switch-source
           path: dist
 
       - name: Validate assets and generate SHA-256 checksums
@@ -109,16 +109,16 @@ jobs:
           set -euo pipefail
           version="${GITHUB_REF_NAME#v}"
 
-          test -s dist/Artemis-Switch.nro
-          test -s dist/Artemis-Switch.elf
-          test -s "dist/Artemis-Switch-${version}-source.tar.gz"
-          test -s "dist/Artemis-Switch-${version}-source.zip"
+          test -s dist/artemi-switch.nro
+          test -s dist/artemi-switch.elf
+          test -s "dist/artemi-switch-${version}-source.tar.gz"
+          test -s "dist/artemi-switch-${version}-source.zip"
 
           sha256sum \
-            dist/Artemis-Switch.nro \
-            dist/Artemis-Switch.elf \
-            "dist/Artemis-Switch-${version}-source.tar.gz" \
-            "dist/Artemis-Switch-${version}-source.zip" \
+            dist/artemi-switch.nro \
+            dist/artemi-switch.elf \
+            "dist/artemi-switch-${version}-source.tar.gz" \
+            "dist/artemi-switch-${version}-source.zip" \
             > dist/SHA256SUMS.txt
 
           cat dist/SHA256SUMS.txt
@@ -134,12 +134,12 @@ jobs:
           elif [[ "$tag" == *-* ]]; then
             gh release create "$tag" dist/* \
               --verify-tag \
-              --title "Artemis Switch $tag" \
+              --title "artemi-switch $tag" \
               --generate-notes \
               --prerelease
           else
             gh release create "$tag" dist/* \
               --verify-tag \
-              --title "Artemis Switch $tag" \
+              --title "artemi-switch $tag" \
               --generate-notes
           fi

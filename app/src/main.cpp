@@ -38,7 +38,6 @@ unsigned int sceLibcHeapSize             = 24 * 1024 * 1024;
 #include "MoonlightSession.hpp"
 #include "SwitchMoonlightSessionDecoderAndRenderProvider.hpp"
 
-
 #if defined(_WIN32) && defined(__SDL2__)
 #include <SDL.h>
 #define SDL_MAIN
@@ -103,22 +102,10 @@ int main(int argc, char* argv[]) {
     // Keep the main thread above others so that the program stays responsive
     // when doing software decoding
     svcSetThreadPriority(CUR_THREAD_HANDLE, 0x20);
-
-    // auto at = appletGetAppletType();
-    // g_application_mode = at == AppletType_Application || at == AppletType_SystemApplication;
-
-    // // To get access to /dev/nvhost-nvjpg, we need nvdrv:{a,s,t}
-    // // However, nvdrv:{a,s} have limited address space for gpu mappings
-    // extern u32 __nx_nv_service_type, __nx_nv_transfermem_size;
-    // __nx_nv_service_type     = NvServiceType_Factory;
-    // __nx_nv_transfermem_size = (g_application_mode ? 16 : 3) * 0x100000;
 #endif
 
-    // Set log level
-    // We recommend to use INFO for real apps
     brls::Logger::setLogLevel(brls::LogLevel::LOG_DEBUG);
 
-    // Init the app and i18n
     if (!brls::Application::init()) {
         brls::Logger::error("Unable to init Borealis application");
         return EXIT_FAILURE;
@@ -133,19 +120,18 @@ int main(int argc, char* argv[]) {
     MoonlightSession::set_provider(
             new SwitchMoonlightSessionDecoderAndRenderProvider());
 
-    brls::Application::createWindow("title"_i18n);
+    brls::Application::createWindow("artemi-switch");
 
+    // Keep the legacy data directory for settings compatibility. Product-facing
+    // naming is artemi-switch, but existing hosts/profiles must remain available.
     auto home = Application::getPlatform()->getHomeDirectory("Moonlight-Switch");
     Settings::instance().set_working_dir(home);
     Settings::instance().set_launch_path(argc > 0 ? argv[0] : "");
-    brls::Logger::info("Working dir, {}", home);
+    brls::Logger::info("artemi-switch working dir: {}", home);
 
-    // Have the application register an action on every activity that will quit
-    // when you press BUTTON_START
     brls::Application::setGlobalQuit(false);
     brls::Application::setFPSStatus(false);
 
-    // Register custom views (including tabs, which are views)
     brls::Application::registerXMLView("BooleanSliderCell", BooleanSliderCell::create);
     brls::Application::registerXMLView("LinkCell", LinkCell::create);
 
@@ -155,18 +141,15 @@ int main(int argc, char* argv[]) {
     brls::Application::registerXMLView("SettingsTab", SettingsTab::create);
     brls::Application::registerXMLView("PerformanceTab", PerformanceTab::create);
 
-    // Add custom values to the theme
     brls::Theme::getLightTheme().addColor("captioned_image/caption",
                                    nvgRGB(2, 176, 183));
     brls::Theme::getDarkTheme().addColor("captioned_image/caption",
                                   nvgRGB(51, 186, 227));
 
-    // Add custom values to the style
     brls::getStyle().addMetric("about/padding_top_bottom", 50);
     brls::getStyle().addMetric("about/padding_sides", 75);
     brls::getStyle().addMetric("about/description_margin", 50);
 
-    // Create and push the main activity to the stack if cannot run game from arguments
     if (!startFromArgs(argc, argv)) {
         brls::Application::pushActivity(new MainActivity());
     }
@@ -174,8 +157,6 @@ int main(int argc, char* argv[]) {
     brls::Application::enableDebuggingView(Settings::instance().write_log());
     brls::Application::setSwapInputKeys(Settings::instance().swap_ui_keys());
 
-    // Run the app. The Vita development loop waits for this marker so a
-    // successful launch means at least one complete Borealis frame rendered.
 #ifdef __PSV__
     bool vitaHealthReported = false;
 #endif
@@ -188,10 +169,9 @@ int main(int argc, char* argv[]) {
 #endif
     }
 
-    // Exit
 #if defined(PLATFORM_TVOS)
     exit(0);
 #endif
-    
+
     return EXIT_SUCCESS;
 }

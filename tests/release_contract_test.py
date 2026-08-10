@@ -33,8 +33,8 @@ def main():
         "./.github/workflows/docker-image.yml",
         "needs: quality-gate",
         "startsWith(github.ref, 'refs/tags/v')",
-        "Artemis-Switch.nro",
-        "Artemis-Switch.elf",
+        "artemi-switch.nro",
+        "artemi-switch.elf",
         "source.tar.gz",
         "source.zip",
         "SHA256SUMS.txt",
@@ -52,8 +52,8 @@ def main():
         "actions/checkout@v4",
         "actions/upload-artifact@v4",
         "submodules: recursive",
-        "Artemis-Switch.nro",
-        "Artemis-Switch.elf",
+        "artemi-switch.nro",
+        "artemi-switch.elf",
         "if-no-files-found: error",
         "test -s build/switch/Moonlight.nro",
         "test -s build/switch/Moonlight.elf",
@@ -68,12 +68,15 @@ def main():
         "ctest --test-dir build/tests",
         "ctest --test-dir build/integration",
         "-fsanitize=address,undefined",
+        "artemi-switch-0.0.0-ci-source.tar.gz",
     ]:
         require(integration, needle, "feature-integration-ci.yml")
 
     for needle in [
         "rsync -a",
         "SOURCE_INFO.txt",
+        "artemi-switch source bundle",
+        "Author: antoinebou12",
         "source.tar.gz",
         "source.zip",
         "test -s",
@@ -83,8 +86,8 @@ def main():
         require(package, needle, "package-release-source.sh")
 
     print(
-        "Release contract OK: quality gate, Switch binary, debug ELF, "
-        "source archives, prerelease handling and checksums are required"
+        "Release contract OK: artemi-switch branding, quality gate, Switch binary, "
+        "debug ELF, source archives, prerelease handling and checksums are required"
     )
 
 

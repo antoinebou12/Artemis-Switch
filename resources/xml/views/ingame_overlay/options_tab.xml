@@ -20,7 +20,7 @@
             <brls:Header title="@i18n/artemis/overlay/quick_actions"/>
             <brls:DetailCell id="quick_keyboard"/>
             <brls:DetailCell id="quick_performance"/>
-            <brls:DetailCell id="quick_benchmark"/>
+            <brls:BooleanCell id="touchscreen_mouse_mode"/>
             <brls:DetailCell id="quick_disconnect"/>
             <brls:DetailCell id="quick_quit_host"/>
 
@@ -31,7 +31,6 @@
             <brls:DetailCell id="input_overlay"/>
             <brls:SelectorCell id="keyboard_type"/>
             <brls:SelectorCell id="keyboard_fingers"/>
-            <brls:BooleanCell id="touchscreen_mouse_mode"/>
 
             <brls:Header title="@i18n/settings/guide_key" paddingTop="60"/>
             <brls:DetailCell id="guide_key_buttons"/>
@@ -56,6 +55,7 @@
             <BooleanSliderCell id="rcas"/>
 
             <brls:Header title="@i18n/settings/debug" paddingTop="60" lineTop="1px"/>
+            <brls:DetailCell id="quick_benchmark"/>
             <brls:BooleanCell id="debug"/>
             <brls:BooleanCell id="onscreen_log"/>
         </brls:Box>

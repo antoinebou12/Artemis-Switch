@@ -1,4 +1,4 @@
-name: Build Artemis Switch
+name: Build artemi-switch
 
 on:
   workflow_call:
@@ -22,8 +22,6 @@ jobs:
       - name: Remove conflicting enet package
         run: dkp-pacman --noconfirm -R switch-enet
 
-      # Keep the upstream two-pass configure behavior until the Switch build
-      # has been fully cleaned up. The second pass remains the required one.
       - name: Configure (compatibility pass)
         continue-on-error: true
         run: cmake -B build/switch -DCMAKE_BUILD_TYPE=Release -DPLATFORM_SWITCH=ON -DUSE_DEKO3D=ON
@@ -34,26 +32,26 @@ jobs:
       - name: Build Nintendo Switch NRO
         run: cmake --build build/switch --target Moonlight.nro --parallel 8
 
-      - name: Prepare Artemis artifacts
+      - name: Prepare artemi-switch artifacts
         run: |
           set -euo pipefail
           test -s build/switch/Moonlight.nro
           test -s build/switch/Moonlight.elf
-          cp build/switch/Moonlight.nro build/switch/Artemis-Switch.nro
-          cp build/switch/Moonlight.elf build/switch/Artemis-Switch.elf
+          cp build/switch/Moonlight.nro build/switch/artemi-switch.nro
+          cp build/switch/Moonlight.elf build/switch/artemi-switch.elf
 
-      - name: Upload Artemis-Switch.nro
+      - name: Upload artemi-switch NRO
         uses: actions/upload-artifact@v4
         with:
-          name: Artemis-Switch-nro
-          path: build/switch/Artemis-Switch.nro
+          name: artemi-switch-nro
+          path: build/switch/artemi-switch.nro
           if-no-files-found: error
           retention-days: 14
 
-      - name: Upload Artemis-Switch.elf
+      - name: Upload artemi-switch ELF
         uses: actions/upload-artifact@v4
         with:
-          name: Artemis-Switch-elf
-          path: build/switch/Artemis-Switch.elf
+          name: artemi-switch-elf
+          path: build/switch/artemi-switch.elf
           if-no-files-found: error
           retention-days: 14

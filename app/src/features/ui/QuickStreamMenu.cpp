@@ -7,9 +7,6 @@ std::vector<QuickAction> buildQuickActions(const QuickMenuContext& context) {
         QuickAction::ToggleKeyboard,
         QuickAction::TogglePerformanceStats,
         QuickAction::ToggleMouseMode,
-        QuickAction::SendSpecialKey,
-        context.benchmarkRunning ? QuickAction::StopBenchmark
-                                 : QuickAction::StartBenchmark,
         QuickAction::Disconnect,
     };
 
