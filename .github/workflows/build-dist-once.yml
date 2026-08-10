@@ -14,6 +14,7 @@ permissions:
 jobs:
   build-and-commit:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     container:
       image: docker://devkitpro/devkita64:latest
 
