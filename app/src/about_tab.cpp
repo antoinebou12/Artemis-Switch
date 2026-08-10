@@ -20,10 +20,10 @@ AboutTab::AboutTab() {
     std::string themePart =
         variant == brls::ThemeVariant::DARK ? "_dark" : "_light";
 
-    std::string subtitle = fmt::format(fmt::runtime("about/version"_i18n), APP_VERSION);
-    versionLabel->setSubtitle(subtitle);
+    versionLabel->setSubtitle(
+        fmt::format("artemi-switch v{} by antoinebou12", APP_VERSION));
 
-    std::string githubLink = "https://github.com/XITRIX/Moonlight-Switch";
+    std::string githubLink = "https://github.com/antoinebou12/Artemis-Switch";
     github->addGestureRecognizer(new TapGestureRecognizer(github));
     github->title->setText("about/link_github"_i18n);
     github->subtitle->setText(githubLink);
@@ -33,6 +33,8 @@ AboutTab::AboutTab() {
         return true;
     });
 
+    // Keep upstream support/community links available while the fork retains
+    // Moonlight-Switch code and its licensing/credit obligations.
     std::string patreonLink = "https://www.patreon.com/xitrix";
     patreon->addGestureRecognizer(new TapGestureRecognizer(patreon));
     patreon->title->setText("about/link_patreon"_i18n);
