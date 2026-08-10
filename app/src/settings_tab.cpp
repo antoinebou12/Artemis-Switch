@@ -894,6 +894,13 @@ SettingsTab::SettingsTab() {
                        Settings::instance().set_write_log(value);
                        brls::Application::enableDebuggingView(value);
                    });
+
+    showHostWebConfig->init(
+        "settings/show_host_web_config"_i18n,
+        Settings::instance().show_host_web_config(), [](bool value) {
+            Settings::instance().set_show_host_web_config(value);
+            Settings::instance().save();
+        });
 }
 
 void SettingsTab::updateDeadZoneItems() {

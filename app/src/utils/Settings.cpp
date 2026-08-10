@@ -430,6 +430,12 @@ void Settings::load() {
                 }
             }
 
+            if (json_t* show_host_web_config =
+                    json_object_get(settings, "show_host_web_config")) {
+                m_show_host_web_config =
+                    json_typeof(show_host_web_config) == JSON_TRUE;
+            }
+
             if (json_t* stream_audio_configuration =
                     json_object_get(settings, "stream_audio_configuration")) {
                 if (json_typeof(stream_audio_configuration) == JSON_INTEGER) {
@@ -726,6 +732,9 @@ void Settings::save() {
                                 m_easytier_enabled ? json_true() : json_false());
             json_object_set_new(settings, "easytier_config_path",
                                 json_string(m_easytier_config_path.c_str()));
+            json_object_set_new(settings, "show_host_web_config",
+                                m_show_host_web_config ? json_true()
+                                                       : json_false());
             json_object_set_new(settings, "stream_audio_configuration",
                                 json_integer(m_stream_audio_configuration));
             json_object_set_new(settings, "terminate_app_on_disconnect",

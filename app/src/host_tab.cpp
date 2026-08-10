@@ -10,10 +10,8 @@
 #include "app_list_view.hpp"
 #include "helper.hpp"
 #include "main_tabs_view.hpp"
-#include "features/ui/QrCodeView.hpp"
-#include "streaming/StreamConfigProfileStore.hpp"
-
-#include <fmt/format.h>
+#include "streaming/HostProfileKey.hpp"
+#include "streaming/HostStreamProfileUi.hpp"
 
 using namespace brls::literals;
 
@@ -29,85 +27,15 @@ std::string host_subtitle(const Host& host) {
     return addresses.front() + " | +" +
            std::to_string(addresses.size() - 1) + " more";
 }
-
-std::string host_profile_key(const Host& host) {
-    if (is_usable_mac(host.mac))
-        return host.mac;
-    return host.preferred_address();
-}
-
-std::string host_web_config_url(const Host& host) {
-    const std::string address = host.preferred_address();
-    if (address.empty())
-        return {};
-    return "https://" + address + ":47990/";
-}
-
-std::string profile_detail_label(const std::string& hostKey) {
-    auto& store = artemis::streaming::StreamConfigProfileStore::instance();
-    const auto selectedId = store.selectedForHost(hostKey);
-    if (selectedId.empty())
-        return "host/stream_profile_global"_i18n;
-    if (auto profile = store.get(selectedId))
-        return profile->name;
-    return "host/stream_profile_global"_i18n;
-}
-
-int height_to_picker_index(int height) {
-    switch (artemis::streaming::StreamConfigProfileStore::normalizeHeight(
-        height)) {
-    case 360:
-        return 0;
-    case 480:
-        return 1;
-    case 1080:
-        return 3;
-    case 720:
-    default:
-        return 2;
-    }
-}
-
-int picker_index_to_height(int index) {
-    switch (index) {
-    case 0:
-        return 360;
-    case 1:
-        return 480;
-    case 3:
-        return 1080;
-    case 2:
-    default:
-        return 720;
-    }
-}
 } // namespace
 
 HostTab::HostTab(const Host& host) : host(host) {
-    // Inflate the tab from the XML file
     this->inflateFromXMLRes("xml/tabs/host.xml");
 
     remove->setText("common/remove"_i18n);
     remove->title->setTextColor(RGB(229, 57, 53));
 
     reloadHost();
-
-    hostWebConfig->setText("host/web_config"_i18n);
-    hostWebConfig->setDetailText("host/web_config_hint"_i18n);
-    hostWebConfig->registerClickAction([this](View*) {
-        const std::string url = host_web_config_url(this->host);
-        if (url.empty()) {
-            showError("host/web_config_no_address"_i18n);
-            return true;
-        }
-        try {
-            if (auto* platform = Application::getPlatform())
-                platform->openBrowser(url);
-        } catch (...) {
-        }
-        artemis::ui::showUrlQrDialog("host/web_config"_i18n, url);
-        return true;
-    });
 
     streamProfile->setText("host/stream_profile"_i18n);
     refreshStreamProfileLabel();
@@ -217,140 +145,26 @@ HostTab::HostTab(const Host& host) : host(host) {
 }
 
 void HostTab::refreshStreamProfileLabel() {
-    streamProfile->setDetailText(profile_detail_label(host_profile_key(host)));
+    streamProfile->setDetailText(artemis::streaming::profile_detail_label(
+        artemis::streaming::host_profile_key(host)));
 }
 
 void HostTab::openProfilePicker() {
-    const auto key = host_profile_key(host);
-    auto& store = artemis::streaming::StreamConfigProfileStore::instance();
-    const auto& profiles = store.list();
-    std::vector<std::string> options;
-    options.reserve(profiles.size() + 1);
-    options.push_back("host/stream_profile_global"_i18n);
-    int selected = 0;
-    const auto currentId = store.selectedForHost(key);
-    for (size_t i = 0; i < profiles.size(); ++i) {
-        options.push_back(profiles[i].name);
-        if (!currentId.empty() && profiles[i].id == currentId)
-            selected = static_cast<int>(i + 1);
-    }
-
-    auto* dropdown = new Dropdown(
-        "host/stream_profile"_i18n, options,
-        [this, key](int index) {
-            auto& store =
-                artemis::streaming::StreamConfigProfileStore::instance();
-            if (index <= 0) {
-                store.clearSelectedForHost(key);
-            } else {
-                const auto& profiles = store.list();
-                const size_t profileIndex = static_cast<size_t>(index - 1);
-                if (profileIndex < profiles.size())
-                    store.setSelectedForHost(key, profiles[profileIndex].id);
-            }
-            refreshStreamProfileLabel();
-        },
-        selected);
-    Application::pushActivity(new Activity(dropdown));
+    artemis::streaming::open_host_profile_picker(
+        artemis::streaming::host_profile_key(host),
+        [this] { refreshStreamProfileLabel(); });
 }
 
 void HostTab::createProfileForHost() {
-    Application::getPlatform()->getImeManager()->openForText(
-        [this](const std::string& text) {
-            if (text.empty())
-                return;
-            auto& store =
-                artemis::streaming::StreamConfigProfileStore::instance();
-            const auto profile = store.create(text, true);
-            store.setSelectedForHost(host_profile_key(this->host), profile.id);
-            refreshStreamProfileLabel();
-        },
-        "host/new_profile_title"_i18n, "", 40, "", 0);
+    artemis::streaming::open_create_host_profile(
+        artemis::streaming::host_profile_key(host),
+        [this] { refreshStreamProfileLabel(); });
 }
 
 void HostTab::openProfileManage() {
-    const auto key = host_profile_key(host);
-    auto& store = artemis::streaming::StreamConfigProfileStore::instance();
-    const auto selectedId = store.selectedForHost(key);
-    if (selectedId.empty()) {
-        showError("host/manage_profile_none"_i18n);
-        return;
-    }
-    auto profile = store.get(selectedId);
-    if (!profile) {
-        showError("host/manage_profile_none"_i18n);
-        return;
-    }
-
-    auto* dialog = new Dialog(fmt::format("{} — {}", "host/manage_profile"_i18n,
-                                          profile->name));
-    dialog->addButton("host/rename_profile"_i18n, [this, selectedId] {
-        Application::getPlatform()->getImeManager()->openForText(
-            [this, selectedId](const std::string& text) {
-                if (text.empty())
-                    return;
-                artemis::streaming::StreamConfigProfileStore::instance().rename(
-                    selectedId, text);
-                refreshStreamProfileLabel();
-            },
-            "host/rename_profile_title"_i18n, "", 40, "", 0);
-    });
-    dialog->addButton("host/edit_profile_resolution"_i18n,
-                      [this, selectedId] {
-                          auto existing = artemis::streaming::
-                              StreamConfigProfileStore::instance()
-                                  .get(selectedId);
-                          if (!existing)
-                              return;
-                          const std::vector<std::string> options = {
-                              "360p", "480p", "720p", "1080p"};
-                          auto* dropdown = new Dropdown(
-                              "host/edit_profile_resolution"_i18n, options,
-                              [this, selectedId](int index) {
-                                  auto profile = artemis::streaming::
-                                      StreamConfigProfileStore::instance()
-                                          .get(selectedId);
-                                  if (!profile)
-                                      return;
-                                  profile->resolutionHeight =
-                                      picker_index_to_height(index);
-                                  artemis::streaming::
-                                      StreamConfigProfileStore::instance()
-                                          .update(*profile);
-                                  refreshStreamProfileLabel();
-                              },
-                              height_to_picker_index(
-                                  existing->resolutionHeight));
-                          Application::pushActivity(new Activity(dropdown));
-                      });
-    dialog->addButton("host/snapshot_profile"_i18n, [this, selectedId] {
-        auto snapshot =
-            artemis::streaming::StreamConfigProfileStore::snapshotFromSettings(
-                "");
-        snapshot.id = selectedId;
-        auto existing =
-            artemis::streaming::StreamConfigProfileStore::instance().get(
-                selectedId);
-        if (existing)
-            snapshot.name = existing->name;
-        artemis::streaming::StreamConfigProfileStore::instance().update(
-            snapshot);
-        refreshStreamProfileLabel();
-    });
-    dialog->addButton("common/remove"_i18n, [this, selectedId, key] {
-        auto* confirm = new Dialog("host/delete_profile_message"_i18n);
-        confirm->addButton("common/cancel"_i18n, [] {});
-        confirm->addButton("common/remove"_i18n, [this, selectedId, key] {
-            auto& store =
-                artemis::streaming::StreamConfigProfileStore::instance();
-            store.remove(selectedId);
-            store.clearSelectedForHost(key);
-            refreshStreamProfileLabel();
-        });
-        confirm->open();
-    });
-    dialog->addButton("common/close"_i18n, [] {});
-    dialog->open();
+    artemis::streaming::open_manage_host_profile(
+        artemis::streaming::host_profile_key(host),
+        [this] { refreshStreamProfileLabel(); });
 }
 
 void HostTab::reloadHost() {

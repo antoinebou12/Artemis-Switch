@@ -2,6 +2,7 @@
 
 #include "Settings.hpp"
 #include "helper.hpp"
+#include "streaming/ProfileEditorDialog.hpp"
 #include "streaming/StreamConfigProfileStore.hpp"
 #include "streaming/StreamProfileStore.hpp"
 
@@ -529,31 +530,17 @@ void ArtemisSettingsTab::openManageProfiles() {
                 artemis::streaming::StreamConfigProfileStore::instance();
             const auto profiles = store.list();
             if (index == static_cast<int>(profiles.size())) {
-                Application::getPlatform()->getImeManager()->openForText(
-                    [this](const std::string& text) {
-                        if (text.empty())
-                            return;
-                        artemis::streaming::StreamConfigProfileStore::instance()
-                            .create(text, true);
-                        refreshDefaultProfileLabel();
-                    },
-                    "host/new_profile_title"_i18n, "", 40, "", 0);
+                artemis::streaming::openProfileEditor(
+                    {}, {}, [this] { refreshDefaultProfileLabel(); });
                 return;
             }
             if (index < 0 || index >= static_cast<int>(profiles.size()))
                 return;
             const auto profile = profiles[static_cast<size_t>(index)];
             auto* dialog = new Dialog(profile.name);
-            dialog->addButton("host/rename_profile"_i18n, [this, profile] {
-                Application::getPlatform()->getImeManager()->openForText(
-                    [this, id = profile.id](const std::string& text) {
-                        if (text.empty())
-                            return;
-                        artemis::streaming::StreamConfigProfileStore::instance()
-                            .rename(id, text);
-                        refreshDefaultProfileLabel();
-                    },
-                    "host/rename_profile_title"_i18n, "", 40, profile.name, 0);
+            dialog->addButton("common/edit"_i18n, [this, id = profile.id] {
+                artemis::streaming::openProfileEditor(
+                    id, {}, [this] { refreshDefaultProfileLabel(); });
             });
             dialog->addButton("artemis/settings/duplicate_profile"_i18n,
                               [this, profile] {
@@ -561,54 +548,6 @@ void ArtemisSettingsTab::openManageProfiles() {
                                       instance()
                                           .duplicate(profile.id, {});
                                   refreshDefaultProfileLabel();
-                              });
-            dialog->addButton("host/edit_profile_resolution"_i18n,
-                              [this, id = profile.id,
-                               height = profile.resolutionHeight] {
-                                  const std::vector<std::string> options = {
-                                      "360p", "480p", "720p", "1080p"};
-                                  int selected = 2;
-                                  switch (artemis::streaming::
-                                              StreamConfigProfileStore::
-                                                  normalizeHeight(height)) {
-                                  case 360:
-                                      selected = 0;
-                                      break;
-                                  case 480:
-                                      selected = 1;
-                                      break;
-                                  case 1080:
-                                      selected = 3;
-                                      break;
-                                  default:
-                                      selected = 2;
-                                      break;
-                                  }
-                                  auto* resDropdown = new Dropdown(
-                                      "host/edit_profile_resolution"_i18n,
-                                      options,
-                                      [this, id](int resIndex) {
-                                          auto existing =
-                                              artemis::streaming::
-                                                  StreamConfigProfileStore::
-                                                      instance()
-                                                          .get(id);
-                                          if (!existing)
-                                              return;
-                                          constexpr int heights[] = {360, 480,
-                                                                     720, 1080};
-                                          if (resIndex >= 0 && resIndex < 4)
-                                              existing->resolutionHeight =
-                                                  heights[resIndex];
-                                          artemis::streaming::
-                                              StreamConfigProfileStore::
-                                                  instance()
-                                                      .update(*existing);
-                                          refreshDefaultProfileLabel();
-                                      },
-                                      selected);
-                                  Application::pushActivity(
-                                      new Activity(resDropdown));
                               });
             dialog->addButton("common/remove"_i18n, [this, id = profile.id] {
                 auto* confirm =

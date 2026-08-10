@@ -1,0 +1,510 @@
+#include "ProfileEditorDialog.hpp"
+
+#include <algorithm>
+#include <borealis.hpp>
+#include <fmt/format.h>
+#include <utility>
+#include <vector>
+
+using namespace brls::literals;
+
+namespace artemis::streaming {
+namespace {
+
+brls::Header* addHeader(brls::Box* content, const std::string& title) {
+    auto* header = new brls::Header();
+    header->setTitle(title);
+    header->setMarginTop(24);
+    content->addView(header);
+    return header;
+}
+
+brls::DetailCell* addDetail(brls::Box* content, const std::string& title,
+                            const std::string& detail) {
+    auto* cell = new brls::DetailCell();
+    cell->setText(title);
+    cell->setDetailText(detail);
+    cell->title->setSingleLine(true);
+    cell->detail->setSingleLine(true);
+    content->addView(cell);
+    return cell;
+}
+
+brls::BooleanCell* addBool(brls::Box* content, const std::string& title,
+                           bool value,
+                           const std::function<void(bool)>& onChange) {
+    auto* cell = new brls::BooleanCell();
+    cell->init(title, value, onChange);
+    content->addView(cell);
+    return cell;
+}
+
+std::string heightLabel(int height) {
+    return fmt::format("{}p", normalizeProfileHeight(height));
+}
+
+std::string codecLabel(VideoCodec codec) {
+    switch (codec) {
+    case H264:
+        return "H.264";
+    case AV1:
+        return "AV1";
+    case H265:
+    default:
+        return "H.265";
+    }
+}
+
+std::string scaleLabel(artemis::video::ScaleMode mode) {
+    switch (mode) {
+    case artemis::video::ScaleMode::Fit:
+        return "artemis/settings/fit"_i18n;
+    case artemis::video::ScaleMode::Stretch:
+        return "artemis/settings/stretch"_i18n;
+    case artemis::video::ScaleMode::Fill:
+    default:
+        return "artemis/settings/fill"_i18n;
+    }
+}
+
+std::string upscalingLabel(UpscalingMode mode) {
+    switch (mode) {
+    case UPSCALING_FSR1:
+        return "FSR1";
+    case UPSCALING_SGSR1:
+        return "SGSR1";
+    case UPSCALING_NIS:
+        return "NIS";
+    case UPSCALING_METALFX:
+        return "MetalFX";
+    case UPSCALING_OFF:
+    default:
+        return "hints/off"_i18n;
+    }
+}
+
+} // namespace
+
+void openProfileEditor(const std::string& profileId,
+                       const std::string& assignHostKey,
+                       const std::function<void()>& onChanged) {
+    auto* draft = new StreamConfigProfile();
+    if (!profileId.empty()) {
+        if (auto existing =
+                StreamConfigProfileStore::instance().get(profileId)) {
+            *draft = *existing;
+        } else {
+            *draft = StreamConfigProfileStore::snapshotFromSettings("Profile");
+            draft->id = profileId;
+        }
+    } else {
+        *draft = StreamConfigProfileStore::snapshotFromSettings("Profile");
+        draft->id.clear();
+        draft->name.clear();
+    }
+
+    auto* outer = new brls::Box(brls::Axis::COLUMN);
+    outer->setWidth(900);
+    outer->setHeight(620);
+
+    auto* scroll = new brls::ScrollingFrame();
+    scroll->setGrow(1.0f);
+    auto* content = new brls::Box(brls::Axis::COLUMN);
+    content->setWidth(10000);
+    content->setPadding(12, 20, 12, 20);
+
+    auto* nameCell =
+        addDetail(content, "artemis/settings/profile_name"_i18n,
+                  draft->name.empty() ? "artemis/settings/profile_name_hint"_i18n
+                                      : draft->name);
+    nameCell->registerClickAction([draft, nameCell](brls::View*) {
+        brls::Application::getPlatform()->getImeManager()->openForText(
+            [draft, nameCell](const std::string& text) {
+                if (text.empty())
+                    return;
+                draft->name = text;
+                nameCell->setDetailText(text);
+            },
+            "artemis/settings/profile_name"_i18n, "", 40, draft->name, 0);
+        return true;
+    });
+
+    addHeader(content, "artemis/settings/profile_section_video"_i18n);
+
+    auto* resCell =
+        addDetail(content, "settings/resolution"_i18n, heightLabel(draft->resolutionHeight));
+    resCell->registerClickAction([draft, resCell](brls::View*) {
+        const std::vector<std::string> options = {"360p", "480p", "720p", "1080p"};
+        int selected = 2;
+        switch (normalizeProfileHeight(draft->resolutionHeight)) {
+        case 360:
+            selected = 0;
+            break;
+        case 480:
+            selected = 1;
+            break;
+        case 1080:
+            selected = 3;
+            break;
+        default:
+            selected = 2;
+            break;
+        }
+        auto* dropdown = new brls::Dropdown(
+            "settings/resolution"_i18n, options,
+            [draft, resCell](int index) {
+                constexpr int heights[] = {360, 480, 720, 1080};
+                if (index >= 0 && index < 4)
+                    draft->resolutionHeight = heights[index];
+                resCell->setDetailText(heightLabel(draft->resolutionHeight));
+            },
+            selected);
+        brls::Application::pushActivity(new brls::Activity(dropdown));
+        return true;
+    });
+
+    auto* fpsCell =
+        addDetail(content, "settings/fps"_i18n, fmt::format("{} FPS", draft->fps));
+    fpsCell->registerClickAction([draft, fpsCell](brls::View*) {
+        const std::vector<int> values = {30, 40, 60, 90, 120};
+        std::vector<std::string> labels;
+        int selected = 2;
+        for (size_t i = 0; i < values.size(); ++i) {
+            labels.push_back(fmt::format("{} FPS", values[i]));
+            if (values[i] == draft->fps)
+                selected = static_cast<int>(i);
+        }
+        auto* dropdown = new brls::Dropdown(
+            "settings/fps"_i18n, labels,
+            [draft, fpsCell, values](int index) {
+                if (index >= 0 && index < static_cast<int>(values.size()))
+                    draft->fps = values[static_cast<size_t>(index)];
+                fpsCell->setDetailText(fmt::format("{} FPS", draft->fps));
+            },
+            selected);
+        brls::Application::pushActivity(new brls::Activity(dropdown));
+        return true;
+    });
+
+    auto* bitrateCell = addDetail(
+        content, "settings/video_bitrate"_i18n,
+        fmt::format("{:.1f} Mbps", draft->bitrateKbps / 1000.0));
+    bitrateCell->registerClickAction([draft, bitrateCell](brls::View*) {
+        brls::Application::getImeManager()->openForNumber(
+            [draft, bitrateCell](long number) {
+                const int mbps =
+                    std::clamp(static_cast<int>(number), 1, 100);
+                draft->bitrateKbps = mbps * 1000;
+                bitrateCell->setDetailText(
+                    fmt::format("{:.1f} Mbps", draft->bitrateKbps / 1000.0));
+            },
+            "artemis/settings/exact_bitrate_title"_i18n,
+            "artemis/settings/exact_bitrate_hint"_i18n, 3,
+            std::to_string(std::max(1, draft->bitrateKbps / 1000)), "", "", 0);
+        return true;
+    });
+
+    auto* codecCell =
+        addDetail(content, "settings/video_codec"_i18n, codecLabel(draft->videoCodec));
+    codecCell->registerClickAction([draft, codecCell](brls::View*) {
+        const std::vector<std::string> options = {"H.264", "H.265", "AV1"};
+        int selected = draft->videoCodec == H264   ? 0
+                       : draft->videoCodec == AV1  ? 2
+                                                   : 1;
+        auto* dropdown = new brls::Dropdown(
+            "settings/video_codec"_i18n, options,
+            [draft, codecCell](int index) {
+                draft->videoCodec =
+                    index == 0 ? H264 : (index == 2 ? AV1 : H265);
+                codecCell->setDetailText(codecLabel(draft->videoCodec));
+            },
+            selected);
+        brls::Application::pushActivity(new brls::Activity(dropdown));
+        return true;
+    });
+
+    addBool(content, "settings/request_hdr"_i18n, draft->requestHdr,
+            [draft](bool v) { draft->requestHdr = v; });
+    addBool(content, "artemis/settings/force_full_range"_i18n,
+            draft->forceFullRangeVideo,
+            [draft](bool v) { draft->forceFullRangeVideo = v; });
+    addBool(content, "artemis/settings/prevent_packet_loss"_i18n,
+            draft->preventPacketLoss,
+            [draft](bool v) { draft->preventPacketLoss = v; });
+
+    auto* decoderCell = addDetail(content, "settings/decoder_threads"_i18n,
+                                  std::to_string(draft->decoderThreads));
+    decoderCell->registerClickAction([draft, decoderCell](brls::View*) {
+        const std::vector<std::string> options = {"0", "2", "3", "4"};
+        int selected = 3;
+        for (size_t i = 0; i < options.size(); ++i) {
+            if (std::stoi(options[i]) == draft->decoderThreads)
+                selected = static_cast<int>(i);
+        }
+        auto* dropdown = new brls::Dropdown(
+            "settings/decoder_threads"_i18n, options,
+            [draft, decoderCell](int index) {
+                constexpr int values[] = {0, 2, 3, 4};
+                if (index >= 0 && index < 4)
+                    draft->decoderThreads = values[index];
+                decoderCell->setDetailText(
+                    std::to_string(draft->decoderThreads));
+            },
+            selected);
+        brls::Application::pushActivity(new brls::Activity(dropdown));
+        return true;
+    });
+
+    addHeader(content, "artemis/settings/profile_section_presentation"_i18n);
+    auto* scaleCell = addDetail(content, "artemis/settings/video_scale_mode"_i18n,
+                                scaleLabel(draft->scaleMode));
+    scaleCell->registerClickAction([draft, scaleCell](brls::View*) {
+        const std::vector<std::string> options = {
+            "artemis/settings/fit"_i18n, "artemis/settings/fill"_i18n,
+            "artemis/settings/stretch"_i18n};
+        int selected = draft->scaleMode == artemis::video::ScaleMode::Fit   ? 0
+                       : draft->scaleMode == artemis::video::ScaleMode::Stretch
+                           ? 2
+                           : 1;
+        auto* dropdown = new brls::Dropdown(
+            "artemis/settings/video_scale_mode"_i18n, options,
+            [draft, scaleCell](int index) {
+                draft->scaleMode =
+                    index == 0   ? artemis::video::ScaleMode::Fit
+                    : index == 2 ? artemis::video::ScaleMode::Stretch
+                                 : artemis::video::ScaleMode::Fill;
+                scaleCell->setDetailText(scaleLabel(draft->scaleMode));
+            },
+            selected);
+        brls::Application::pushActivity(new brls::Activity(dropdown));
+        return true;
+    });
+
+    auto* upscaleCell =
+        addDetail(content, "settings/upscaling"_i18n, upscalingLabel(draft->upscalingMode));
+    upscaleCell->registerClickAction([draft, upscaleCell](brls::View*) {
+        const std::vector<std::string> options = {
+            "hints/off"_i18n, "FSR1", "SGSR1", "NIS"};
+        int selected = 0;
+        switch (draft->upscalingMode) {
+        case UPSCALING_FSR1:
+            selected = 1;
+            break;
+        case UPSCALING_SGSR1:
+            selected = 2;
+            break;
+        case UPSCALING_NIS:
+            selected = 3;
+            break;
+        default:
+            selected = 0;
+            break;
+        }
+        auto* dropdown = new brls::Dropdown(
+            "settings/upscaling"_i18n, options,
+            [draft, upscaleCell](int index) {
+                draft->upscalingMode =
+                    index == 1   ? UPSCALING_FSR1
+                    : index == 2 ? UPSCALING_SGSR1
+                    : index == 3 ? UPSCALING_NIS
+                                 : UPSCALING_OFF;
+                upscaleCell->setDetailText(upscalingLabel(draft->upscalingMode));
+            },
+            selected);
+        brls::Application::pushActivity(new brls::Activity(dropdown));
+        return true;
+    });
+
+    addBool(content, "settings/dithering"_i18n, draft->dithering,
+            [draft](bool v) { draft->dithering = v; });
+    addBool(content, "settings/rcas_sharpening"_i18n, draft->rcas,
+            [draft](bool v) { draft->rcas = v; });
+
+    addHeader(content, "artemis/settings/profile_section_audio"_i18n);
+    auto* audioCell =
+        addDetail(content, "settings/stream_audio_configuration"_i18n,
+                  draft->streamAudioConfiguration == STREAM_AUDIO_51_SURROUND
+                      ? "5.1"
+                      : "Stereo");
+    audioCell->registerClickAction([draft, audioCell](brls::View*) {
+        const std::vector<std::string> options = {"Stereo", "5.1"};
+        auto* dropdown = new brls::Dropdown(
+            "settings/stream_audio_configuration"_i18n, options,
+            [draft, audioCell](int index) {
+                draft->streamAudioConfiguration =
+                    index == 1 ? STREAM_AUDIO_51_SURROUND
+                               : STREAM_AUDIO_STEREO;
+                audioCell->setDetailText(index == 1 ? "5.1" : "Stereo");
+            },
+            draft->streamAudioConfiguration == STREAM_AUDIO_51_SURROUND ? 1
+                                                                        : 0);
+        brls::Application::pushActivity(new brls::Activity(dropdown));
+        return true;
+    });
+    addBool(content, "settings/paop"_i18n, draft->playAudioOnPc,
+            [draft](bool v) { draft->playAudioOnPc = v; });
+    addBool(content, "settings/usops"_i18n, draft->sops,
+            [draft](bool v) { draft->sops = v; });
+    addBool(content, "settings/terminate_app_on_disconnect"_i18n,
+            draft->terminateAppOnDisconnect,
+            [draft](bool v) { draft->terminateAppOnDisconnect = v; });
+
+    addHeader(content, "artemis/settings/profile_section_keyboard"_i18n);
+    auto* kbType = addDetail(content, "settings/keyboard_type"_i18n,
+                             draft->keyboardType == FULLSIZED
+                                 ? "Full"
+                                 : (draft->keyboardType == NUMPAD ? "Numpad"
+                                                                  : "Compact"));
+    kbType->registerClickAction([draft, kbType](brls::View*) {
+        const std::vector<std::string> options = {"Compact", "Full", "Numpad"};
+        int selected = draft->keyboardType == FULLSIZED ? 1
+                       : draft->keyboardType == NUMPAD  ? 2
+                                                        : 0;
+        auto* dropdown = new brls::Dropdown(
+            "settings/keyboard_type"_i18n, options,
+            [draft, kbType, options](int index) {
+                draft->keyboardType =
+                    index == 1 ? FULLSIZED : (index == 2 ? NUMPAD : COMPACT);
+                kbType->setDetailText(options[static_cast<size_t>(index)]);
+            },
+            selected);
+        brls::Application::pushActivity(new brls::Activity(dropdown));
+        return true;
+    });
+    auto* kbFingers =
+        addDetail(content, "settings/keyboard_fingers"_i18n,
+                  draft->keyboardFingers <= 0
+                      ? "hints/off"_i18n
+                      : std::to_string(draft->keyboardFingers));
+    kbFingers->registerClickAction([draft, kbFingers](brls::View*) {
+        const std::vector<std::string> options = {"3", "4", "5", "hints/off"_i18n};
+        int selected = draft->keyboardFingers <= 0 ? 3
+                       : draft->keyboardFingers == 4 ? 1
+                       : draft->keyboardFingers == 5 ? 2
+                                                     : 0;
+        auto* dropdown = new brls::Dropdown(
+            "settings/keyboard_fingers"_i18n, options,
+            [draft, kbFingers](int index) {
+                draft->keyboardFingers =
+                    index == 3 ? 0 : (index == 0 ? 3 : (index == 1 ? 4 : 5));
+                kbFingers->setDetailText(
+                    draft->keyboardFingers <= 0
+                        ? "hints/off"_i18n
+                        : std::to_string(draft->keyboardFingers));
+            },
+            selected);
+        brls::Application::pushActivity(new brls::Activity(dropdown));
+        return true;
+    });
+
+    addHeader(content, "artemis/settings/profile_section_mouse"_i18n);
+    addBool(content, "settings/touchscreen_mouse_mode"_i18n,
+            draft->touchscreenMouseMode,
+            [draft](bool v) { draft->touchscreenMouseMode = v; });
+    addBool(content, "settings/swap_mouse_keys"_i18n, draft->swapMouseKeys,
+            [draft](bool v) { draft->swapMouseKeys = v; });
+    addBool(content, "settings/swap_mouse_scroll"_i18n, draft->swapMouseScroll,
+            [draft](bool v) { draft->swapMouseScroll = v; });
+    addBool(content, "settings/swap_mouse_sticks"_i18n, draft->swapMouseSticks,
+            [draft](bool v) { draft->swapMouseSticks = v; });
+    auto* mouseSpeed = addDetail(
+        content, "settings/mouse_speed"_i18n,
+        fmt::format("{:.1f}x",
+                    0.1f + (draft->mouseSpeedMultiplier / 100.f) * 1.9f));
+    mouseSpeed->registerClickAction([draft, mouseSpeed](brls::View*) {
+        brls::Application::getImeManager()->openForNumber(
+            [draft, mouseSpeed](long number) {
+                draft->mouseSpeedMultiplier =
+                    std::clamp(static_cast<int>(number), 0, 100);
+                mouseSpeed->setDetailText(fmt::format(
+                    "{:.1f}x",
+                    0.1f + (draft->mouseSpeedMultiplier / 100.f) * 1.9f));
+            },
+            "settings/mouse_speed"_i18n, "0 - 100", 3,
+            std::to_string(draft->mouseSpeedMultiplier), "", "", 0);
+        return true;
+    });
+
+    addHeader(content, "artemis/settings/profile_section_controller"_i18n);
+    addBool(content, "settings/swap_ui"_i18n, draft->swapUiKeys,
+            [draft](bool v) { draft->swapUiKeys = v; });
+    addBool(content, "settings/swap_stick_to_dpad"_i18n, draft->swapStickToDpad,
+            [draft](bool v) { draft->swapStickToDpad = v; });
+    auto* dzL = addDetail(
+        content, "settings/deadzone/stick_left"_i18n,
+        fmt::format("{}%", static_cast<int>(draft->deadzoneLeft * 100.f)));
+    dzL->registerClickAction([draft, dzL](brls::View*) {
+        brls::Application::getImeManager()->openForNumber(
+            [draft, dzL](long number) {
+                draft->deadzoneLeft =
+                    std::clamp(static_cast<int>(number), 0, 90) / 100.f;
+                dzL->setDetailText(fmt::format(
+                    "{}%", static_cast<int>(draft->deadzoneLeft * 100.f)));
+            },
+            "settings/deadzone/stick_left"_i18n, "0 - 90", 2,
+            std::to_string(static_cast<int>(draft->deadzoneLeft * 100.f)), "",
+            "", 0);
+        return true;
+    });
+    auto* dzR = addDetail(
+        content, "settings/deadzone/stick_right"_i18n,
+        fmt::format("{}%", static_cast<int>(draft->deadzoneRight * 100.f)));
+    dzR->registerClickAction([draft, dzR](brls::View*) {
+        brls::Application::getImeManager()->openForNumber(
+            [draft, dzR](long number) {
+                draft->deadzoneRight =
+                    std::clamp(static_cast<int>(number), 0, 90) / 100.f;
+                dzR->setDetailText(fmt::format(
+                    "{}%", static_cast<int>(draft->deadzoneRight * 100.f)));
+            },
+            "settings/deadzone/stick_right"_i18n, "0 - 90", 2,
+            std::to_string(static_cast<int>(draft->deadzoneRight * 100.f)), "",
+            "", 0);
+        return true;
+    });
+    auto* rumble = addDetail(
+        content, "settings/rumble_force"_i18n,
+        fmt::format("{}%", static_cast<int>(draft->rumbleForce * 100.f)));
+    rumble->registerClickAction([draft, rumble](brls::View*) {
+        brls::Application::getImeManager()->openForNumber(
+            [draft, rumble](long number) {
+                draft->rumbleForce =
+                    std::clamp(static_cast<int>(number), 0, 100) / 100.f;
+                rumble->setDetailText(fmt::format(
+                    "{}%", static_cast<int>(draft->rumbleForce * 100.f)));
+            },
+            "settings/rumble_force"_i18n, "0 - 100", 3,
+            std::to_string(static_cast<int>(draft->rumbleForce * 100.f)), "", "",
+            0);
+        return true;
+    });
+
+    scroll->setContentView(content);
+    outer->addView(scroll);
+
+    auto* dialog = new brls::Dialog(outer);
+    dialog->addButton("common/cancel"_i18n, [draft] { delete draft; });
+    dialog->addButton("common/confirm"_i18n, [draft, profileId, assignHostKey,
+                                           onChanged] {
+        if (draft->name.empty()) {
+            draft->name = "Profile";
+        }
+        auto& store = StreamConfigProfileStore::instance();
+        std::string id = profileId;
+        if (id.empty()) {
+            auto created = store.create(draft->name, false);
+            draft->id = created.id;
+            id = created.id;
+        }
+        draft->id = id;
+        store.update(*draft);
+        if (!assignHostKey.empty())
+            store.setSelectedForHost(assignHostKey, id);
+        if (onChanged)
+            onChanged();
+        delete draft;
+    });
+    dialog->open();
+}
+
+} // namespace artemis::streaming

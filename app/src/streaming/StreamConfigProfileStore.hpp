@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Settings.hpp"
+#include "StreamConfigProfileNormalize.hpp"
 #include "video/VideoScale.hpp"
 
 #include <map>
@@ -13,15 +14,49 @@ namespace artemis::streaming {
 struct StreamConfigProfile {
     std::string id;
     std::string name;
+
+    // Video
     int resolutionHeight = 720; // 360, 480, 720, or 1080
     int fps = 60;
     int bitrateKbps = 10000;
     VideoCodec videoCodec = H264;
-    StreamAudioConfiguration streamAudioConfiguration = STREAM_AUDIO_STEREO;
-    UpscalingMode upscalingMode = UPSCALING_OFF;
+    bool requestHdr = false;
+    int decoderThreads = 4;
     bool forceFullRangeVideo = false;
     bool preventPacketLoss = false;
+
+    // Presentation
     artemis::video::ScaleMode scaleMode = artemis::video::ScaleMode::Fill;
+    UpscalingMode upscalingMode = UPSCALING_OFF;
+    bool dithering = false;
+    float ditheringStrength = 3.0f;
+    bool rcas = true;
+    float rcasStrength = 0.2f;
+
+    // Audio / stream
+    StreamAudioConfiguration streamAudioConfiguration = STREAM_AUDIO_STEREO;
+    bool playAudioOnPc = false;
+    bool sops = false;
+    bool terminateAppOnDisconnect = false;
+
+    // Keyboard
+    KeyboardType keyboardType = COMPACT;
+    int keyboardLocale = 0;
+    int keyboardFingers = 3;
+
+    // Mouse
+    bool touchscreenMouseMode = false;
+    bool swapMouseKeys = false;
+    bool swapMouseScroll = false;
+    bool swapMouseSticks = false;
+    int mouseSpeedMultiplier = 47;
+
+    // Controller
+    bool swapUiKeys = false;
+    float deadzoneLeft = 0.0f;
+    float deadzoneRight = 0.0f;
+    float rumbleForce = 1.0f;
+    bool swapStickToDpad = false;
 
     [[nodiscard]] int resolutionWidth() const {
         return resolutionHeight * 16 / 9;
@@ -30,7 +65,7 @@ struct StreamConfigProfile {
 
 class StreamConfigProfileStore {
 public:
-    static constexpr int SchemaVersion = 1;
+    static constexpr int SchemaVersion = 2;
     static StreamConfigProfileStore& instance();
 
     const std::vector<StreamConfigProfile>& list();
@@ -51,16 +86,11 @@ public:
     std::string activeProfileId();
     void setActiveProfileId(const std::string& profileId);
 
-    // Snapshot current Settings / advanced options into a profile struct.
     static StreamConfigProfile snapshotFromSettings(const std::string& name);
-
-    // Apply profile fields into Settings + related stores. Returns false if
-    // the profile id is missing.
     bool applyToSettings(const std::string& id);
+    bool applyProfile(const StreamConfigProfile& profile);
 
     bool exportJson(const std::string& path) const;
-    // Merge by id; conflicting ids keep existing and import under a new id
-    // when renameOnConflict is true (default).
     bool importJson(const std::string& path, bool renameOnConflict = true,
                     std::string* errorOut = nullptr);
 
@@ -79,5 +109,7 @@ private:
     std::string m_activeProfileId;
     bool m_loaded = false;
 };
+
+StreamConfigProfile normalizeProfile(StreamConfigProfile profile);
 
 } // namespace artemis::streaming

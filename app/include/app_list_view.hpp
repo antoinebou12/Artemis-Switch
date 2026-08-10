@@ -15,6 +15,7 @@
 #include "GameStreamClient.hpp"
 
 #include <optional>
+#include <string>
 
 using namespace brls;
 
@@ -27,7 +28,10 @@ class AppListView : public Box {
 
   private:
     Host host;
+    std::string hostProfileKey;
     View* hintView = nullptr;
+    DetailCell* webConfig = nullptr;
+    DetailCell* streamProfile = nullptr;
     std::optional<AppInfo> currentApp;
     bool loading = false;
     bool inputBlocked = false;
@@ -41,4 +45,6 @@ class AppListView : public Box {
     void terninateApp();
     void updateAppList();
     void updateFavoriteAction(AppCell* cell, Host host, const AppInfo& app);
+    void refreshStreamProfileLabel();
+    void refreshWebConfigVisibility();
 };

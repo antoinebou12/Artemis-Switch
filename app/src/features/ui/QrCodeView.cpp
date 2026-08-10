@@ -101,6 +101,7 @@ void showUrlQrDialog(const std::string& title, const std::string& url) {
     holder->addView(urlLabel);
 
     auto* dialog = new brls::Dialog(holder);
+#ifndef __SWITCH__
     auto* platform = brls::Application::getPlatform();
     if (platform) {
         dialog->addButton("host/web_config_copy"_i18n, [url, platform] {
@@ -110,6 +111,7 @@ void showUrlQrDialog(const std::string& title, const std::string& url) {
             }
         });
     }
+#endif
     dialog->addButton("common/close"_i18n, [] {});
     dialog->open();
 }

@@ -1,5 +1,6 @@
 #include "StreamConfigProfileStore.hpp"
 
+#include "StreamConfigProfileNormalize.hpp"
 #include "StreamProfileStore.hpp"
 #include "features/stream/AdvancedStreamOptionsStore.hpp"
 #include "video/VideoScaleStore.hpp"
@@ -14,6 +15,9 @@
 #include <random>
 
 namespace artemis::streaming {
+
+StreamConfigProfile normalizeProfile(StreamConfigProfile profile);
+
 namespace {
 
 std::filesystem::path storePath() {
@@ -36,9 +40,10 @@ const char* scaleModeToString(artemis::video::ScaleMode mode) {
 artemis::video::ScaleMode scaleModeFromString(const char* value) {
     if (!value)
         return artemis::video::ScaleMode::Fill;
-    if (std::string(value) == "fit")
+    const std::string s(value);
+    if (s == "fit")
         return artemis::video::ScaleMode::Fit;
-    if (std::string(value) == "stretch")
+    if (s == "stretch")
         return artemis::video::ScaleMode::Stretch;
     return artemis::video::ScaleMode::Fill;
 }
@@ -66,12 +71,28 @@ VideoCodec codecFromString(const char* value) {
     return H265;
 }
 
+bool jsonToBool(json_t* value) {
+    return value && json_is_true(value);
+}
+
+float jsonToFloat(json_t* value, float defaultValue) {
+    if (!value)
+        return defaultValue;
+    if (json_is_real(value))
+        return static_cast<float>(json_real_value(value));
+    if (json_is_integer(value))
+        return static_cast<float>(json_integer_value(value));
+    return defaultValue;
+}
+
 json_t* profileToJson(const StreamConfigProfile& profile) {
     json_t* item = json_object();
     if (!item)
         return nullptr;
+
     json_object_set_new(item, "id", json_string(profile.id.c_str()));
     json_object_set_new(item, "name", json_string(profile.name.c_str()));
+
     json_object_set_new(item, "resolution_height",
                         json_integer(profile.resolutionHeight));
     json_object_set_new(item, "fps", json_integer(profile.fps));
@@ -79,18 +100,68 @@ json_t* profileToJson(const StreamConfigProfile& profile) {
                         json_integer(profile.bitrateKbps));
     json_object_set_new(item, "video_codec",
                         json_string(codecToString(profile.videoCodec)));
-    json_object_set_new(item, "stream_audio_configuration",
-                        json_integer(static_cast<int>(
-                            profile.streamAudioConfiguration)));
-    json_object_set_new(item, "upscaling_mode",
-                        json_integer(static_cast<int>(profile.upscalingMode)));
+    json_object_set_new(item, "request_hdr",
+                        profile.requestHdr ? json_true() : json_false());
+    json_object_set_new(item, "decoder_threads",
+                        json_integer(profile.decoderThreads));
     json_object_set_new(item, "force_full_range_video",
                         profile.forceFullRangeVideo ? json_true()
                                                     : json_false());
     json_object_set_new(item, "prevent_packet_loss",
                         profile.preventPacketLoss ? json_true() : json_false());
+
     json_object_set_new(item, "scale_mode",
                         json_string(scaleModeToString(profile.scaleMode)));
+    json_object_set_new(item, "upscaling_mode",
+                        json_integer(static_cast<int>(profile.upscalingMode)));
+    json_object_set_new(item, "dithering",
+                        profile.dithering ? json_true() : json_false());
+    json_object_set_new(item, "dithering_strength",
+                        json_real(static_cast<double>(profile.ditheringStrength)));
+    json_object_set_new(item, "rcas", profile.rcas ? json_true() : json_false());
+    json_object_set_new(item, "rcas_strength",
+                        json_real(static_cast<double>(profile.rcasStrength)));
+
+    json_object_set_new(item, "stream_audio_configuration",
+                        json_integer(static_cast<int>(
+                            profile.streamAudioConfiguration)));
+    json_object_set_new(item, "play_audio_on_pc",
+                        profile.playAudioOnPc ? json_true() : json_false());
+    json_object_set_new(item, "sops", profile.sops ? json_true() : json_false());
+    json_object_set_new(
+        item, "terminate_app_on_disconnect",
+        profile.terminateAppOnDisconnect ? json_true() : json_false());
+
+    json_object_set_new(item, "keyboard_type",
+                        json_integer(static_cast<int>(profile.keyboardType)));
+    json_object_set_new(item, "keyboard_locale",
+                        json_integer(profile.keyboardLocale));
+    json_object_set_new(item, "keyboard_fingers",
+                        json_integer(profile.keyboardFingers));
+
+    json_object_set_new(
+        item, "touchscreen_mouse_mode",
+        profile.touchscreenMouseMode ? json_true() : json_false());
+    json_object_set_new(item, "swap_mouse_keys",
+                        profile.swapMouseKeys ? json_true() : json_false());
+    json_object_set_new(item, "swap_mouse_scroll",
+                        profile.swapMouseScroll ? json_true() : json_false());
+    json_object_set_new(item, "swap_mouse_sticks",
+                        profile.swapMouseSticks ? json_true() : json_false());
+    json_object_set_new(item, "mouse_speed_multiplier",
+                        json_integer(profile.mouseSpeedMultiplier));
+
+    json_object_set_new(item, "swap_ui_keys",
+                        profile.swapUiKeys ? json_true() : json_false());
+    json_object_set_new(item, "deadzone_left",
+                        json_real(static_cast<double>(profile.deadzoneLeft)));
+    json_object_set_new(item, "deadzone_right",
+                        json_real(static_cast<double>(profile.deadzoneRight)));
+    json_object_set_new(item, "rumble_force",
+                        json_real(static_cast<double>(profile.rumbleForce)));
+    json_object_set_new(item, "swap_stick_to_dpad",
+                        profile.swapStickToDpad ? json_true() : json_false());
+
     return item;
 }
 
@@ -103,6 +174,7 @@ StreamConfigProfile profileFromJson(json_t* object) {
         profile.id = json_string_value(id);
     if (json_t* name = json_object_get(object, "name"); json_is_string(name))
         profile.name = json_string_value(name);
+
     if (json_t* height = json_object_get(object, "resolution_height");
         json_is_integer(height))
         profile.resolutionHeight =
@@ -115,34 +187,159 @@ StreamConfigProfile profileFromJson(json_t* object) {
     if (json_t* codec = json_object_get(object, "video_codec");
         json_is_string(codec))
         profile.videoCodec = codecFromString(json_string_value(codec));
-    if (json_t* audio = json_object_get(object, "stream_audio_configuration");
-        json_is_integer(audio))
-        profile.streamAudioConfiguration =
-            static_cast<StreamAudioConfiguration>(json_integer_value(audio));
+    if (json_t* hdr = json_object_get(object, "request_hdr"))
+        profile.requestHdr = jsonToBool(hdr);
+    if (json_t* threads = json_object_get(object, "decoder_threads");
+        json_is_integer(threads))
+        profile.decoderThreads = static_cast<int>(json_integer_value(threads));
+    if (json_t* full = json_object_get(object, "force_full_range_video"))
+        profile.forceFullRangeVideo = jsonToBool(full);
+    if (json_t* loss = json_object_get(object, "prevent_packet_loss"))
+        profile.preventPacketLoss = jsonToBool(loss);
+
+    if (json_t* scale = json_object_get(object, "scale_mode");
+        json_is_string(scale))
+        profile.scaleMode = scaleModeFromString(json_string_value(scale));
     if (json_t* upscaling = json_object_get(object, "upscaling_mode");
         json_is_integer(upscaling))
         profile.upscalingMode =
             static_cast<UpscalingMode>(json_integer_value(upscaling));
-    if (json_t* full = json_object_get(object, "force_full_range_video"))
-        profile.forceFullRangeVideo = json_is_true(full);
-    if (json_t* loss = json_object_get(object, "prevent_packet_loss"))
-        profile.preventPacketLoss = json_is_true(loss);
-    if (json_t* scale = json_object_get(object, "scale_mode");
-        json_is_string(scale))
-        profile.scaleMode = scaleModeFromString(json_string_value(scale));
+    if (json_t* dithering = json_object_get(object, "dithering"))
+        profile.dithering = jsonToBool(dithering);
+    profile.ditheringStrength =
+        jsonToFloat(json_object_get(object, "dithering_strength"),
+                    profile.ditheringStrength);
+    if (json_t* rcas = json_object_get(object, "rcas"))
+        profile.rcas = jsonToBool(rcas);
+    profile.rcasStrength =
+        jsonToFloat(json_object_get(object, "rcas_strength"),
+                    profile.rcasStrength);
 
-    profile.resolutionHeight =
-        StreamConfigProfileStore::normalizeHeight(profile.resolutionHeight);
+    if (json_t* audio = json_object_get(object, "stream_audio_configuration");
+        json_is_integer(audio))
+        profile.streamAudioConfiguration =
+            static_cast<StreamAudioConfiguration>(json_integer_value(audio));
+    if (json_t* playAudio = json_object_get(object, "play_audio_on_pc"))
+        profile.playAudioOnPc = jsonToBool(playAudio);
+    if (json_t* sops = json_object_get(object, "sops"))
+        profile.sops = jsonToBool(sops);
+    if (json_t* terminate = json_object_get(object, "terminate_app_on_disconnect"))
+        profile.terminateAppOnDisconnect = jsonToBool(terminate);
+
+    if (json_t* keyboardType = json_object_get(object, "keyboard_type");
+        json_is_integer(keyboardType))
+        profile.keyboardType =
+            static_cast<KeyboardType>(json_integer_value(keyboardType));
+    if (json_t* keyboardLocale = json_object_get(object, "keyboard_locale");
+        json_is_integer(keyboardLocale))
+        profile.keyboardLocale =
+            static_cast<int>(json_integer_value(keyboardLocale));
+    if (json_t* keyboardFingers = json_object_get(object, "keyboard_fingers");
+        json_is_integer(keyboardFingers))
+        profile.keyboardFingers =
+            static_cast<int>(json_integer_value(keyboardFingers));
+
+    if (json_t* touchMouse = json_object_get(object, "touchscreen_mouse_mode"))
+        profile.touchscreenMouseMode = jsonToBool(touchMouse);
+    if (json_t* swapKeys = json_object_get(object, "swap_mouse_keys"))
+        profile.swapMouseKeys = jsonToBool(swapKeys);
+    if (json_t* swapScroll = json_object_get(object, "swap_mouse_scroll"))
+        profile.swapMouseScroll = jsonToBool(swapScroll);
+    if (json_t* swapSticks = json_object_get(object, "swap_mouse_sticks"))
+        profile.swapMouseSticks = jsonToBool(swapSticks);
+    if (json_t* mouseSpeed = json_object_get(object, "mouse_speed_multiplier");
+        json_is_integer(mouseSpeed))
+        profile.mouseSpeedMultiplier =
+            static_cast<int>(json_integer_value(mouseSpeed));
+
+    if (json_t* swapUi = json_object_get(object, "swap_ui_keys"))
+        profile.swapUiKeys = jsonToBool(swapUi);
+    profile.deadzoneLeft =
+        jsonToFloat(json_object_get(object, "deadzone_left"),
+                    profile.deadzoneLeft);
+    profile.deadzoneRight =
+        jsonToFloat(json_object_get(object, "deadzone_right"),
+                    profile.deadzoneRight);
+    profile.rumbleForce =
+        jsonToFloat(json_object_get(object, "rumble_force"),
+                    profile.rumbleForce);
+    if (json_t* swapStick = json_object_get(object, "swap_stick_to_dpad"))
+        profile.swapStickToDpad = jsonToBool(swapStick);
+
+    return normalizeProfile(profile);
+}
+
+void applyProfileToSettings(const StreamConfigProfile& profile) {
+    auto& settings = Settings::instance();
+    settings.set_resolution(profile.resolutionHeight);
+    settings.set_fps(profile.fps);
+    settings.set_bitrate(profile.bitrateKbps);
+    settings.set_video_codec(profile.videoCodec);
+    settings.set_request_hdr(profile.requestHdr);
+    settings.set_decoder_threads(profile.decoderThreads);
+    settings.set_upscaling_mode(profile.upscalingMode);
+    settings.set_dithering(profile.dithering);
+    settings.set_dithering_strength(profile.ditheringStrength);
+    settings.set_rcas(profile.rcas);
+    settings.set_rcas_strength(profile.rcasStrength);
+    settings.set_stream_audio_configuration(profile.streamAudioConfiguration);
+    settings.set_play_audio(profile.playAudioOnPc);
+    settings.set_sops(profile.sops);
+    settings.set_terminate_app_on_disconnect(profile.terminateAppOnDisconnect);
+    settings.set_keyboard_type(profile.keyboardType);
+    settings.set_keyboard_locale(profile.keyboardLocale);
+    settings.set_keyboard_fingers(profile.keyboardFingers);
+    settings.set_touchscreen_mouse_mode(profile.touchscreenMouseMode);
+    settings.set_swap_mouse_keys(profile.swapMouseKeys);
+    settings.set_swap_mouse_scroll(profile.swapMouseScroll);
+    settings.set_swap_mouse_sticks(profile.swapMouseSticks);
+    settings.set_mouse_speed_multiplier(profile.mouseSpeedMultiplier);
+    settings.set_swap_ui_keys(profile.swapUiKeys);
+    settings.set_deadzone_stick_left(profile.deadzoneLeft);
+    settings.set_deadzone_stick_right(profile.deadzoneRight);
+    settings.set_rumble_force(profile.rumbleForce);
+    settings.set_swap_joycon_stick_to_dpad(profile.swapStickToDpad);
+    settings.save();
+
+    auto advanced =
+        artemis::stream::AdvancedStreamOptionsStore::instance().get();
+    advanced.forceFullRangeVideo = profile.forceFullRangeVideo;
+    advanced.preventPacketLoss = profile.preventPacketLoss;
+    artemis::stream::AdvancedStreamOptionsStore::instance().set(advanced);
+
+    artemis::video::VideoScaleStore::instance().set(profile.scaleMode);
+
+    StreamProfileStore::instance().setCustomResolution(
+        true, profile.resolutionWidth(), profile.resolutionHeight);
+}
+
+} // namespace
+
+StreamConfigProfile normalizeProfile(StreamConfigProfile profile) {
+    profile.resolutionHeight = normalizeProfileHeight(profile.resolutionHeight);
     if (profile.fps <= 0)
         profile.fps = 60;
     if (profile.bitrateKbps <= 0)
         profile.bitrateKbps = 10000;
+    if (profile.decoderThreads < 0)
+        profile.decoderThreads = 4;
     if (profile.name.empty())
         profile.name = "Profile";
+
+    profile.ditheringStrength =
+        std::clamp(profile.ditheringStrength, 1.0f, 10.0f);
+    profile.rcasStrength = std::clamp(profile.rcasStrength, 0.0f, 1.0f);
+    profile.deadzoneLeft = std::clamp(profile.deadzoneLeft, 0.0f, 1.0f);
+    profile.deadzoneRight = std::clamp(profile.deadzoneRight, 0.0f, 1.0f);
+    profile.rumbleForce = std::clamp(profile.rumbleForce, 0.0f, 1.0f);
+    profile.mouseSpeedMultiplier =
+        std::clamp(profile.mouseSpeedMultiplier, 0, 100);
+    profile.keyboardFingers = std::clamp(profile.keyboardFingers, 0, 10);
+    if (profile.keyboardLocale < 0)
+        profile.keyboardLocale = 0;
+
     return profile;
 }
-
-} // namespace
 
 StreamConfigProfileStore& StreamConfigProfileStore::instance() {
     static StreamConfigProfileStore store;
@@ -150,23 +347,14 @@ StreamConfigProfileStore& StreamConfigProfileStore::instance() {
 }
 
 int StreamConfigProfileStore::normalizeHeight(int height) {
-    constexpr int allowed[] = {360, 480, 720, 1080};
-    int best = 720;
-    int bestDistance = std::abs(height - best);
-    for (int value : allowed) {
-        const int distance = std::abs(height - value);
-        if (distance < bestDistance) {
-            best = value;
-            bestDistance = distance;
-        }
-    }
-    return best;
+    return normalizeProfileHeight(height);
 }
 
 std::string StreamConfigProfileStore::makeId() {
     static std::mt19937 rng{std::random_device{}()};
     std::uniform_int_distribution<uint32_t> dist;
-    const auto now = std::chrono::steady_clock::now().time_since_epoch().count();
+    const auto now =
+        std::chrono::steady_clock::now().time_since_epoch().count();
     char buffer[48];
     std::snprintf(buffer, sizeof(buffer), "p-%lld-%08x",
                   static_cast<long long>(now), dist(rng));
@@ -183,23 +371,45 @@ StreamConfigProfileStore::snapshotFromSettings(const std::string& name) {
     StreamConfigProfile profile;
     profile.id = makeId();
     profile.name = name.empty() ? "Profile" : name;
+
+    const auto& settings = Settings::instance();
     profile.resolutionHeight =
-        normalizeHeight(Settings::instance().resolution() > 0
-                            ? Settings::instance().resolution()
-                            : 720);
-    profile.fps = Settings::instance().fps();
-    profile.bitrateKbps = Settings::instance().bitrate();
-    profile.videoCodec = Settings::instance().video_codec();
-    profile.streamAudioConfiguration =
-        Settings::instance().stream_audio_configuration();
-    profile.upscalingMode = Settings::instance().upscaling_mode();
+        normalizeHeight(settings.resolution() > 0 ? settings.resolution() : 720);
+    profile.fps = settings.fps();
+    profile.bitrateKbps = settings.bitrate();
+    profile.videoCodec = settings.video_codec();
+    profile.requestHdr = settings.request_hdr();
+    profile.decoderThreads = settings.decoder_threads();
+    profile.upscalingMode = settings.upscaling_mode();
+    profile.dithering = settings.dithering();
+    profile.ditheringStrength = settings.dithering_strength();
+    profile.rcas = settings.rcas();
+    profile.rcasStrength = settings.rcas_strength();
+    profile.streamAudioConfiguration = settings.stream_audio_configuration();
+    profile.playAudioOnPc = settings.play_audio();
+    profile.sops = settings.sops();
+    profile.terminateAppOnDisconnect = settings.terminate_app_on_disconnect();
+    profile.keyboardType = settings.get_keyboard_type();
+    profile.keyboardLocale = settings.get_keyboard_locale();
+    profile.keyboardFingers = settings.get_keyboard_fingers();
+    profile.touchscreenMouseMode = settings.touchscreen_mouse_mode();
+    profile.swapMouseKeys = settings.swap_mouse_keys();
+    profile.swapMouseScroll = settings.swap_mouse_scroll();
+    profile.swapMouseSticks = settings.swap_mouse_sticks();
+    profile.mouseSpeedMultiplier = settings.get_mouse_speed_multiplier();
+    profile.swapUiKeys = settings.swap_ui_keys();
+    profile.deadzoneLeft = settings.get_deadzone_stick_left();
+    profile.deadzoneRight = settings.get_deadzone_stick_right();
+    profile.rumbleForce = settings.get_rumble_force();
+    profile.swapStickToDpad = settings.swap_joycon_stick_to_dpad();
 
     const auto advanced =
         artemis::stream::AdvancedStreamOptionsStore::instance().get();
     profile.forceFullRangeVideo = advanced.forceFullRangeVideo;
     profile.preventPacketLoss = advanced.preventPacketLoss;
     profile.scaleMode = artemis::video::VideoScaleStore::instance().get();
-    return profile;
+
+    return normalizeProfile(profile);
 }
 
 void StreamConfigProfileStore::seedDefaultsIfEmpty() {
@@ -256,6 +466,7 @@ StreamConfigProfileStore::create(const std::string& name,
         if (profile.id.empty())
             profile.id = makeId();
     }
+    profile = normalizeProfile(profile);
     m_profiles.push_back(profile);
     if (m_activeProfileId.empty())
         m_activeProfileId = profile.id;
@@ -285,10 +496,8 @@ bool StreamConfigProfileStore::update(const StreamConfigProfile& profile) {
     for (auto& existing : m_profiles) {
         if (existing.id != profile.id)
             continue;
-        existing = profile;
-        existing.resolutionHeight = normalizeHeight(existing.resolutionHeight);
-        if (existing.name.empty())
-            existing.name = "Profile";
+        existing = normalizeProfile(profile);
+        existing.id = profile.id;
         save();
         return true;
     }
@@ -384,32 +593,17 @@ void StreamConfigProfileStore::setActiveProfileId(
     save();
 }
 
+bool StreamConfigProfileStore::applyProfile(const StreamConfigProfile& profile) {
+    applyProfileToSettings(normalizeProfile(profile));
+    return true;
+}
+
 bool StreamConfigProfileStore::applyToSettings(const std::string& id) {
     auto profile = get(id);
     if (!profile)
         return false;
-
-    auto& settings = Settings::instance();
-    settings.set_resolution(profile->resolutionHeight);
-    settings.set_fps(profile->fps);
-    settings.set_bitrate(profile->bitrateKbps);
-    settings.set_video_codec(profile->videoCodec);
-    settings.set_stream_audio_configuration(
-        profile->streamAudioConfiguration);
-    settings.set_upscaling_mode(profile->upscalingMode);
-    settings.save();
-
-    auto advanced =
-        artemis::stream::AdvancedStreamOptionsStore::instance().get();
-    advanced.forceFullRangeVideo = profile->forceFullRangeVideo;
-    advanced.preventPacketLoss = profile->preventPacketLoss;
-    artemis::stream::AdvancedStreamOptionsStore::instance().set(advanced);
-
-    artemis::video::VideoScaleStore::instance().set(profile->scaleMode);
-
-    StreamProfileStore::instance().setCustomResolution(
-        true, profile->resolutionWidth(), profile->resolutionHeight);
-
+    if (!applyProfile(*profile))
+        return false;
     m_activeProfileId = profile->id;
     save();
     return true;
@@ -443,8 +637,7 @@ bool StreamConfigProfileStore::exportJson(const std::string& path) const {
         json_object_set_new(root, "active_profile_id",
                             json_string(m_activeProfileId.c_str()));
 
-    const int result =
-        json_dump_file(root, path.c_str(), JSON_INDENT(4));
+    const int result = json_dump_file(root, path.c_str(), JSON_INDENT(4));
     json_decref(root);
     return result == 0;
 }

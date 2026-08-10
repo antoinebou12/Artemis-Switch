@@ -101,7 +101,15 @@
             "import_profiles": "Import profiles",
             "import_profiles_hint": "Read artemis_profiles_export.json",
             "import_profiles_done": "Profiles imported",
-            "import_profiles_error": "Could not import profiles"
+            "import_profiles_error": "Could not import profiles",
+            "profile_name": "Profile name",
+            "profile_name_hint": "Tap to name",
+            "profile_section_video": "Video",
+            "profile_section_presentation": "Presentation",
+            "profile_section_audio": "Audio",
+            "profile_section_keyboard": "Keyboard",
+            "profile_section_mouse": "Mouse",
+            "profile_section_controller": "Controller"
         },
         "overlay": {
             "options": "Options",
@@ -279,7 +287,7 @@
         "wake_up_error": "Could not wake up the host",
         "wake_up_message": "Sending Wake Up",
         "web_config": "Host web config",
-        "web_config_hint": "Open URL / show QR",
+        "web_config_hint": "Show QR code",
         "web_config_message": "Open this URL on your PC or phone to add apps in Sunshine/Apollo:",
         "web_config_no_address": "No host address available",
         "web_config_scan_hint": "Scan with your phone",
@@ -329,6 +337,7 @@
         },
         "debug": "Debug",
         "debugging_view": "Show debugging view",
+        "show_host_web_config": "Show host web config",
         "debug_stats_corner": "Debug stats position",
         "corner_top_left": "Top left",
         "corner_top_right": "Top right",

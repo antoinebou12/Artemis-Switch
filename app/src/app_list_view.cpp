@@ -9,9 +9,13 @@
 #include "helper.hpp"
 #include "main_tabs_view.hpp"
 #include "features/ui/QrCodeView.hpp"
+#include "streaming/HostProfileKey.hpp"
+#include "streaming/HostStreamProfileUi.hpp"
+#include "utils/UsableMac.hpp"
 
 AppListView::AppListView(const Host& host) : host(host) {
     this->inflateFromXMLRes("xml/views/app_list_view.xml");
+    hostProfileKey = artemis::streaming::host_profile_key(host);
 
     auto* label = new brls::Label();
     label->setText(brls::Hint::getKeyIcon(ControllerButton::BUTTON_BACK) +
@@ -30,7 +34,8 @@ AppListView::AppListView(const Host& host) : host(host) {
     getAppletFrameItem()->setHintView(hintView);
 
     container->setHideHighlight(true);
-    auto* webConfig = new DetailCell();
+
+    webConfig = new DetailCell();
     webConfig->setText("host/web_config"_i18n);
     webConfig->setDetailText("host/web_config_hint"_i18n);
     webConfig->title->setSingleLine(true);
@@ -42,15 +47,23 @@ AppListView::AppListView(const Host& host) : host(host) {
             return true;
         }
         const std::string url = "https://" + address + ":47990/";
-        try {
-            if (auto* platform = Application::getPlatform())
-                platform->openBrowser(url);
-        } catch (...) {
-        }
         artemis::ui::showUrlQrDialog("host/web_config"_i18n, url);
         return true;
     });
     container->addView(webConfig);
+    refreshWebConfigVisibility();
+
+    streamProfile = new DetailCell();
+    streamProfile->setText("host/stream_profile"_i18n);
+    streamProfile->title->setSingleLine(true);
+    streamProfile->detail->setSingleLine(true);
+    refreshStreamProfileLabel();
+    streamProfile->registerClickAction([this](View*) {
+        artemis::streaming::open_host_profile_picker(
+            hostProfileKey, [this] { refreshStreamProfileLabel(); });
+        return true;
+    });
+    container->addView(streamProfile);
 
     gridView = new GridView();
     container->addView(gridView);
@@ -69,20 +82,32 @@ AppListView::AppListView(const Host& host) : host(host) {
     registerAction("", brls::ControllerButton::BUTTON_BACK, closeCurrentAction,
                    true);
 
-    // #ifdef __SWITCH__
-    //     registerAction("", brls::ControllerButton::BUTTON_LB, [](View* view)
-    //     {
-    //         appletPerformSystemButtonPressingIfInFocus(AppletSystemButtonType_HomeButtonLongPressing);
-    //         return true;
-    //     }, true);
-    // #endif
-
     registerAction("app_list/reload_app_list"_i18n, BUTTON_Y,
                    [this](View* view) {
                        this->updateAppList();
                        return true;
                    });
+    registerAction("host/new_profile"_i18n, BUTTON_RB, [this](View*) {
+        artemis::streaming::open_create_host_profile(
+            hostProfileKey, [this] { refreshStreamProfileLabel(); });
+        return true;
+    });
     blockInput(true);
+}
+
+void AppListView::refreshStreamProfileLabel() {
+    if (!streamProfile)
+        return;
+    streamProfile->setDetailText(
+        artemis::streaming::profile_detail_label(hostProfileKey));
+}
+
+void AppListView::refreshWebConfigVisibility() {
+    if (!webConfig)
+        return;
+    webConfig->setVisibility(Settings::instance().show_host_web_config()
+                                 ? Visibility::VISIBLE
+                                 : Visibility::GONE);
 }
 
 void AppListView::blockInput(bool block) {
@@ -145,6 +170,7 @@ void AppListView::updateAppList() {
     currentApp = std::nullopt;
     hintView->setVisibility(Visibility::GONE);
     blockInput(true);
+    refreshWebConfigVisibility();
 
     getAppletFrameItem()->title = host.hostname;
     updateAppletFrameItem();
@@ -155,6 +181,10 @@ void AppListView::updateAppList() {
             ASYNC_RELEASE
 
             if (result.isSuccess()) {
+                hostProfileKey = artemis::streaming::host_profile_key(
+                    this->host, result.value().mac);
+                refreshStreamProfileLabel();
+
                 int currentGame = result.value().currentGame;
 
                 ASYNC_RETAIN

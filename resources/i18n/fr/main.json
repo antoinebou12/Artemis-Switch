@@ -101,7 +101,15 @@
             "import_profiles": "Importer les profils",
             "import_profiles_hint": "Lire artemis_profiles_export.json",
             "import_profiles_done": "Profils importés",
-            "import_profiles_error": "Impossible d’importer les profils"
+            "import_profiles_error": "Impossible d’importer les profils",
+            "profile_name": "Nom du profil",
+            "profile_name_hint": "Appuyer pour nommer",
+            "profile_section_video": "Vidéo",
+            "profile_section_presentation": "Affichage",
+            "profile_section_audio": "Audio",
+            "profile_section_keyboard": "Clavier",
+            "profile_section_mouse": "Souris",
+            "profile_section_controller": "Manette"
         },
         "overlay": {
             "options": "Options",
@@ -279,7 +287,7 @@
         "wake_up_error": "L'hôte n'a pas pu être réveillé",
         "wake_up_message": "Réveil en cours...",
         "web_config": "Config web de l’hôte",
-        "web_config_hint": "Ouvrir l’URL / afficher le QR",
+        "web_config_hint": "Afficher le QR",
         "web_config_message": "Ouvrez cette URL sur le PC ou le téléphone pour ajouter des apps dans Sunshine/Apollo :",
         "web_config_no_address": "Aucune adresse d’hôte disponible",
         "web_config_scan_hint": "Scannez avec votre téléphone",
@@ -329,6 +337,7 @@
         },
         "debug": "Debug",
         "debugging_view": "Afficher la vue Debug",
+        "show_host_web_config": "Afficher la config web de l’hôte",
         "debug_stats_corner": "Position des stats debug",
         "corner_top_left": "Haut gauche",
         "corner_top_right": "Haut droite",

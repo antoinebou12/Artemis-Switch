@@ -309,6 +309,13 @@ class Settings : public Singleton<Settings> {
         return m_easytier_config_path;
     }
 
+    void set_show_host_web_config(bool enabled) {
+        m_show_host_web_config = enabled;
+    }
+    [[nodiscard]] bool show_host_web_config() const {
+        return m_show_host_web_config;
+    }
+
     void set_stream_audio_configuration(StreamAudioConfiguration config) {
         m_stream_audio_configuration = config;
     }
@@ -461,6 +468,7 @@ class Settings : public Singleton<Settings> {
     std::string m_wireguard_config_path;
     bool m_easytier_enabled = false;
     std::string m_easytier_config_path;
+    bool m_show_host_web_config = true;
     StreamAudioConfiguration m_stream_audio_configuration = STREAM_AUDIO_STEREO;
     bool m_terminate_app_on_disconnect = false;
     bool m_write_log = false;

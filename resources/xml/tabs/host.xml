@@ -27,9 +27,6 @@
                 id="connect"/>
 
             <brls:DetailCell
-                id="host_web_config"/>
-
-            <brls:DetailCell
                 id="stream_profile"/>
 
             <brls:DetailCell

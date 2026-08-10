@@ -226,6 +226,9 @@
                 title="@i18n/settings/debug"
                 paddingTop="60"
                 lineTop="1px"/>
+
+            <brls:BooleanCell
+                id="show_host_web_config"/>
                 
             <brls:BooleanCell
                 id="writeLog"/>
