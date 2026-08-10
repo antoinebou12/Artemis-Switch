@@ -23,6 +23,13 @@ enum AudioBackend : int {
 
 enum KeyboardType : int { COMPACT, FULLSIZED, NUMPAD };
 
+enum class DebugStatsCorner : int {
+    TOP_LEFT = 0,
+    TOP_RIGHT = 1,
+    BOTTOM_LEFT = 2,
+    BOTTOM_RIGHT = 3,
+};
+
 enum class ButtonOverrideType : int { NONE, SCREENSHOT, HOME };
 
 struct KeyMappingLayout {
@@ -305,6 +312,13 @@ class Settings : public Singleton<Settings> {
     void set_keyboard_locale(int locale) { m_keyboard_locale = locale; }
     [[nodiscard]] int get_keyboard_locale() const { return m_keyboard_locale; }
 
+    void set_debug_stats_corner(DebugStatsCorner corner) {
+        m_debug_stats_corner = corner;
+    }
+    [[nodiscard]] DebugStatsCorner get_debug_stats_corner() const {
+        return m_debug_stats_corner;
+    }
+
     void set_rumble_force(float rumble_force) { m_rumble_force = int(rumble_force * 100); }
     [[nodiscard]] float get_rumble_force() const { return float(m_rumble_force) / 100.f; }
 
@@ -377,6 +391,7 @@ class Settings : public Singleton<Settings> {
     ButtonOverrideType m_guide_system_button = ButtonOverrideType::NONE;
     int m_keyboard_fingers = 3;
     int m_keyboard_locale = 0;
+    DebugStatsCorner m_debug_stats_corner = DebugStatsCorner::TOP_LEFT;
     bool m_volume_amplification = false;
     int m_mouse_speed_multiplier = 47; // ~1.0x with 0.1 + progress*1.9
     int m_current_mapping_layout = 0;

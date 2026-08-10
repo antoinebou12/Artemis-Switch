@@ -19,6 +19,7 @@
 #include "two_finger_scroll_recognizer.hpp"
 #include "features/input/InputSettingsStore.hpp"
 #include "features/apollo/ApolloHostOptionsStore.hpp"
+#include "features/ui/StatsOverlayLayout.hpp"
 #include "streaming/StreamProfileStore.hpp"
 #include "utils/ArtemisPlatformFeatures.hpp"
 #include "utils/UsableMac.hpp"
@@ -448,15 +449,25 @@ void StreamingView::draw(NVGcontext* vg, float x, float y, float width,
 
         nvgFontFaceId(vg, Application::getFont(FONT_REGULAR));
         nvgFontSize(vg, 20);
-        nvgTextAlign(vg, NVG_ALIGN_LEFT | NVG_ALIGN_BOTTOM);
+        const auto origin = artemis::ui::stats_overlay_origin(
+            static_cast<artemis::ui::StatsCorner>(
+                Settings::instance().get_debug_stats_corner()),
+            width, height);
+        int align = 0;
+        align |= origin.alignRight ? NVG_ALIGN_RIGHT : NVG_ALIGN_LEFT;
+        align |= origin.alignBottom ? NVG_ALIGN_BOTTOM : NVG_ALIGN_TOP;
+        nvgTextAlign(vg, align);
 
+        const float boxWidth = width - 40;
         nvgFontBlur(vg, 1);
         nvgFillColor(vg, nvgRGBA(0, 0, 0, 255));
-        nvgTextBox(vg, 20, 30, width, statistics.c_str(), nullptr);
+        nvgTextBox(vg, origin.alignRight ? origin.x - boxWidth : origin.x,
+                   origin.y, boxWidth, statistics.c_str(), nullptr);
 
         nvgFontBlur(vg, 0);
         nvgFillColor(vg, nvgRGBA(0, 255, 0, 255));
-        nvgTextBox(vg, 20, 30, width, statistics.c_str(), nullptr);
+        nvgTextBox(vg, origin.alignRight ? origin.x - boxWidth : origin.x,
+                   origin.y, boxWidth, statistics.c_str(), nullptr);
     }
 
     Box::draw(vg, x, y, width, height, style, ctx);
