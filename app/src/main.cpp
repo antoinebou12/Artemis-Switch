@@ -33,6 +33,7 @@ unsigned int sceLibcHeapSize             = 24 * 1024 * 1024;
 #include "main_tabs_view.hpp"
 #include "performance_tab.hpp"
 #include "settings_tab.hpp"
+#include "wifi_performance_graph.hpp"
 #include "views/boolean_slider_cell.hpp"
 
 #include "DiscoverManager.hpp"
@@ -162,6 +163,7 @@ int main(int argc, char* argv[]) {
     brls::Application::registerXMLView("ArtemisSettingsTab", ArtemisSettingsTab::create);
     brls::Application::registerXMLView("SettingsTab", SettingsTab::create);
     brls::Application::registerXMLView("PerformanceTab", PerformanceTab::create);
+    brls::Application::registerXMLView("WifiPerformanceGraph", WifiPerformanceGraph::create);
 
     // Add custom values to the theme
     brls::Theme::getLightTheme().addColor("captioned_image/caption",

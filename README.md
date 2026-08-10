@@ -32,7 +32,6 @@ It keeps the existing Moonlight-Switch architecture instead of replacing it: **B
 | Live performance view | ✅ Integrated | Uses the existing in-game Borealis overlay |
 | Benchmark runtime | ✅ Integrated | Live sampling, P50/P95/P99, frame-queue faults, stability score |
 | Benchmark JSON / CSV | ✅ Integrated | Includes Switch runtime metadata when services are available |
-| Auto Tune | 🟡 Device validation | Reconnect → warm-up → benchmark → rank → apply winner |
 | Apollo capability detection | 🟡 Partial | Conservative detection with Sunshine-safe fallback |
 | Apollo virtual display / commands / clipboard | ⏳ Planned | Only verified Apollo protocol operations will be added |
 | French Artemis UI | ✅ Integrated | Artemis settings, overlay tabs and Performance UI use Borealis i18n |
@@ -44,20 +43,19 @@ It keeps the existing Moonlight-Switch architecture instead of replacing it: **B
 | Feature | Artemis Switch implementation |
 |---|---|
 | Custom resolution | Persistent width / height override used by `MoonlightSession` |
-| Exact bitrate | 1–100 Mbps configuration; the Performance row applies a new value during streaming through a brief controlled reconnect |
+| Exact bitrate | 1–100 Mbps configuration saved for the next stream connection |
 | Frame rates | 30 / 40 / 60 FPS plus gated 90 / 120 FPS options |
 | Video codecs | H.264 and HEVC, using the existing decoder path |
 | Presentation | Fit, Fill, Stretch, Zoom and Pan on the Switch deko3d path |
 | Full range | Host color-range negotiation plus Switch-side deko3d conversion |
 | Motion | Joy-Con / controller gyro and accelerometer forwarding policy |
-| Performance | Receive, decode, render, FPS, packet-loss and queue telemetry |
+| Performance | Compact bitrate, Switch Wi-Fi history, latency, packet-loss and FPS dashboard |
 | Benchmark | Mean, median, P95, P99 and stability scoring |
 | Export | JSON + CSV files saved under the Artemis working directory |
 | Switch metadata | Handheld/docked mode, battery, charging state and best-effort read-only CPU/GPU/EMC clocks |
-| Auto Tune | Quick and extended profile sweeps with safe profile restore/cancel logic |
 | Quick tab | A separate lightweight tab for keyboard, move active PC window, display, controllers, mouse, touch, disconnect and quit-host actions |
 | Move game window | Sends `Win + Shift + Left/Right` so the focused Windows game can be pulled onto the Apollo/Sunshine display |
-| Controller list | Shows every currently connected local player in the in-game Options menu |
+| Controller list | Shows each local player, mapped PC slot, rumble and motion capability in the Quick tab |
 | Host capabilities | Sunshine-safe defaults with conservative Apollo feature gating |
 
 ## Nintendo Switch
@@ -72,15 +70,14 @@ Sunshine / Apollo host
         ▼
 ┌──────────────────────── Artemis Switch ────────────────────────┐
 │ MoonlightSession                                               │
-│   ├── stream configuration / reconnect                         │
+│   ├── stream configuration                                     │
 │   ├── custom resolution / bitrate / FPS                        │
 │   └── live session telemetry                                   │
 │                                                               │
-│ Benchmark + Auto Tune                                          │
+│ Benchmark                                                      │
 │   ├── receive / decode / render / queue metrics                │
 │   ├── P50 / P95 / P99 + stability                             │
-│   ├── JSON / CSV + Switch metadata                             │
-│   └── profile sweep / rank / apply                            │
+│   └── JSON / CSV + Switch metadata                             │
 │                                                               │
 │ Borealis UI                                                    │
 │   ├── Artemis settings                                        │
@@ -114,29 +111,9 @@ Joy-Con and compatible controller motion continues to use Moonlight-Switch's exi
 
 **Console-motion fallback is OFF by default.** Artemis can detect whether the libnx SevenSixAxis API is available, but does not treat opaque/undocumented sensor fields as acceleration or gyro data. The UI therefore remains disabled until the console-motion vectors are mapped and validated unambiguously.
 
-## Benchmark and Auto Tune
+## Benchmark
 
 A benchmark samples the active stream instead of using synthetic data. Results include frame rate, receive/decode/render timing, packet loss, frame-queue behavior and percentile statistics.
-
-Example Auto Tune flow:
-
-```text
-720p60 HEVC / 15 Mbps
-        ↓
-1080p60 / 15 Mbps
-        ↓
-1080p60 / 20 Mbps
-        ↓
-1080p60 / 25 Mbps
-        ↓
-1080p60 / 30 Mbps
-        ↓
-compare stability + loss + FPS + P99 latency
-        ↓
-apply the best stable profile
-```
-
-Auto Tune temporarily removes conflicting custom-resolution overrides while testing and restores the previous configuration on cancellation/failure.
 
 ## Localization
 
@@ -148,13 +125,13 @@ Artemis-specific UI uses the same Borealis localization system as Moonlight-Swit
 | Français | ✅ |
 | Other upstream Moonlight-Switch languages | ↩️ Existing/fallback strings until Artemis keys are translated |
 
-French currently covers the Artemis settings page, presentation/motion options, overlay tabs, Performance controls, benchmark actions and Auto Tune controls.
+French currently covers the Artemis settings page, presentation/motion options, overlay tabs, Performance controls and benchmark actions.
 
 ## Continuous Integration
 
 | Gate | Purpose |
 |---|---|
-| **Unit Tests** | Portable C++20 policy, controller topology, host-key shortcut, live-bitrate, statistics, export, stream-profile and geometry tests |
+| **Unit Tests** | Portable C++20 policy, controller topology, host-key shortcut, statistics, export, stream-profile and geometry tests |
 | **ASan + UBSan** | Memory and undefined-behavior checks for the portable feature suite |
 | **Localization contract** | Every Artemis key referenced by C++/XML must exist in both English and French |
 | **Release contract** | CI verifies the CD workflow still requires NRO, ELF, source archives and checksums |
@@ -165,7 +142,7 @@ French currently covers the Artemis settings page, presentation/motion options, 
 
 Additional regression coverage includes the five-controller `0x1F` mask, controller-count clamping, benchmark counter reset/NaN/queue-fault behavior, 4:3 Fit/Fill presentation, filtered Fill/Stretch routing, extreme Zoom/Pan clamping, and minimum/maximum stream-profile normalization.
 
-Moonlight/GameStream negotiates bitrate during setup rather than exposing a safe in-band encoder update. Artemis therefore makes bitrate editable from the active Performance view and immediately performs a controlled stream reconnect with the new value.
+Moonlight/GameStream negotiates bitrate during setup rather than exposing a safe in-band encoder update. Artemis saves bitrate changes for the next stream connection and does not restart an active stream.
 
 ## Automatic releases
 
@@ -253,7 +230,7 @@ ctest --test-dir build/integration --output-on-failure
 
 Artemis benchmark metadata performs **read-only** clock queries. It does not set CPU, GPU or EMC/RAM clocks. If the relevant service is unavailable, clock metadata remains unavailable/zero rather than modifying the system or failing the benchmark.
 
-Overclocking is outside Artemis Switch's automatic tuning scope. Auto Tune changes streaming parameters, not console clock rates.
+Overclocking is outside Artemis Switch's scope.
 
 ## Known limitations before the first release
 
@@ -261,7 +238,7 @@ Overclocking is outside Artemis Switch's automatic tuning scope. Auto Tune chang
 - Fit, Zoom/Pan and full-range output still benefit from visual verification across different host resolutions.
 - Console-motion fallback remains disabled until the libnx console sensor vectors are mapped safely.
 - Apollo virtual-display, server-command and clipboard operations are not enabled until their client protocol behavior is verified.
-- Benchmark scoring and Auto Tune thresholds still need tuning from real Switch measurements.
+- Benchmark scoring still needs tuning from real Switch measurements.
 
 See [`docs/ARTEMIS_SWITCH_INTEGRATION_PLAN.md`](docs/ARTEMIS_SWITCH_INTEGRATION_PLAN.md) for the detailed release acceptance criteria.
 

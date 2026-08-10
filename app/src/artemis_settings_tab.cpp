@@ -2,7 +2,6 @@
 
 #include "Settings.hpp"
 #include "streaming/StreamProfileStore.hpp"
-#include "streaming/MoonlightSession.hpp"
 
 #if __has_include("features/stream/AdvancedStreamOptionsStore.hpp")
 #include "features/stream/AdvancedStreamOptionsStore.hpp"
@@ -312,13 +311,8 @@ void ArtemisSettingsTab::editBitrate() {
     Application::getImeManager()->openForNumber(
         [this](long number) {
             const int mbps = std::clamp(static_cast<int>(number), 1, 100);
-            auto* session = MoonlightSession::activeSession();
-            if (session) {
-                session->applyBitrateKbps(mbps * 1000);
-            } else {
-                Settings::instance().set_bitrate(mbps * 1000);
-                Settings::instance().save();
-            }
+            Settings::instance().set_bitrate(mbps * 1000);
+            Settings::instance().save();
             refreshValues();
         },
         "artemis/settings/exact_bitrate_title"_i18n,

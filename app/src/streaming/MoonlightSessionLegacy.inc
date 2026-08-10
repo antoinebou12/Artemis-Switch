@@ -391,7 +391,6 @@ void MoonlightSession::restart() {
     m_is_active.store(false);
     m_is_terminated.store(false);
     m_restart_in_progress.store(true);
-    m_restart_generation.fetch_add(1);
     LiStopConnection();
 
     start([](const GSResult<bool>& result) {

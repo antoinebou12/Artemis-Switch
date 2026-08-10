@@ -4,6 +4,7 @@
 
 using artemis::performance::LitePerformanceSnapshot;
 using artemis::performance::buildLiteStatus;
+using artemis::performance::normalizeWifiSignal;
 
 int main() {
     {
@@ -25,6 +26,13 @@ int main() {
         const auto status = buildLiteStatus({20.0, 2.0, 4.0, 1.5, 60.0});
         assert(!status.healthy);
     }
+
+    assert(normalizeWifiSignal(-1) == 0.0f);
+    assert(normalizeWifiSignal(0) == 0.0f);
+    assert(normalizeWifiSignal(1) > 0.33f && normalizeWifiSignal(1) < 0.34f);
+    assert(normalizeWifiSignal(2) > 0.66f && normalizeWifiSignal(2) < 0.67f);
+    assert(normalizeWifiSignal(3) == 1.0f);
+    assert(normalizeWifiSignal(10) == 1.0f);
 
     return 0;
 }

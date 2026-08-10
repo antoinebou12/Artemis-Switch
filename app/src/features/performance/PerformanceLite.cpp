@@ -21,13 +21,16 @@ LitePerformanceStatus buildLiteStatus(const LitePerformanceSnapshot& snapshot) {
     status.packetLossText = fixed(std::clamp(snapshot.packetLossPercent, 0.0, 100.0), 2, "%");
     status.fpsText = fixed(std::max(0.0, snapshot.renderedFps), 2, " FPS");
 
-    // Switch-first health thresholds. They are intentionally conservative and
-    // only drive UI state; Auto Tune performs the stricter profile ranking.
+    // Switch-first health thresholds only drive the compact live UI state.
     status.healthy = snapshot.packetLossPercent <= 0.10 &&
                      snapshot.receiveLatencyMs <= 8.0 &&
                      snapshot.decodeLatencyMs <= 12.0 &&
                      snapshot.renderedFps >= 55.0;
     return status;
+}
+
+float normalizeWifiSignal(int signalLevel) {
+    return static_cast<float>(std::clamp(signalLevel, 0, 3)) / 3.0f;
 }
 
 } // namespace artemis::performance

@@ -21,13 +21,6 @@
 #include <chrono>
 #include <nanovg.h>
 
-#if __has_include("benchmark/AutoTuneRuntime.hpp")
-#include "benchmark/AutoTuneRuntime.hpp"
-#define ARTEMIS_STREAM_HAS_AUTO_TUNE 1
-#else
-#define ARTEMIS_STREAM_HAS_AUTO_TUNE 0
-#endif
-
 #if defined(__SDL3__)
 #include <SDL3/SDL.h>
 #elif defined(__SDL2__)
@@ -601,9 +594,6 @@ StreamingView::~StreamingView() {
         ->getInputManager()
         ->getKeyboardKeyStateChanged()
         ->unsubscribe(keysSubscription);
-#if ARTEMIS_STREAM_HAS_AUTO_TUNE
-    artemis::benchmark::AutoTuneRuntime::instance().cancel();
-#endif
     session->stop(false);
     delete session;
 }

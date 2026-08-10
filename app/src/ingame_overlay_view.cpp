@@ -148,7 +148,7 @@ QuickTab::QuickTab(StreamingView* streamView) : streamView(streamView) {
     });
 
     quickMoveWindow->setText("artemis/overlay/move_window"_i18n);
-    quickMoveWindow->setDetailText("Win + Shift + ← / →");
+    quickMoveWindow->setDetailText("artemis/overlay/target_display"_i18n);
     quickMoveWindow->registerClickAction([this](View*) {
         auto* dialog = new Dialog("artemis/overlay/move_window_help"_i18n);
         dialog->addButton("artemis/overlay/left_display"_i18n, [this] {
@@ -205,9 +205,10 @@ QuickTab::QuickTab(StreamingView* streamView) : streamView(streamView) {
                 for (std::size_t i = 0; i < players.size(); ++i) {
                     if (i != 0)
                         message += "\n";
-                    message += "artemis/overlay/player"_i18n + " " +
+                    message += "P" + std::to_string(players[i]) + " → " +
+                               "artemis/overlay/pc_slot"_i18n + " " +
                                std::to_string(players[i]) + " · " +
-                               "artemis/overlay/connected"_i18n;
+                               "artemis/overlay/rumble_motion"_i18n;
                 }
             }
 

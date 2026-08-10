@@ -22,5 +22,6 @@ struct LitePerformanceStatus {
 };
 
 LitePerformanceStatus buildLiteStatus(const LitePerformanceSnapshot& snapshot);
+float normalizeWifiSignal(int signalLevel);
 
 } // namespace artemis::performance

@@ -29,8 +29,6 @@ Artemis Switch is developed through a single consolidated integration branch and
 - exact bitrate configuration
 - H.264/HEVC profile validation
 - 30/40/60/90/120 FPS policy
-- Auto Tune quick and extended benchmark plans
-- reconnect/warm-up/benchmark/rank/apply runtime
 - full-range preference applied both to Moonlight `STREAM_CONFIGURATION.colorRange` and Switch renderer conversion
 
 ### UI and Switch controls
@@ -83,7 +81,7 @@ The main Switch presentation, motion, full-range negotiation and benchmark metad
 - propagate Artemis presentation geometry through the existing FSR/RCAS/dithering post-processing path after the direct path is proven stable
 - expose a distinct console-IMU fallback only if Borealis/libnx provides an unambiguous source separate from controller motion
 - map and implement verified Apollo virtual-display/server-command/clipboard operations
-- run benchmark/Auto Tune validation on real Switch hardware and tune scoring thresholds from collected data
+- run benchmark validation on real Switch hardware and tune scoring thresholds from collected data
 
 ## Release acceptance
 
@@ -97,5 +95,4 @@ A release candidate should not be tagged until:
 - a real stream can start, stop, reconnect and exit safely
 - Fit / Fill / Stretch and Zoom/Pan are visually verified on the Switch
 - benchmark collection/export is validated on-device
-- Auto Tune can cancel and restore the original profile safely
 - Sunshine continues to work when Apollo features are unavailable

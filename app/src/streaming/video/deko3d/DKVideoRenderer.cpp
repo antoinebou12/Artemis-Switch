@@ -114,14 +114,15 @@ public:
     float cachedPanY = 0.0f;
     bool cachedForceFullRange = false;
 
-    bool wantsCustomPresentation() const {
-        const ScaleMode scaleMode = artemis::video::VideoScaleStore::instance().get();
-        const auto zoomPan = artemis::video::normalizeZoomPan(
-            artemis::video::ZoomPanStore::instance().get().state);
+    bool wantsCustomPresentation(
+        ScaleMode scaleMode,
+        const artemis::video::ZoomPanState& zoomPan,
+        bool forceFullRange) const {
         return !artemis::video::usesFilteredFullScreenPath(scaleMode) ||
                !nearlyEqual(zoomPan.zoom, 1.0f) ||
                !nearlyEqual(zoomPan.panX, 0.0f) ||
-               !nearlyEqual(zoomPan.panY, 0.0f);
+               !nearlyEqual(zoomPan.panY, 0.0f) ||
+               forceFullRange;
     }
 
     void restoreLegacyCommands(int width, int height, AVFrame* frame) {
@@ -332,7 +333,9 @@ public:
     }
 
     void drawCustom(NVGcontext* vg, int width, int height, AVFrame* frame,
-                    int imageFormat) {
+                    int imageFormat, ScaleMode scaleMode,
+                    const artemis::video::ZoomPanState& zoomPan,
+                    bool forceFullRange) {
         (void)vg;
         (void)imageFormat;
 
@@ -347,14 +350,6 @@ public:
         }
 
         prepareLegacyFrameState(width, height, frame);
-
-        const ScaleMode scaleMode = artemis::video::VideoScaleStore::instance().get();
-        const auto zoomPan = artemis::video::normalizeZoomPan(
-            artemis::video::ZoomPanStore::instance().get().state);
-        const bool forceFullRange =
-            artemis::stream::AdvancedStreamOptionsStore::instance()
-                .get()
-                .forceFullRangeVideo;
 
         AVColorSpace colorSpace = AVCOL_SPC_UNSPECIFIED;
         bool colorFull = false;
@@ -394,13 +389,25 @@ void ArtemisDKVideoRenderer::draw(NVGcontext* vg, int width, int height,
     if (!frame)
         return;
 
-    if (!impl->wantsCustomPresentation()) {
+    // Read presentation settings once per frame. Fit previously fetched and
+    // normalized the same state twice on the render thread.
+    const ScaleMode scaleMode =
+        artemis::video::VideoScaleStore::instance().get();
+    const auto zoomPan = artemis::video::normalizeZoomPan(
+        artemis::video::ZoomPanStore::instance().get().state);
+    const bool forceFullRange =
+        artemis::stream::AdvancedStreamOptionsStore::instance()
+            .get()
+            .forceFullRangeVideo;
+
+    if (!impl->wantsCustomPresentation(scaleMode, zoomPan, forceFullRange)) {
         impl->restoreLegacyCommands(width, height, frame);
         impl->legacy.draw(vg, width, height, frame, imageFormat);
         return;
     }
 
-    impl->drawCustom(vg, width, height, frame, imageFormat);
+    impl->drawCustom(vg, width, height, frame, imageFormat, scaleMode,
+                     zoomPan, forceFullRange);
 }
 
 VideoRenderStats* ArtemisDKVideoRenderer::video_render_stats() {
