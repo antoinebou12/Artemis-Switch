@@ -351,6 +351,7 @@
         "stream_settings": "Diffusion",
         "swap_mouse_keys": "Inverser les boutons  et  de la souris",
         "swap_mouse_scroll": "Inverser le sens de défilement vertical de la souris",
+        "swap_mouse_sticks": "Inverser les sticks gauche/droit en mode souris",
         "swap_stick_to_dpad": "Utiliser le stick comme D-Pad",
         "swap_ui": "Inverser / et / dans l'interface",
         "system_button_duplication_error": "Une autre action utilise déjà ce bouton système.",

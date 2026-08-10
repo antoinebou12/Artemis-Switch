@@ -539,11 +539,17 @@ void MoonlightInputManager::handleInput(bool ignoreTouch) {
 
     float stickScrolling = 0;
     if (specialKey) {
-        stickScrolling =
+        if (Settings::instance().swap_mouse_sticks()) {
+            stickScrolling = applyStickScrollDeadzone(
+                controller.axes[brls::LEFT_Y],
+                Settings::instance().get_deadzone_stick_left());
+        } else {
+            stickScrolling =
                 applyStickScrollDeadzone(controller.axes[brls::LEFT_Y],
                                          Settings::instance().get_deadzone_stick_left()) +
                 applyStickScrollDeadzone(controller.axes[brls::RIGHT_Y],
                                          Settings::instance().get_deadzone_stick_right());
+        }
     }
 
     static MouseStateS lastMouseState;

@@ -59,6 +59,7 @@ class SettingsTab : public brls::Box {
     BRLS_BIND(brls::BooleanCell, touchscreenMouseMode, "touchscreen_mouse_mode");
     BRLS_BIND(brls::BooleanCell, swapMouseKeys, "swap_mouse_keys");
     BRLS_BIND(brls::BooleanCell, swapMouseScroll, "swap_mouse_scroll");
+    BRLS_BIND(brls::BooleanCell, swapMouseSticks, "swap_mouse_sticks");
     BRLS_BIND(brls::Header, mouseSpeedHeader, "mouse_speed_header");
     BRLS_BIND(brls::Slider, mouseSpeedSlider, "mouse_speed_slider");
     BRLS_BIND(brls::BooleanCell, writeLog, "writeLog");

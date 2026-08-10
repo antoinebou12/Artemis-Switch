@@ -280,6 +280,9 @@ class Settings : public Singleton<Settings> {
     void set_swap_mouse_scroll(bool swap_mouse_scroll) { m_swap_mouse_scroll = swap_mouse_scroll; }
     [[nodiscard]] bool swap_mouse_scroll() const { return m_swap_mouse_scroll; }
 
+    void set_swap_mouse_sticks(bool swap_mouse_sticks) { m_swap_mouse_sticks = swap_mouse_sticks; }
+    [[nodiscard]] bool swap_mouse_sticks() const { return m_swap_mouse_sticks; }
+
     void set_guide_key_options(KeyComboOptions options) { m_guide_key_options = std::move(options); }
     [[nodiscard]] KeyComboOptions guide_key_options() const { return m_guide_key_options; }
 
@@ -401,6 +404,7 @@ class Settings : public Singleton<Settings> {
     bool m_swap_mouse_keys = false;
     bool m_swap_mouse_scroll = false;
     bool m_disable_overlay_swipe = false;
+    bool m_swap_mouse_sticks = false;
     int m_rumble_force = 100;
     int m_volume = 100;
     bool m_use_hw_decoding = true;

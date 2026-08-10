@@ -351,6 +351,7 @@
         "stream_settings": "Stream",
         "swap_mouse_keys": "Swap mouse  and  buttons",
         "swap_mouse_scroll": "Swap mouse vertical scrolling direction",
+        "swap_mouse_sticks": "Swap mouse mode left/right sticks",
         "swap_stick_to_dpad": "Use Stick as D-Pad",
         "swap_ui": "Swap / and / for UI",
         "system_button_duplication_error": "Another action already use this system button.",

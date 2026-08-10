@@ -83,8 +83,18 @@ void StreamingInputOverlay::draw(NVGcontext* vg, float x, float y, float width,
         if (controller.buttons[BUTTON_LB])
             mouseSpeed -= 10;
 
-        float x = controller.axes[LEFT_X] * mouseSpeed;
-        float y = controller.axes[LEFT_Y] * mouseSpeed;
+        float x;
+        float y;
+        float scroll_y;
+        if (Settings::instance().swap_mouse_sticks()) {
+            x = controller.axes[RIGHT_X] * mouseSpeed;
+            y = controller.axes[RIGHT_Y] * mouseSpeed;
+            scroll_y = controller.axes[brls::LEFT_Y];
+        } else {
+            x = controller.axes[LEFT_X] * mouseSpeed;
+            y = controller.axes[LEFT_Y] * mouseSpeed;
+            scroll_y = controller.axes[brls::RIGHT_Y];
+        }
 
         // Dead zone prevents from mouse drifting
         if (x < 2 && x > -2)
@@ -100,7 +110,6 @@ void StreamingInputOverlay::draw(NVGcontext* vg, float x, float y, float width,
         static bool old_l_pressed;
         static bool old_r_pressed;
 
-        float scroll_y = controller.axes[brls::RIGHT_Y];
         bool l_pressed = controller.buttons[brls::BUTTON_RT];
         bool r_pressed = controller.buttons[brls::BUTTON_LT];
 
