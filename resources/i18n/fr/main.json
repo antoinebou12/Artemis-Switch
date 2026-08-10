@@ -1,19 +1,27 @@
 {
     "about": {
-        "about": "Moonlight-Switch est une App de streaming pour Nintendo Switch basée sur Moonlight-Common-C",
+        "about": "Artemis Switch diffuse les jeux d'un PC Apollo ou Sunshine. Il est basé sur le code original de Moonlight-Switch par XITRIX et Moonlight-Common-C. Apollo et Artemis (Moonlight Noir) de ClassicOldSong ont inspiré l'hôte et le client. Les licences amont s'appliquent toujours — voir LICENSE.",
         "link_gbatemp": "Page GbaTemp",
-        "link_github": "Page GitHub",
+        "link_github": "Dépôt Artemis Switch",
+        "link_moonlight_switch": "Moonlight-Switch (XITRIX)",
+        "link_apollo": "Hôte Apollo (ClassicOldSong)",
+        "link_artemis": "Artemis Android (ClassicOldSong)",
         "link_patreon": "Page Patreon",
         "links": "Liens",
         "thanks": "Remerciements spéciaux",
+        "thanks_xitrix": " XITRIX pour Moonlight-Switch — auteur original et base de cette app",
+        "thanks_artemis": " antoinebou12 pour la création et les tests d’Artemis Switch",
         "thanks_1": " Rock88 et son Moonlight-NX, beaucoup de code a été réutilisé ici",
         "thanks_2": " Natinusala pour avoir créé Borealis",
         "thanks_3": " L'équipe de Moonlight, rien ne serait possible sans eux",
         "thanks_4": " Cameron Gutman pour son aide sur un problème avec LibNX",
-        "thanks_5": " Tous ceux qui développent des Apps",
-        "thanks_6": " Vous, pour utiliser cet homebrew !",
+        "thanks_5": " ClassicOldSong pour Apollo et Artemis (Moonlight Noir)",
+        "thanks_6": " Tous ceux qui développent des Apps",
+        "thanks_7": " Vous, pour utiliser cet homebrew !",
+        "thanks_community": "Idées de la communauté Moonlight-Switch",
+        "thanks_community_body": "Idées issues des signalements Moonlight-Switch (implémentations dans ce fork) :\n #110 benwa — Échanger X/Y pour les favoris\n #195 orcavia — Désactiver le swipe de l'overlay\n #163 antegorov — Échanger les sticks en mode souris\n #70 xyourmomx — Profils / hôtes multi-adresses\n #112 xenophobentx — Audio surround 5.1\n #295 linckosz — Upscaling type FSR\n #254 JoJuStudio / #250 bengrahamreview / #144 MetalGooseSolid — WireGuard / VPN distant\n #24 windraver / #165 Msv777 — Quitter l'app hôte à la déconnexion\n #252 Befeeter — AV1 expérimental\n #58 gcseed — Coin de l'overlay de debug\n #239 HackZy01 / #283 AquaSteam — Langue et clavier\n #266 Moby812 — Affichage virtuel (Apollo)\nLiens complets dans la section Credits du README du dépôt.",
         "title": "À propos",
-        "version": "Moonlight-Switch v{} par XITRIX"
+        "version": "Artemis Switch v{} par antoinebou12"
     },
     "add_host": {
         "connect": "Se connecter",

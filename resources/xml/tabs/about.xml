@@ -31,9 +31,10 @@
                 paddingTop="40"/>
 
             <brls:Label
-                width="auto"
+                width="100%"
                 height="auto"
                 fontSize="15"
+                lineHeight="1.2"
                 textColor="@theme/brls/header/subtitle"
                 text="@i18n/about/about"
                 marginTop="8"/>
@@ -42,18 +43,43 @@
                 title="@i18n/about/links"
                 paddingTop="60"/>
 
-            <LinkCell 
+            <LinkCell
                 id="github"/>
 
-            <LinkCell 
+            <LinkCell
+                id="moonlight_switch"/>
+
+            <LinkCell
+                id="apollo"/>
+
+            <LinkCell
+                id="artemis"/>
+
+            <LinkCell
                 id="patreon"/>
 
-            <LinkCell 
+            <LinkCell
                 id="gbatemp"/>
 
             <brls:Header
                 title="@i18n/about/thanks"
                 paddingTop="60"/>
+
+            <brls:Label
+                width="100%"
+                height="auto"
+                fontSize="15"
+                textColor="@theme/brls/accent"
+                text="@i18n/about/thanks_xitrix"
+                marginTop="8"/>
+
+            <brls:Label
+                width="100%"
+                height="auto"
+                fontSize="15"
+                textColor="@theme/brls/header/subtitle"
+                text="@i18n/about/thanks_artemis"
+                marginTop="8"/>
 
             <brls:Label
                 width="auto"
@@ -101,6 +127,27 @@
                 fontSize="15"
                 textColor="@theme/brls/header/subtitle"
                 text="@i18n/about/thanks_6"
+                marginTop="8"/>
+
+            <brls:Label
+                width="auto"
+                height="auto"
+                fontSize="15"
+                textColor="@theme/brls/header/subtitle"
+                text="@i18n/about/thanks_7"
+                marginTop="8"/>
+
+            <brls:Header
+                title="@i18n/about/thanks_community"
+                paddingTop="60"/>
+
+            <brls:Label
+                width="100%"
+                height="auto"
+                fontSize="14"
+                lineHeight="1.25"
+                textColor="@theme/brls/header/subtitle"
+                text="@i18n/about/thanks_community_body"
                 marginTop="8"/>
 
         </brls:Box>
