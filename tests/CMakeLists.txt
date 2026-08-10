@@ -90,6 +90,14 @@ add_artemis_test(zoom_pan_state_test
     app/src/features/video/ZoomPanState.cpp
     app/src/features/video)
 
+add_executable(usable_mac_test
+    "${REPO_ROOT}/tests/usable_mac_test.cpp"
+)
+target_include_directories(usable_mac_test PRIVATE
+    "${REPO_ROOT}/app/src/utils")
+target_compile_features(usable_mac_test PRIVATE cxx_std_20)
+add_test(NAME usable_mac_test COMMAND usable_mac_test)
+
 add_artemis_test(display_transform_test
     tests/display_transform_test.cpp
     app/src/features/video/DisplayTransform.cpp

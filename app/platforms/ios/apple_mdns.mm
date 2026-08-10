@@ -228,7 +228,7 @@ static NSString* NV_SERVICE_TYPE = @"_nvstream._tcp";
             if (!host.hostname.empty()) {
                 it->hostname = host.hostname;
             }
-            if (!host.mac.empty()) {
+            if (is_usable_mac(host.mac)) {
                 it->mac = host.mac;
             }
         }

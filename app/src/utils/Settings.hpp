@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Singleton.hpp"
+#include "UsableMac.hpp"
 #include <borealis.hpp>
 #include <map>
 #include <cstdio>
@@ -67,7 +68,7 @@ struct Host {
 };
 
 inline bool hosts_match(const Host& lhs, const Host& rhs) {
-    if (!lhs.mac.empty() && !rhs.mac.empty())
+    if (is_usable_mac(lhs.mac) && is_usable_mac(rhs.mac))
         return lhs.mac == rhs.mac;
 
     for (const auto& address : lhs.connection_addresses()) {
