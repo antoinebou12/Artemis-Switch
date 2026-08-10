@@ -145,6 +145,11 @@ add_executable(korean_keyboard_layout_test
 target_compile_features(korean_keyboard_layout_test PRIVATE cxx_std_20)
 add_test(NAME korean_keyboard_layout_test COMMAND korean_keyboard_layout_test)
 
+add_artemis_test(stats_overlay_layout_test
+    tests/stats_overlay_layout_test.cpp
+    app/src/features/ui/StatsOverlayLayout.cpp
+    app/src/features/ui)
+
 add_executable(display_coordinate_mapper_test
     "${REPO_ROOT}/tests/display_coordinate_mapper_test.cpp"
     "${REPO_ROOT}/app/src/features/video/DisplayCoordinateMapper.cpp"

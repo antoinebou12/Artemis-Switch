@@ -646,6 +646,20 @@ SettingsTab::SettingsTab() {
     overlayBySystemButton->setDetailTextColor(color);
 #endif
 
+    debugStatsCorner->init(
+        "settings/debug_stats_corner"_i18n,
+        {"settings/corner_top_left"_i18n, "settings/corner_top_right"_i18n,
+         "settings/corner_bottom_left"_i18n,
+         "settings/corner_bottom_right"_i18n},
+        static_cast<int>(Settings::instance().get_debug_stats_corner()),
+        [](int value) {
+            if (value < 0 || value > 3) {
+                return;
+            }
+            Settings::instance().set_debug_stats_corner(
+                static_cast<DebugStatsCorner>(value));
+        });
+
     overlayTime->init(
         "settings/overlay_time"_i18n,
         {"settings/overlay_zero_time"_i18n, "1", "2", "3", "4", "5"},
