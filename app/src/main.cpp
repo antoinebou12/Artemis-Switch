@@ -37,6 +37,9 @@ unsigned int sceLibcHeapSize             = 24 * 1024 * 1024;
 #include "DiscoverManager.hpp"
 #include "MoonlightSession.hpp"
 #include "SwitchMoonlightSessionDecoderAndRenderProvider.hpp"
+#if defined(__SWITCH__) && defined(ENABLE_WIREGUARD)
+#include "vpn/WireGuardManager.hpp"
+#endif
 
 #if defined(_WIN32) && defined(__SDL2__)
 #include <SDL.h>
@@ -128,6 +131,16 @@ int main(int argc, char* argv[]) {
     Settings::instance().set_working_dir(home);
     Settings::instance().set_launch_path(argc > 0 ? argv[0] : "");
     brls::Logger::info("artemi-switch working dir: {}", home);
+
+#if defined(__SWITCH__) && defined(ENABLE_WIREGUARD)
+    if (Settings::instance().wireguard_enabled()) {
+        if (Settings::instance().wireguard_config_path().empty()) {
+            Settings::instance().set_wireguard_config_path(
+                home + "/wg0.conf");
+        }
+        WireGuardManager::instance().enable_from_settings();
+    }
+#endif
 
     brls::Application::setGlobalQuit(false);
     brls::Application::setFPSStatus(false);

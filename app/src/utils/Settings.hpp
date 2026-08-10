@@ -264,6 +264,16 @@ class Settings : public Singleton<Settings> {
     void set_play_audio(bool play_audio) { m_play_audio = play_audio; }
     [[nodiscard]] bool play_audio() const { return m_play_audio; }
 
+    void set_wireguard_enabled(bool enabled) { m_wireguard_enabled = enabled; }
+    [[nodiscard]] bool wireguard_enabled() const { return m_wireguard_enabled; }
+
+    void set_wireguard_config_path(std::string path) {
+        m_wireguard_config_path = std::move(path);
+    }
+    [[nodiscard]] std::string wireguard_config_path() const {
+        return m_wireguard_config_path;
+    }
+
     void set_write_log(bool write_log) { m_write_log = write_log; }
     [[nodiscard]] bool write_log() const { return m_write_log; }
 
@@ -375,6 +385,8 @@ class Settings : public Singleton<Settings> {
     int m_frames_queue_size = 3;
     bool m_sops = false;
     bool m_play_audio = false;
+    bool m_wireguard_enabled = false;
+    std::string m_wireguard_config_path;
     bool m_write_log = false;
     bool m_swap_ui_keys = false;
     bool m_swap_joycon_stick_to_dpad = false;

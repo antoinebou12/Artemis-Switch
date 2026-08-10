@@ -90,3 +90,12 @@ add_executable(host_endpoints_test
 )
 target_compile_features(host_endpoints_test PRIVATE cxx_std_20)
 add_test(NAME host_endpoints_test COMMAND host_endpoints_test)
+
+add_executable(wireguard_config_test
+    "${REPO_ROOT}/tests/wireguard_config_test.cpp"
+    "${REPO_ROOT}/app/src/vpn/WireGuardConfig.cpp"
+)
+target_include_directories(wireguard_config_test PRIVATE
+    "${REPO_ROOT}/app/src/vpn")
+target_compile_features(wireguard_config_test PRIVATE cxx_std_20)
+add_test(NAME wireguard_config_test COMMAND wireguard_config_test)

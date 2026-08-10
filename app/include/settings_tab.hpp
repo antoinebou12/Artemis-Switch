@@ -33,6 +33,9 @@ class SettingsTab : public brls::Box {
     BRLS_BIND(brls::SelectorCell, audioBackend, "audio_backend");
     BRLS_BIND(brls::BooleanCell, optimal, "optimal");
     BRLS_BIND(brls::BooleanCell, pcAudio, "pcAudio");
+    BRLS_BIND(brls::BooleanCell, wireguardEnabled, "wireguard_enabled");
+    BRLS_BIND(brls::DetailCell, wireguardConfigPath, "wireguard_config_path");
+    BRLS_BIND(brls::DetailCell, wireguardStatus, "wireguard_status");
     BRLS_BIND(brls::BooleanCell, swapUi, "swap_ui");
     BRLS_BIND(brls::DetailCell, swapGame, "swap_game");
     BRLS_BIND(brls::DetailCell, deadzoneStickLeft, "dead_zone_stick_left");
