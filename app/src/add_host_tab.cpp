@@ -9,71 +9,32 @@
 #include "DiscoverManager.hpp"
 #include "helper.hpp"
 #include "main_tabs_view.hpp"
-
-#if defined(_WIN32)
-#include <winsock2.h>
-#include <ws2tcpip.h>
-#else
-#include <arpa/inet.h>
-#include <sys/socket.h>
-#endif
+#include "features/host/HostAddressParse.hpp"
 
 #if defined(PLATFORM_IOS) || defined(PLATFORM_TVOS) || defined(PLATFORM_VISIONOS)
 extern void darwin_mdns_start(ServerCallback<std::vector<Host>>& callback);
 extern void darwin_mdns_stop();
 #endif
 
-namespace {
-std::string strip_ipv4_port(const std::string& address) {
-    const auto firstColon = address.find(':');
-    if (firstColon == std::string::npos) {
-        return address;
-    }
-
-    if (address.find(':', firstColon + 1) != std::string::npos) {
-        return address;
-    }
-
-    return address.substr(0, firstColon);
-}
-
-bool is_private_ipv4(const in_addr& address) {
-    const uint32_t value = ntohl(address.s_addr);
-    const uint8_t a = (value >> 24) & 0xFF;
-    const uint8_t b = (value >> 16) & 0xFF;
-
-    return a == 10 || a == 127 || (a == 169 && b == 254) ||
-           (a == 192 && b == 168) || (a == 172 && b >= 16 && b <= 31);
-}
-
-bool should_store_manual_address_as_remote(const std::string& address) {
-    const auto hostPart = strip_ipv4_port(address);
-    if (hostPart.empty()) {
-        return false;
-    }
-
-    in_addr parsed{};
-    if (inet_pton(AF_INET, hostPart.c_str(), &parsed) != 1) {
-        return false;
-    }
-
-    return !is_private_ipv4(parsed);
-}
-}
-
 AddHostTab::AddHostTab() {
     // Inflate the tab from the XML file
     this->inflateFromXMLRes("xml/tabs/add_host.xml");
 
     hostIP->init("add_host/host_ip"_i18n, "");
-    hostIP->setPlaceholder("192.168.1.109:47989");
+    hostIP->setPlaceholder("stream.example.com:47989");
     hostIP->setHint("192.168.1.109:47989");
 
     connect->setText("add_host/connect"_i18n);
     connect->registerClickAction([this](View* view) {
         Host host;
         const auto inputAddress = hostIP->getValue();
-        if (should_store_manual_address_as_remote(inputAddress)) {
+        const auto parsed = artemis::host::parse_host_address(inputAddress);
+        if (parsed.host.empty()) {
+            showError("add_host/invalid_address"_i18n);
+            return true;
+        }
+
+        if (artemis::host::should_store_as_remote(parsed)) {
             host.remoteAddress = inputAddress;
         } else {
             host.address = inputAddress;
