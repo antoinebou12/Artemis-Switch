@@ -688,6 +688,12 @@ SettingsTab::SettingsTab() {
         return true;
     });
 
+    disableOverlaySwipe->init(
+        "settings/disable_overlay_swipe"_i18n,
+        Settings::instance().disable_overlay_swipe(), [](bool value) {
+            Settings::instance().set_disable_overlay_swipe(value);
+        });
+
     mouseInputTime->init(
         "settings/overlay_time"_i18n,
         {"settings/overlay_zero_time"_i18n, "1", "2", "3", "4", "5"},

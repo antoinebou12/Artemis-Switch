@@ -255,6 +255,13 @@ class Settings : public Singleton<Settings> {
     void set_play_audio(bool play_audio) { m_play_audio = play_audio; }
     [[nodiscard]] bool play_audio() const { return m_play_audio; }
 
+    void set_terminate_app_on_disconnect(bool terminate_app_on_disconnect) {
+        m_terminate_app_on_disconnect = terminate_app_on_disconnect;
+    }
+    [[nodiscard]] bool terminate_app_on_disconnect() const {
+        return m_terminate_app_on_disconnect;
+    }
+
     void set_write_log(bool write_log) { m_write_log = write_log; }
     [[nodiscard]] bool write_log() const { return m_write_log; }
 
@@ -278,6 +285,9 @@ class Settings : public Singleton<Settings> {
 
     void set_overlay_options(KeyComboOptions options) { m_overlay_options = std::move(options); }
     [[nodiscard]] KeyComboOptions overlay_options() const { return m_overlay_options; }
+
+    void set_disable_overlay_swipe(bool disable) { m_disable_overlay_swipe = disable; }
+    [[nodiscard]] bool disable_overlay_swipe() const { return m_disable_overlay_swipe; }
 
     void set_mouse_input_options(KeyComboOptions options) { m_mouse_input_options = std::move(options); }
     [[nodiscard]] KeyComboOptions mouse_input_options() const { return m_mouse_input_options; }
@@ -389,6 +399,7 @@ class Settings : public Singleton<Settings> {
     bool m_touchscreen_mouse_mode = false;
     bool m_swap_mouse_keys = false;
     bool m_swap_mouse_scroll = false;
+    bool m_disable_overlay_swipe = false;
     int m_rumble_force = 100;
     int m_volume = 100;
     bool m_use_hw_decoding = true;
