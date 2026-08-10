@@ -1,0 +1,84 @@
+name: Stop active Actions
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - .github/workflows/stop-active-actions.yml
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: write
+
+jobs:
+  cancel-active-runs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Cancel every other active workflow run
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          api="https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs"
+          headers=(
+            -H "Authorization: Bearer ${GH_TOKEN}"
+            -H "Accept: application/vnd.github+json"
+            -H "X-GitHub-Api-Version: 2022-11-28"
+          )
+
+          for round in 1 2 3 4 5 6; do
+            cancelled=0
+            for status in queued in_progress requested waiting pending; do
+              response="$(curl -fsSL "${headers[@]}" "${api}?status=${status}&per_page=100")"
+              while IFS= read -r run_id; do
+                [ -z "$run_id" ] && continue
+                [ "$run_id" = "$GITHUB_RUN_ID" ] && continue
+
+                echo "Cancelling run ${run_id} (${status})"
+                code="$(curl -sS -o /tmp/cancel-response -w '%{http_code}' \
+                  -X POST "${headers[@]}" "${api}/${run_id}/cancel")"
+
+                case "$code" in
+                  202|409) : ;;
+                  *)
+                    echo "Cancel request for ${run_id} returned HTTP ${code}"
+                    cat /tmp/cancel-response || true
+                    ;;
+                esac
+                cancelled=$((cancelled + 1))
+              done < <(python3 -c 'import json,sys; data=json.load(sys.stdin); [print(r["id"]) for r in data.get("workflow_runs", [])]' <<< "$response")
+            done
+
+            [ "$cancelled" -eq 0 ] && break
+            sleep 5
+          done
+
+      - name: Remove this one-shot workflow
+        if: always()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          path='.github/workflows/stop-active-actions.yml'
+          headers=(
+            -H "Authorization: Bearer ${GH_TOKEN}"
+            -H "Accept: application/vnd.github+json"
+            -H "X-GitHub-Api-Version: 2022-11-28"
+          )
+
+          file_json="$(curl -fsSL "${headers[@]}" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/contents/${path}?ref=master")"
+          sha="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["sha"])' <<< "$file_json")"
+
+          payload="$(python3 -c 'import json,sys; print(json.dumps({"message":"ci: remove one-shot Actions stopper [skip ci]","sha":sys.argv[1],"branch":"master"}))' "$sha")"
+          curl -fsSL -X DELETE "${headers[@]}" \
+            -H "Content-Type: application/json" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/contents/${path}" \
+            -d "$payload"
