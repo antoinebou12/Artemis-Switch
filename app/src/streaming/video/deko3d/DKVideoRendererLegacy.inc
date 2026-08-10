@@ -417,6 +417,14 @@ void DKVideoRenderer::checkAndInitialize(int width, int height, AVFrame* frame) 
         brls::Logger::warning("{}: Failed to load Switch upscaling shader",
                               __PRETTY_FUNCTION__);
     }
+    if (!sgsr1FragmentShader.load(*pool_code, "romfs:/shaders/sgsr1_fsh.dksh")) {
+        brls::Logger::warning("{}: Failed to load Switch SGSR1 shader",
+                              __PRETTY_FUNCTION__);
+    }
+    if (!nisFragmentShader.load(*pool_code, "romfs:/shaders/nis_fsh.dksh")) {
+        brls::Logger::warning("{}: Failed to load Switch NIS shader",
+                              __PRETTY_FUNCTION__);
+    }
     if (!rcasFragmentShader.load(*pool_code, "romfs:/shaders/rcas_fsh.dksh")) {
         brls::Logger::warning("{}: Failed to load Switch RCAS shader",
                               __PRETTY_FUNCTION__);
@@ -968,7 +976,18 @@ void DKVideoRenderer::recordStaticCommands(AVFrame* frame) {
 
 #ifdef SUPPORT_UPSCALING
     if (useUpscaling && sourceTargetHandle && upscalingTargetHandle &&
-        sourceTextureId >= 0 && upscalingFragmentShader && easuUniformBuffer) {
+        sourceTextureId >= 0 && easuUniformBuffer) {
+        CShader* upscaleShader = &upscalingFragmentShader;
+        const UpscalingMode mode = Settings::instance().upscaling_mode();
+        if (mode == UPSCALING_SGSR1 && sgsr1FragmentShader) {
+            upscaleShader = &sgsr1FragmentShader;
+        } else if (mode == UPSCALING_NIS && nisFragmentShader) {
+            upscaleShader = &nisFragmentShader;
+        }
+        if (!(*upscaleShader)) {
+            upscaleShader = &upscalingFragmentShader;
+        }
+
         bindRenderTarget(sourceTargetImage, m_source_target_width,
                          m_source_target_height);
         drawDecodePass(sourceTransformState);
@@ -977,7 +996,7 @@ void DKVideoRenderer::recordStaticCommands(AVFrame* frame) {
         bindRenderTarget(upscalingTargetImage, m_upscaling_target_width,
                          m_upscaling_target_height);
         cmdbuf.clearColor(0, DkColorMask_RGBA, 0.0f, 0.0f, 0.0f, 0.0f);
-        bindFullscreenState(upscalingFragmentShader);
+        bindFullscreenState(*upscaleShader);
         cmdbuf.bindTextures(DkStage_Fragment, 0,
                             dkMakeTextureHandle(sourceTextureId, 0));
         cmdbuf.bindUniformBuffer(DkStage_Fragment, 0,

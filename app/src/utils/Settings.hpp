@@ -12,7 +12,13 @@
 enum VideoCodec : int { H264, H265, AV1 };
 std::string getVideoCodecName(VideoCodec codec);
 
-enum UpscalingMode : int { UPSCALING_OFF, UPSCALING_METALFX, UPSCALING_FSR1 };
+enum UpscalingMode : int {
+    UPSCALING_OFF = 0,
+    UPSCALING_METALFX = 1,
+    UPSCALING_FSR1 = 2,
+    UPSCALING_SGSR1 = 3,
+    UPSCALING_NIS = 4,
+};
 
 enum AudioBackend : int {
     SDL,
@@ -182,6 +188,12 @@ class Settings : public Singleton<Settings> {
     void set_upscaling_mode(UpscalingMode mode) {
 #if defined(PLATFORM_APPLE) && !defined(PLATFORM_TVOS)
         if (mode == UPSCALING_METALFX || mode == UPSCALING_FSR1)
+            m_upscaling_mode = mode;
+        else
+            m_upscaling_mode = UPSCALING_OFF;
+#elif defined(PLATFORM_SWITCH)
+        if (mode == UPSCALING_FSR1 || mode == UPSCALING_SGSR1 ||
+            mode == UPSCALING_NIS)
             m_upscaling_mode = mode;
         else
             m_upscaling_mode = UPSCALING_OFF;
