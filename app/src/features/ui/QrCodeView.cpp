@@ -9,16 +9,16 @@ using namespace brls::literals;
 
 namespace artemis::ui {
 
-QrCodeView::QrCodeView(std::string payload) {
+QrCodeView::QrCodeView(const std::string& payload) {
+    setHeight(360.0f);
     try {
-        const auto qr = qrcodegen::QrCode::encodeText(
+        const qrcodegen::QrCode code = qrcodegen::QrCode::encodeText(
             payload.c_str(), qrcodegen::QrCode::Ecc::MEDIUM);
-        size_ = qr.getSize();
-        modules_.assign(static_cast<size_t>(size_ * size_), false);
+        size_ = code.getSize();
+        modules_.reserve(static_cast<std::size_t>(size_ * size_));
         for (int y = 0; y < size_; ++y) {
-            for (int x = 0; x < size_; ++x) {
-                modules_[static_cast<size_t>(y * size_ + x)] = qr.getModule(x, y);
-            }
+            for (int x = 0; x < size_; ++x)
+                modules_.push_back(code.getModule(x, y) ? 1 : 0);
         }
     } catch (...) {
         modules_.clear();
@@ -27,80 +27,79 @@ QrCodeView::QrCodeView(std::string payload) {
 }
 
 void QrCodeView::draw(NVGcontext* vg, float x, float y, float width, float height,
-                      brls::Style, brls::FrameContext*) {
+                      brls::Style style, brls::FrameContext* ctx) {
+    (void)style;
+    (void)ctx;
     if (!valid() || size_ <= 0)
         return;
 
-    const float side = std::min(width, height);
-    const float quiet = side / static_cast<float>(size_ + 4);
-    const float module = quiet;
-    const float card = quiet * static_cast<float>(size_ + 4);
-    const float originX = x + (width - card) * 0.5f + quiet * 2.0f;
-    const float originY = y + (height - card) * 0.5f + quiet * 2.0f;
+    constexpr int quietZone = 4;
+    const float available = std::max(1.0f, std::min(width, height));
+    const float module =
+        std::floor(available / static_cast<float>(size_ + quietZone * 2));
+    if (module < 1.0f)
+        return;
+    const float imageSize =
+        module * static_cast<float>(size_ + quietZone * 2);
+    const float left = x + (width - imageSize) * 0.5f;
+    const float top = y + (height - imageSize) * 0.5f;
 
     nvgBeginPath(vg);
-    nvgRoundedRect(vg, x + (width - card) * 0.5f, y + (height - card) * 0.5f,
-                   card, card, 8.0f);
+    nvgRect(vg, left, top, imageSize, imageSize);
     nvgFillColor(vg, nvgRGB(255, 255, 255));
     nvgFill(vg);
 
-    nvgFillColor(vg, nvgRGB(0, 0, 0));
+    nvgBeginPath(vg);
     for (int row = 0; row < size_; ++row) {
-        for (int col = 0; col < size_; ++col) {
-            if (!modules_[static_cast<size_t>(row * size_ + col)])
+        for (int column = 0; column < size_; ++column) {
+            if (!modules_[static_cast<std::size_t>(row * size_ + column)])
                 continue;
-            nvgBeginPath(vg);
-            nvgRect(vg, originX + col * module, originY + row * module, module,
+            nvgRect(vg,
+                    left + static_cast<float>(column + quietZone) * module,
+                    top + static_cast<float>(row + quietZone) * module, module,
                     module);
-            nvgFill(vg);
         }
     }
+    nvgFillColor(vg, nvgRGB(0, 0, 0));
+    nvgFill(vg);
 }
 
 void showUrlQrDialog(const std::string& title, const std::string& url) {
-    auto* holder = new brls::Box(brls::Axis::COLUMN);
-    holder->setAlignItems(brls::AlignItems::CENTER);
-    holder->setJustifyContent(brls::JustifyContent::CENTER);
-    holder->setPadding(24);
+    auto* container = new brls::Box(brls::Axis::COLUMN);
+    container->setAlignItems(brls::AlignItems::STRETCH);
+    container->setWidth(500.0f);
+    container->setPadding(18.0f);
 
     auto* heading = new brls::Label();
     heading->setText(title.empty() ? "host/web_config"_i18n : title);
-    heading->setHorizontalAlign(brls::HorizontalAlign::CENTER);
-    heading->setFontSize(22);
-    heading->setMarginBottom(8);
-    holder->addView(heading);
+    heading->setFontSize(20.0f);
+    heading->setMarginBottom(4.0f);
+    container->addView(heading);
 
     auto* hint = new brls::Label();
     hint->setText("host/web_config_scan_hint"_i18n);
-    hint->setHorizontalAlign(brls::HorizontalAlign::CENTER);
-    hint->setFontSize(16);
-    hint->setMarginBottom(16);
-    holder->addView(hint);
+    hint->setFontSize(16.0f);
+    hint->setMarginBottom(8.0f);
+    container->addView(hint);
 
     auto* qr = new QrCodeView(url);
-    constexpr float kQrSize = 340.0f;
-    qr->setWidth(kQrSize);
-    qr->setHeight(kQrSize);
-    qr->setMarginBottom(12);
-    holder->addView(qr);
+    container->addView(qr);
 
     if (!qr->valid()) {
         auto* fallback = new brls::Label();
         fallback->setText("host/web_config_qr_unavailable"_i18n);
-        fallback->setHorizontalAlign(brls::HorizontalAlign::CENTER);
-        fallback->setFontSize(16);
-        fallback->setMarginBottom(12);
-        holder->addView(fallback);
+        fallback->setFontSize(16.0f);
+        fallback->setMarginTop(8.0f);
+        container->addView(fallback);
     }
 
     auto* urlLabel = new brls::Label();
     urlLabel->setText(url);
-    urlLabel->setFontSize(16);
-    urlLabel->setHorizontalAlign(brls::HorizontalAlign::CENTER);
-    urlLabel->setMarginBottom(4);
-    holder->addView(urlLabel);
+    urlLabel->setFontSize(16.0f);
+    urlLabel->setMarginTop(8.0f);
+    container->addView(urlLabel);
 
-    auto* dialog = new brls::Dialog(holder);
+    auto* dialog = new brls::Dialog(container);
 #ifndef __SWITCH__
     auto* platform = brls::Application::getPlatform();
     if (platform) {

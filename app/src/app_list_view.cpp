@@ -47,7 +47,9 @@ AppListView::AppListView(const Host& host) : host(host) {
             return true;
         }
         const std::string url = "https://" + address + ":47990/";
-        artemis::ui::showUrlQrDialog("host/web_config"_i18n, url);
+        brls::sync([url] {
+            artemis::ui::showUrlQrDialog("host/web_config"_i18n, url);
+        });
         return true;
     });
     container->addView(webConfig);
