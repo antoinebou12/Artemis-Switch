@@ -350,14 +350,53 @@ See [`docs/ARTEMIS_SWITCH_INTEGRATION_PLAN.md`](docs/ARTEMIS_SWITCH_INTEGRATION_
 
 ## Credits and license
 
-Artemis Switch builds on Moonlight-Switch, Moonlight common code, Sunshine/GameStream, Borealis, FFmpeg/NVDEC, deko3d, libnx, and their contributors. Existing upstream license and source-file notice requirements remain applicable.
+Artemis Switch is a fork of [Moonlight-Switch](https://github.com/XITRIX/Moonlight-Switch) by **XITRIX**. The original Moonlight-Switch source, Borealis UI, Moonlight/GameStream client, FFmpeg/NVDEC decode path, deko3d renderer, and input stack remain the foundation. Existing upstream license and source-file notice requirements remain applicable — see [`LICENSE`](LICENSE) and notices in individual source files.
 
-Special thanks to:
+### Original projects
 
-- **Rock88** / Moonlight-NX — streaming foundations
-- **Xfangfang** — Borealis (including iOS port foundations)
+| Project | Role | Link |
+|---|---|---|
+| [XITRIX/Moonlight-Switch](https://github.com/XITRIX/Moonlight-Switch) | Original Switch client (this fork’s base) | Upstream |
+| [ClassicOldSong/Apollo](https://github.com/ClassicOldSong/Apollo) | Sunshine-fork host (capability-gated extensions) | Host |
+| [ClassicOldSong/moonlight-android](https://github.com/ClassicOldSong/moonlight-android) | Artemis / Moonlight Noir Android client (UX inspiration) | Client |
+| [LizardByte/Sunshine](https://github.com/LizardByte/Sunshine) | Standard GameStream host | Host |
+| [moonlight-stream](https://github.com/moonlight-stream) | Moonlight ecosystem / protocol | Protocol |
+| [Rock88/moonlight-nx](https://github.com/rock88/moonlight-nx) | Moonlight-NX streaming foundations | Legacy |
+
+### Special thanks
+
+- **XITRIX** — Moonlight-Switch author and original codebase
+- **ClassicOldSong** — Apollo host and Artemis (Moonlight Noir) client
+- **Rock88** / Moonlight-NX — streaming foundations reused in Moonlight-Switch
+- **Natinusala** / **Xfangfang** — Borealis (including later ports)
+- **Moonlight team** — GameStream client and protocol work
+- **Cameron Gutman** — LibNX guidance
 - **Averne** — NVDEC in FFmpeg and guidance
 - **Cooler3D** — deko3d help and performance work
 - **AMD GPUOpen** — FidelityFX FSR 1.0 EASU / RCAS reference (MIT)
+- **antoinebou12** — Artemis Switch fork maintainer
 
-This fork follows the licensing requirements of Moonlight-Switch and the upstream components it incorporates. See [`LICENSE`](LICENSE) and relevant source-file notices for details.
+### Moonlight-Switch community feature ideas
+
+Several Artemis Switch features were implemented from ideas raised on [XITRIX/Moonlight-Switch](https://github.com/XITRIX/Moonlight-Switch) issues (and related discussion). Credit to the reporters — implementations live in this fork only unless noted otherwise.
+
+| Upstream issue | Reporter | Idea used in Artemis Switch |
+|---|---|---|
+| [#110](https://github.com/XITRIX/Moonlight-Switch/issues/110) | [@benwa](https://github.com/benwa) | Swap X/Y for starring in the app list |
+| [#195](https://github.com/XITRIX/Moonlight-Switch/issues/195) | [@orcavia](https://github.com/orcavia) | Disable swipe-to-open overlay |
+| [#163](https://github.com/XITRIX/Moonlight-Switch/issues/163) | [@antegorov](https://github.com/antegorov) | Swap left/right sticks in mouse mode |
+| [#70](https://github.com/XITRIX/Moonlight-Switch/issues/70) | [@xyourmomx](https://github.com/xyourmomx) | Home/away style host addressing (multi-endpoint) |
+| [#112](https://github.com/XITRIX/Moonlight-Switch/issues/112) | [@xenophobentx](https://github.com/xenophobentx) | 5.1 surround audio option |
+| [#295](https://github.com/XITRIX/Moonlight-Switch/issues/295) | [@linckosz](https://github.com/linckosz) | FSR1-like / additional upscaling modes |
+| [#254](https://github.com/XITRIX/Moonlight-Switch/issues/254) | [@JoJuStudio](https://github.com/JoJuStudio) | In-app WireGuard VPN support |
+| [#250](https://github.com/XITRIX/Moonlight-Switch/issues/250) | [@bengrahamreview](https://github.com/bengrahamreview) | Connecting outside the home network |
+| [#144](https://github.com/XITRIX/Moonlight-Switch/issues/144) | [@MetalGooseSolid](https://github.com/MetalGooseSolid) | Bake Tailscale/VPN-style remote access into the client |
+| [#24](https://github.com/XITRIX/Moonlight-Switch/issues/24) / [#165](https://github.com/XITRIX/Moonlight-Switch/issues/165) | [@windraver](https://github.com/windraver) / [@Msv777](https://github.com/Msv777) | Host app terminate / disconnect behavior |
+| [#252](https://github.com/XITRIX/Moonlight-Switch/issues/252) | [@Befeeter](https://github.com/Befeeter) | Experimental AV1 codec support |
+| [#58](https://github.com/XITRIX/Moonlight-Switch/issues/58) | [@gcseed](https://github.com/gcseed) | Debug / FPS overlay corner placement |
+| [#239](https://github.com/XITRIX/Moonlight-Switch/issues/239) / [#283](https://github.com/XITRIX/Moonlight-Switch/issues/283) | [@HackZy01](https://github.com/HackZy01) / [@AquaSteam](https://github.com/AquaSteam) | UI language selection and keyboard layout |
+| [#266](https://github.com/XITRIX/Moonlight-Switch/issues/266) | [@Moby812](https://github.com/Moby812) | Virtual display (Apollo-gated path) |
+
+Related discussion on Moonlight Qt: [moonlight-qt#1557](https://github.com/moonlight-stream/moonlight-qt/issues/1557) (upscaling).
+
+This fork follows the licensing requirements of Moonlight-Switch and the upstream components it incorporates (including Apollo/Sunshine/GameStream, Borealis, FFmpeg/NVDEC, deko3d, and libnx). See [`LICENSE`](LICENSE) and relevant source-file notices for details.
