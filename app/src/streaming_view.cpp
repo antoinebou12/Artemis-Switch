@@ -20,6 +20,8 @@
 #include "features/input/InputSettingsStore.hpp"
 #include "features/apollo/ApolloHostOptionsStore.hpp"
 #include "streaming/StreamProfileStore.hpp"
+#include "utils/ArtemisPlatformFeatures.hpp"
+#include "utils/UsableMac.hpp"
 #include <Limelight.h>
 #include <chrono>
 #include <nanovg.h>
@@ -86,6 +88,19 @@ StreamingView::StreamingView(const Host& host, const AppInfo& app) : host(host),
     session = new MoonlightSession(host.preferred_address(), app.app_id,
                                    app.app_uuid);
 
+#if ARTEMIS_END_STREAM_ON_FOCUS_LOSS
+    // Switch sleep/HOME: subscribe once here, not in onFocusGained (that fires
+    // when overlays close). Disabled on desktop so alt-tab does not kill streams.
+    windowFocusSubscription =
+        Application::getWindowFocusChangedEvent()->subscribe(
+            [this](bool focused) { this->onWindowFocusChanged(focused); });
+#endif
+
+#if ARTEMIS_CLEAR_RUMBLE_ON_STREAM_START
+    // Clear any rumble left from wireless pads connected before launch.
+    clearControllerRumble();
+#endif
+
 #ifdef PLATFORM_TVOS
         updatePreferredDisplayMode(true);
 #endif
@@ -102,7 +117,7 @@ StreamingView::StreamingView(const Host& host, const AppInfo& app) : host(host),
             session->set_address(
                 GameStreamClient::instance().active_address(this->host));
 
-            const auto hostKey = !result.value().mac.empty()
+            const auto hostKey = is_usable_mac(result.value().mac)
                                      ? result.value().mac
                                      : this->host.preferred_address();
             const auto stored = artemis::apollo::ApolloHostOptionsStore::instance().get(hostKey);
@@ -320,6 +335,15 @@ void StreamingView::onFocusLost() {
 
 void StreamingView::draw(NVGcontext* vg, float x, float y, float width,
                          float height, Style style, FrameContext* ctx) {
+#if ARTEMIS_END_STREAM_ON_FOCUS_LOSS
+    if (pendingSuspendTerminate) {
+        // Focus callback only records intent; tear down here on the main loop.
+        pendingSuspendTerminate = false;
+        terminate(false);
+        return;
+    }
+#endif
+
     if (session->is_terminated()) {
         terminate(false);
         return;
@@ -455,6 +479,31 @@ void StreamingView::removeKeyboard() {
     Application::giveFocus(this);
 }
 
+void StreamingView::clearControllerRumble() {
+    int controllersCount = Application::getPlatform()
+                               ->getInputManager()
+                               ->getControllersConnectedCount();
+    for (int i = 0; i < controllersCount; i++)
+        Application::getPlatform()->getInputManager()->sendRumble(i, 0, 0);
+}
+
+void StreamingView::onWindowFocusChanged(bool focused) {
+#if !ARTEMIS_END_STREAM_ON_FOCUS_LOSS
+    (void)focused;
+    return;
+#else
+    if (focused || terminated)
+        return;
+
+    // Sleep or HOME took focus. End the stream on the next draw() rather than
+    // calling terminate() inside the event iteration.
+    Logger::info("StreamingView: window focus lost, will end the stream");
+    MoonlightInputManager::instance().setInputEnabled(false);
+    MoonlightInputManager::instance().dropInput();
+    pendingSuspendTerminate = true;
+#endif
+}
+
 void StreamingView::terminate(bool terminateApp) {
     if (terminated)
         return;
@@ -462,9 +511,7 @@ void StreamingView::terminate(bool terminateApp) {
 
     session->stop(terminateApp);
 
-    int controllersCount = Application::getPlatform()->getInputManager()->getControllersConnectedCount();
-    for (int i = 0; i < controllersCount; i++)
-        Application::getPlatform()->getInputManager()->sendRumble(i, 0, 0);
+    clearControllerRumble();
 
     bool hasOverlays =
         Application::getActivitiesStack().back() != this->getParentActivity();
@@ -491,7 +538,7 @@ void StreamingView::applyVirtualDisplay(
         return;
     }
 
-    const std::string hostKey = !server.mac.empty()
+    const std::string hostKey = is_usable_mac(server.mac)
         ? server.mac
         : host.preferred_address();
     auto& store = artemis::apollo::ApolloHostOptionsStore::instance();
@@ -713,6 +760,10 @@ StreamingView::~StreamingView() {
         ->getInputManager()
         ->getKeyboardKeyStateChanged()
         ->unsubscribe(keysSubscription);
+#if ARTEMIS_END_STREAM_ON_FOCUS_LOSS
+    Application::getWindowFocusChangedEvent()->unsubscribe(
+        windowFocusSubscription);
+#endif
     session->stop(false);
     delete session;
 }

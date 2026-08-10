@@ -3,6 +3,7 @@
 #include "MoonlightSession.hpp"
 #include "Settings.hpp"
 #include "features/performance/PerformanceLite.hpp"
+#include "utils/ArtemisPlatformFeatures.hpp"
 
 #ifdef __SWITCH__
 #include <switch.h>
@@ -50,7 +51,8 @@
 #define ARTEMIS_HAS_ADVANCED_STREAM 0
 #endif
 
-#if __has_include("benchmark/SwitchRuntimeMetadata.hpp")
+#if __has_include("benchmark/SwitchRuntimeMetadata.hpp") && \
+    ARTEMIS_SWITCH_RUNTIME_CLOCKS
 #include "benchmark/SwitchRuntimeMetadata.hpp"
 #define ARTEMIS_HAS_SWITCH_RUNTIME 1
 #else

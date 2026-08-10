@@ -53,12 +53,16 @@ class StreamingView : public brls::Box {
     bool blocked = false;
     bool terminated = false;
     bool tempInputLock = false;
+    bool pendingSuspendTerminate = false;
     brls::Event<brls::KeyState>::Subscription keysSubscription;
+    brls::Event<bool>::Subscription windowFocusSubscription;
     int touchScrollCounter = 0;
     size_t bottombarDelayTask = -1;
     bool m_use_hdr = false;
     TwoFingerScrollGestureRecognizer* scrollTouchRecognizer = nullptr;
 
+    void onWindowFocusChanged(bool focused);
+    void clearControllerRumble();
     void handleInput();
     void handleOverlayCombo();
     void handleMouseInputCombo();

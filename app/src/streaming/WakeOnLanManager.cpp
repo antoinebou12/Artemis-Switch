@@ -61,7 +61,17 @@ std::string normalize_mac_address(const std::string& mac) {
         }
     }
 
-    return normalized.size() == 12 ? normalized : "";
+    if (normalized.size() != 12) {
+        return "";
+    }
+
+    // Sunshine reports an all-zero MAC when it cannot determine the real one.
+    // A magic packet addressed to it wakes nothing.
+    if (normalized.find_first_not_of('0') == std::string::npos) {
+        return "";
+    }
+
+    return normalized;
 }
 
 bool try_parse_port(const std::string& portText, unsigned short& port) {

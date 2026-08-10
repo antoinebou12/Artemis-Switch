@@ -61,7 +61,7 @@ void rebind_server_info(SERVER_DATA& server) {
 }
 
 std::string host_key(const Host& host) {
-    if (!host.mac.empty()) {
+    if (is_usable_mac(host.mac)) {
         return "mac:" + host.mac;
     }
     if (!host.address.empty()) {
@@ -92,7 +92,7 @@ void merge_discovered_host(std::vector<Host>& hosts, const Host& host) {
     if (!host.hostname.empty()) {
         it->hostname = host.hostname;
     }
-    if (!host.mac.empty()) {
+    if (is_usable_mac(host.mac)) {
         it->mac = host.mac;
     }
 }
@@ -441,6 +441,14 @@ void GameStreamClient::find_hosts(ServerCallback<std::vector<Host>>& callback) {
 
         int sock = mdns_socket_open_ipv4(nullptr);
         if (sock < 0) {
+            brls::sync([callback, generation] {
+                if (generation != findHostsGeneration.load()) {
+                    return;
+                }
+
+                callback(GSResult<std::vector<Host>>::failure(
+                    "add_host/search_error"_i18n));
+            });
             return;
         }
 
@@ -494,8 +502,8 @@ void GameStreamClient::find_hosts(ServerCallback<std::vector<Host>>& callback) {
                 if (status == GS_OK) {
                     Host host;
                     host.address = searchContext.foundHost;
-                    host.remoteAddress =
-                        GameStreamClient::external_address_for_mdns(host.address);
+                    // Local mDNS results should not trigger remote STUN lookups.
+                    host.remoteAddress.clear();
                     host.hostname = server_data.hostname;
                     host.mac = server_data.mac;
                     merge_discovered_host(foundHosts, host);
@@ -520,6 +528,21 @@ void GameStreamClient::find_hosts(ServerCallback<std::vector<Host>>& callback) {
         }
 
         closeSocket();
+
+        if (isCancelled()) {
+            return;
+        }
+
+        if (foundHosts.empty()) {
+            brls::sync([callback, generation] {
+                if (generation != findHostsGeneration.load()) {
+                    return;
+                }
+
+                callback(GSResult<std::vector<Host>>::failure(
+                    "discovery_manager/no_host"_i18n));
+            });
+        }
     });
 }
 
@@ -576,7 +599,7 @@ void GameStreamClient::cache_server_data(const std::string& address,
                                          const SERVER_DATA& data) {
     m_server_data[address] = data;
     rebind_server_info(m_server_data[address]);
-    if (!data.mac.empty()) {
+    if (is_usable_mac(data.mac)) {
         m_active_addresses["mac:" + data.mac] = address;
     }
 }
