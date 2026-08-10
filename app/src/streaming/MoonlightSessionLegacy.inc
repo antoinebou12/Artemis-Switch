@@ -311,17 +311,19 @@ void MoonlightSession::start(ServerCallback<bool> callback, bool is_sunshine) {
 
     switch (Settings::instance().video_codec()) {
     case H264:
-        m_config.supportedVideoFormats = VIDEO_FORMAT_H264;
+        m_config.supportedVideoFormats = artemis::stream::supportedVideoFormats(
+            artemis::stream::StreamVideoCodec::H264,
+            Settings::instance().request_hdr());
         break;
     case H265:
-        m_config.supportedVideoFormats = VIDEO_FORMAT_H265;
-        if (Settings::instance().request_hdr())
-            m_config.supportedVideoFormats |= VIDEO_FORMAT_H265_MAIN10;
+        m_config.supportedVideoFormats = artemis::stream::supportedVideoFormats(
+            artemis::stream::StreamVideoCodec::H265,
+            Settings::instance().request_hdr());
         break;
     case AV1:
-        m_config.supportedVideoFormats = VIDEO_FORMAT_AV1_MAIN8;
-        if (Settings::instance().request_hdr())
-            m_config.supportedVideoFormats |= VIDEO_FORMAT_AV1_MAIN10;
+        m_config.supportedVideoFormats = artemis::stream::supportedVideoFormats(
+            artemis::stream::StreamVideoCodec::AV1,
+            Settings::instance().request_hdr());
         break;
     default:
         break;
@@ -372,7 +374,12 @@ void MoonlightSession::start(ServerCallback<bool> callback, bool is_sunshine) {
 
                     if (result != 0) {
                         LiStopConnection();
-                        callback(GSResult<bool>::failure("error/stream_start"_i18n));
+                        if (Settings::instance().video_codec() == AV1) {
+                            callback(GSResult<bool>::failure(
+                                "error/av1_decoder_unavailable"_i18n));
+                        } else {
+                            callback(GSResult<bool>::failure("error/stream_start"_i18n));
+                        }
                     } else {
                         callback(GSResult<bool>::success(true));
                     }

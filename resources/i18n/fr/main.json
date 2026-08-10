@@ -223,6 +223,7 @@
         "host_not_found": "Machine hôte non trouvée",
         "ip_not_obtained": "Impossible de récupérer l'adresse IP",
         "stream_start": "La diffusion a échoué",
+        "av1_decoder_unavailable": "AV1 est expérimental et n'a pas pu être ouvert.\n\nCette version n'offre pas de décodage AV1 matériel sur Switch. Utilisez H.264 ou HEVC, ou activez un décodeur AV1 logiciel.",
         "unknown_error": "Une erreur inconnue s'est produite"
     },
     "forwarder": {

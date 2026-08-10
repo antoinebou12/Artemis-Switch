@@ -465,6 +465,10 @@ int FFmpegVideoDecoder::setup(int video_format, int width, int height,
     } else if (video_format & VIDEO_FORMAT_MASK_H265) {
         m_decoder = avcodec_find_decoder_by_name("hevc_mediacodec");
         m_codec_id = AV_CODEC_ID_HEVC;
+    } else if (video_format & VIDEO_FORMAT_MASK_AV1) {
+        // Prefer software AV1 rather than claiming hardware AV1 support.
+        m_decoder = avcodec_find_decoder(AV_CODEC_ID_AV1);
+        m_codec_id = AV_CODEC_ID_AV1;
     } else {
         // Unsupported decoder type
     }
@@ -497,13 +501,23 @@ int FFmpegVideoDecoder::setup(int video_format, int width, int height,
     } else if (video_format & VIDEO_FORMAT_MASK_H265) {
         m_decoder = avcodec_find_decoder(AV_CODEC_ID_HEVC);
         m_codec_id = AV_CODEC_ID_HEVC;
+    } else if (video_format & VIDEO_FORMAT_MASK_AV1) {
+        // Software AV1 only — Switch NVTEGRA has no AV1 hardware decode.
+        m_decoder = avcodec_find_decoder(AV_CODEC_ID_AV1);
+        m_codec_id = AV_CODEC_ID_AV1;
     } else {
         // Unsupported decoder type
     }
 #endif
 
     if (m_decoder == nullptr) {
-        brls::Logger::error("FFmpeg: Couldn't find decoder");
+        if (video_format & VIDEO_FORMAT_MASK_AV1) {
+            brls::Logger::error(
+                "FFmpeg: AV1 decoder unavailable (experimental software path; "
+                "no hardware AV1 on Switch)");
+        } else {
+            brls::Logger::error("FFmpeg: Couldn't find decoder");
+        }
         return -1;
     }
 
@@ -524,8 +538,12 @@ int FFmpegVideoDecoder::setup(int video_format, int width, int height,
 #endif
 #endif
 
+    const bool is_av1 = (video_format & VIDEO_FORMAT_MASK_AV1) != 0;
 #if defined(__linux__) && defined(PLATFORM_DESKTOP)
-    if (Settings::instance().use_hw_decoding() &&
+    if (is_av1) {
+        brls::Logger::info(
+            "FFmpeg: AV1 uses software decode (experimental; no hardware AV1 claim)");
+    } else if (Settings::instance().use_hw_decoding() &&
         !m_linux_hardware_failed) {
         err = ffmpeg::decoder::initializeLinuxHardwareDevice(
             m_linux_hardware, m_decoder, hw_device_ctx);
@@ -546,7 +564,13 @@ int FFmpegVideoDecoder::setup(int video_format, int width, int height,
         brls::Logger::info("FFmpeg: Linux hardware decoding disabled");
     }
 #else
-    if (Settings::instance().use_hw_decoding() && hwType != AV_HWDEVICE_TYPE_NONE) {
+    if (is_av1) {
+        // Do not initialize NVTEGRA/MediaCodec/etc. for AV1 — Switch has no
+        // hardware AV1, and claiming HW would fail the stream before software open.
+        brls::Logger::info(
+            "FFmpeg: AV1 uses software decode (experimental; no hardware AV1 claim)");
+        m_hw_decode_active = false;
+    } else if (Settings::instance().use_hw_decoding() && hwType != AV_HWDEVICE_TYPE_NONE) {
 #if defined(PLATFORM_ANDROID)
         if (hwType == AV_HWDEVICE_TYPE_MEDIACODEC) {
             err = ffmpeg::decoder::initializeAndroidMediaCodecHardwareDevice(
@@ -617,6 +641,12 @@ int FFmpegVideoDecoder::setup(int video_format, int width, int height,
 
     err = open_decoder();
     if (err < 0) {
+        if (m_video_format & VIDEO_FORMAT_MASK_AV1) {
+            brls::Logger::error(
+                "FFmpeg: Failed to open AV1 decoder (experimental software path; "
+                "no hardware AV1 on Switch) - {}",
+                err);
+        }
         cleanup();
         return err;
     }
