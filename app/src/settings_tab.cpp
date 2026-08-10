@@ -17,6 +17,7 @@
 #include "UpscalingSupport.hpp"
 #include "features/i18n/AppLocalePreference.hpp"
 #include "features/input/InputSettingsStore.hpp"
+#include "keyboard_view.hpp"
 #include <cmath>
 #include <iomanip>
 #include <sstream>
@@ -718,6 +719,25 @@ SettingsTab::SettingsTab() {
             DEFAULT;
         }
     });
+
+    {
+        KeyboardView::ensureLocales();
+        const auto locales = KeyboardView::getLocales();
+        std::vector<std::string> names;
+        names.reserve(locales.size());
+        for (const auto& locale : locales) {
+            names.push_back(locale.name);
+        }
+        int selected = Settings::instance().get_keyboard_locale();
+        if (selected < 0 || selected >= static_cast<int>(names.size())) {
+            selected = 0;
+            Settings::instance().set_keyboard_locale(0);
+        }
+        keyboardLocale->init("settings/keyboard_layout"_i18n, names, selected,
+                             [](int index) {
+                                 Settings::instance().set_keyboard_locale(index);
+                             });
+    }
 
     std::vector<std::string> keyboardFingersOptions = {
         "3", "4", "5", "hints/off"_i18n};

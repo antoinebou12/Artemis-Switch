@@ -135,6 +135,11 @@ add_artemis_test(app_locale_preference_test
     app/src/features/i18n/AppLocalePreference.cpp
     app/src/features/i18n)
 
+add_executable(korean_keyboard_layout_test
+    "${REPO_ROOT}/tests/korean_keyboard_layout_test.cpp")
+target_compile_features(korean_keyboard_layout_test PRIVATE cxx_std_20)
+add_test(NAME korean_keyboard_layout_test COMMAND korean_keyboard_layout_test)
+
 add_executable(display_coordinate_mapper_test
     "${REPO_ROOT}/tests/display_coordinate_mapper_test.cpp"
     "${REPO_ROOT}/app/src/features/video/DisplayCoordinateMapper.cpp"

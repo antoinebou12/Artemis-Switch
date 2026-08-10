@@ -460,6 +460,15 @@ void Settings::load() {
                 }
             }
 
+            if (json_t* keyboard_locale = json_object_get(settings, "keyboard_locale")) {
+                if (json_typeof(keyboard_locale) == JSON_INTEGER) {
+                    m_keyboard_locale = static_cast<int>(json_integer_value(keyboard_locale));
+                    if (m_keyboard_locale < 0) {
+                        m_keyboard_locale = 0;
+                    }
+                }
+            }
+
             if (json_t* overlay_system_button = json_object_get(settings, "overlay_system_button")) {
                 if (json_typeof(overlay_system_button) == JSON_INTEGER) {
                     m_overlay_system_button = (ButtonOverrideType) json_integer_value(overlay_system_button);
@@ -614,6 +623,7 @@ void Settings::save() {
             json_object_set_new(settings, "keyboard_type", json_integer(m_keyboard_type));
             json_object_set_new(settings, "keyboard_fingers", json_integer(m_keyboard_fingers));
             json_object_set_new(settings, "app_locale", json_string(m_app_locale.c_str()));
+            json_object_set_new(settings, "keyboard_locale", json_integer(m_keyboard_locale));
             json_object_set_new(settings, "overlay_system_button", json_integer((int)m_overlay_system_button));
             json_object_set_new(settings, "guide_system_button", json_integer((int)m_guide_system_button));
 

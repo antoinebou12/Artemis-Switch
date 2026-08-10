@@ -299,6 +299,7 @@
         "keyboard_compact": "Moonlight",
         "keyboard_fingers": "Taps to open keyboard",
         "keyboard_fullsized": "Full-sized",
+        "keyboard_layout": "Keyboard layout",
         "keyboard_numpad": "Numbers & symbols",
         "keyboard_type": "Keyboard type",
         "select_language": "Select language",

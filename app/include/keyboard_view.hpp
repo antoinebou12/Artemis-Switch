@@ -67,6 +67,7 @@ class KeyboardView : public brls::Box {
   public:
     inline static brls::VoidEvent shiftUpdated;
     inline static std::vector<KeyboardLocale> getLocales() { return locales; }
+    static void ensureLocales();
 
     explicit KeyboardView(bool focusable);
     ~KeyboardView() override;
@@ -86,7 +87,7 @@ class KeyboardView : public brls::Box {
     void createFullLayout();
     ButtonView* createLocaleSelectorButton(float width);
     static void changeLang(int lang);
-    void createLocales();
+    static void createLocales();
     inline static std::vector<KeyboardLocale> locales;
 
     friend class ButtonView;
