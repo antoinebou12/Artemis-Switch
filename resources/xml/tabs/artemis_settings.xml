@@ -9,23 +9,26 @@
             paddingRight="@style/brls/tab_details/padding_right"
             paddingBottom="@style/brls/tab_details/padding_bottom"
             paddingLeft="@style/brls/tab_details/padding_left">
+
             <brls:Header title="@i18n/artemis/settings/title"/>
             <brls:DetailCell id="active_profile"/>
+
+            <brls:Header title="@i18n/artemis/settings/frame_rate_video" paddingTop="60" lineTop="1px"/>
             <brls:BooleanCell id="custom_resolution"/>
             <brls:DetailCell id="custom_width"/>
             <brls:DetailCell id="custom_height"/>
             <brls:DetailCell id="exact_bitrate"/>
-
-            <brls:Header title="@i18n/artemis/settings/frame_rate_video" paddingTop="60" lineTop="1px"/>
             <brls:SelectorCell id="frame_rate"/>
-            <brls:BooleanCell id="unlock_high_fps"/>
-            <brls:BooleanCell id="force_full_range"/>
-            <brls:BooleanCell id="prevent_packet_loss"/>
 
             <brls:Header title="@i18n/artemis/settings/presentation" paddingTop="60" lineTop="1px"/>
             <brls:SelectorCell id="scale_mode"/>
+            <brls:BooleanCell id="force_full_range"/>
+            <brls:DetailCell id="filter_status"/>
             <brls:BooleanCell id="remember_zoom_pan"/>
             <brls:DetailCell id="reset_zoom_pan"/>
+
+            <brls:Header title="Advanced network" paddingTop="60" lineTop="1px"/>
+            <brls:BooleanCell id="prevent_packet_loss"/>
 
             <brls:Header title="@i18n/artemis/settings/switch_motion" paddingTop="60" lineTop="1px"/>
             <brls:BooleanCell id="forward_motion"/>
