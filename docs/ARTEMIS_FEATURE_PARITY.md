@@ -1,11 +1,12 @@
 # Artemis Switch → Moonlight-Switch feature parity notes
 
-This document is for **XITRIX** and other Moonlight-Switch maintainers.
+This document is for **XITRIX** and other Moonlight-Switch maintainers, and for Artemis Switch contributors.
 
 **Thank you first.** Artemis Switch exists because of [Moonlight-Switch](https://github.com/XITRIX/Moonlight-Switch). The Borealis UI, GameStream client, FFmpeg/NVDEC path, deko3d renderer, and input stack remain the foundation. Nothing here is a demand to merge Artemis code as-is — only an optional map of Switch-focused ideas that proved useful in the fork, offered as inspiration.
 
-Upstream repo: https://github.com/XITRIX/Moonlight-Switch  
-Fork: https://github.com/antoinebou12/Artemis-Switch
+- Upstream: https://github.com/XITRIX/Moonlight-Switch
+- Fork: https://github.com/antoinebou12/Artemis-Switch
+- Implementation PR (fork only): https://github.com/antoinebou12/Artemis-Switch/pull/22
 
 ## Design principles used in Artemis
 
@@ -14,63 +15,85 @@ Fork: https://github.com/antoinebou12/Artemis-Switch
 3. Prefer read-only diagnostics (clocks, battery, controller state) over write APIs.
 4. Do not invent GameStream APIs that do not exist (for example there is no remote “add app”; use the host web UI on `:47990`).
 
-## Feature areas (inspiration checklist)
+## Complete feature catalog
+
+### Credits / provenance
+
+- About link to Moonlight-Switch (XITRIX) and thank **XITRIX first** (accent color), then the Artemis maintainer, then existing credits.
+- Links for Apollo host and Artemis Android (ClassicOldSong) as host/client reference.
 
 ### Presentation / video
 
-| Idea | Why it helped on Switch | Artemis pointers |
+| Idea | Why it helped on Switch | Pointers |
 | --- | --- | --- |
 | Unified Fit / Fill / Stretch / Zoom-Pan / Full-range | One presentation path avoids fighting filtered vs direct renderer modes | `DisplayTransform`, `RendererPresentationPolicy`, deko3d texture path |
 | Live display transform without swapping renderers | Safer mid-stream tweaks | Settings + overlay Options |
+| Coordinate mapper for letterbox / crop / zoom math | Stable geometry across Fit/Fill/Zoom | `DisplayCoordinateMapper` |
+| Keep FSR / RCAS / dithering where already present | Do not replace the post-process path with the Performance HUD | Existing deko3d post-process |
 
 ### Performance visibility
 
-| Idea | Why it helped on Switch | Artemis pointers |
+| Idea | Why it helped on Switch | Pointers |
 | --- | --- | --- |
-| Lite performance snapshot (decode / render / FPS / queue / Wi‑Fi) | Players can see lag sources without a heavy overlay | `PerformanceLite`, Performance tab |
-| Read-only Switch clocks (CPU / GPU / EMC), mode, battery | Explains docked vs handheld behavior; no `clkrst` writes | `collectSwitchRuntimeMetadata()` |
+| Lite performance snapshot | Players see lag sources without a heavy overlay | `PerformanceLite`, Performance tab |
+| Metrics: network Mbps, receive / decode / render latency, packet loss | Actionable stream health | Session stats → lite snapshot |
+| FPS: host / received / decoded / rendered + frame queue | Separates network vs decode vs present issues | Performance tab rows |
+| GPU render timing + presentation mode / color range | Ties UI to what the renderer is doing | Performance tab |
+| Read-only Switch clocks (CPU / GPU / EMC), mode, battery | Explains docked vs handheld; **no `clkrst` writes** | `collectSwitchRuntimeMetadata()` |
+| Show `-` when clocks unavailable | Matches benchmark export semantics | Performance tab |
 
 ### Input / controllers
 
-| Idea | Why it helped on Switch | Artemis pointers |
+| Idea | Why it helped on Switch | Pointers |
 | --- | --- | --- |
-| Multi-slot controller diagnostics + rumble tests | Detached Joy-Cons show up as separate pads | `ControllerDiagnostics`, overlay diagnostics |
-| Rumble both motors / rumble all pads | Low/high alone only hits one Joy-Con motor mapping | Borealis `sendRumble(slot, high, low)` |
-| Mouse speed as true 0.1x–2.0x linear scale | Clearer than a mislabeled “acceleration” curve | `Settings::mouse_speed_scale()` |
-| Host keyboard shortcuts + server commands (capability-gated) | Apollo/Sunshine extras without breaking plain Sunshine | `HostKeyboardShortcuts`, host capabilities |
+| Multi-slot controller diagnostics + live sampling | Detached Joy-Cons show up as separate pads | `ControllerDiagnostics`, overlay diagnostics |
+| Rumble low / high / **both motors** / **all pads** | Borealis maps low→left and high→right; both hits both Joy-Cons | `sendRumble(slot, high, low)` |
+| Mouse speed true linear **0.1x–2.0x** | Clearer than a mislabeled “acceleration” curve | `Settings::mouse_speed_scale()` |
+| Pointer settings / touch control profile | Consistent pointer behavior | `PointerSettings`, `TouchControlProfile` |
+| Switch motion policy gating | Capability-aware motion forwarding | `SwitchMotionPolicy` |
+| Host keyboard shortcuts + capability-gated server commands | Apollo/Sunshine extras without breaking plain Sunshine | `HostKeyboardShortcuts`, `HostCapabilities` |
 
 ### Stream UX
 
-| Idea | Why it helped on Switch | Artemis pointers |
+| Idea | Why it helped on Switch | Pointers |
 | --- | --- | --- |
-| Slim Quick Actions (keyboard, move L/R, shortcuts, mouse) | Less clutter mid-stream | In-game overlay Quick tab |
-| Host web config entry (`https://host:47990/`) | Honest “add apps on the PC” path | App list + Host tab |
-| Handheld / docked resolution presets in settings | Keeps virtual-display style choices out of the live menu | Artemis settings presets |
+| Slim Quick Actions | Less clutter mid-stream | Overlay Quick tab |
+| Quick: keyboard, move window L/R, host shortcuts, server commands, mouse | Separates one-shot actions from deep options | `quick_tab.xml`, overlay |
+| Options keeps deeper tuning | Virtual-display style choices stay out of live Quick | Options tab / Artemis settings |
+| Always-on FPS 30 / 40 / 60 / 90 / 120 | No unlock gate for high FPS entries | Settings FPS list |
+| Handheld 1280×720 and Docked 1920×1080 presets | Fast docked/handheld switch in settings | Artemis settings presets |
+| Host web config `https://<host>:47990/` | Honest “add apps on the PC” path (no fake `gs_add_app`) | App list + Host tab |
 
-### Apollo (optional)
+### Apollo (optional / gated)
 
-| Idea | Why it helped | Artemis pointers |
+| Idea | Why it helped | Pointers |
 | --- | --- | --- |
-| Capability detection before showing Apollo-only controls | Avoids dead UI on Sunshine | `HostCapabilities`, Apollo host options store |
+| Capability detection before Apollo-only UI | Avoids dead controls on Sunshine | `HostCapabilities`, Apollo host options store |
 
-## What we deliberately did **not** push as “must merge”
+### Fork packaging (Artemis-Switch only; not requested upstream)
 
-- Auto-tune / broken performance-writing paths that fought the session.
-- Fake catalog write APIs for adding apps over GameStream.
-- Clock overclocking (read-only metadata only).
+- NRO branding Artemis Switch, version **1.5.1**, About/version strings.
+- Portable unit tests + i18n consistency (en-US + fr) for new strings.
+- Multi-OS CI on the fork: portable Linux tests/sanitizers + All Builds (Linux, Windows, macOS, Android, Vita, Switch).
 
-## Suggested upstream adoption order
+## What is *not* requested for Moonlight-Switch mainline
 
-If any of this is useful upstream, a gentle order would be:
+- Auto-tune / session-fighting performance writers
+- Fake GameStream catalog write / remote “add app” API
+- Clock overclocking (`clkrst` writes)
+- Requirement to adopt Apollo UI in mainline
+- Merging the Artemis runtime/codebase as-is into XITRIX
 
-1. Credits / About link to keep fork provenance clear (already common courtesy).
-2. Performance lite rows (pure UI + existing session stats).
-3. Mouse speed remapping + label clarity.
-4. Controller diagnostics / dual-motor rumble test.
-5. Presentation policy helpers (larger surface; review carefully).
-6. Apollo capability gating (only if you want Apollo UX in mainline).
+## Suggested gentle adoption order (if any)
+
+1. Credits / About provenance
+2. Performance lite rows (UI + existing session stats)
+3. Mouse speed remap + label clarity
+4. Controller diagnostics / dual-motor rumble
+5. Presentation policy helpers (larger review surface)
+6. Apollo capability gating (only if desired)
 
 ## Contact
 
-Maintainer of the Artemis Switch fork: **antoinebou12**  
-Original Moonlight-Switch author: **XITRIX** — thank you again.
+- Artemis Switch fork maintainer: **antoinebou12**
+- Original Moonlight-Switch author: **XITRIX** — thank you again
