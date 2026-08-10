@@ -118,6 +118,11 @@ add_artemis_test(apollo_host_options_test
     app/src/features/apollo/ApolloHostOptions.cpp
     app/src/features/apollo)
 
+add_artemis_test(server_command_shortcuts_test
+    tests/server_command_shortcuts_test.cpp
+    app/src/features/apollo/ServerCommandShortcuts.cpp
+    app/src/features/apollo)
+
 add_artemis_test(controller_diagnostics_test
     tests/controller_diagnostics_test.cpp
     app/src/features/input/ControllerDiagnostics.cpp
