@@ -130,6 +130,11 @@ add_artemis_test(touch_control_profile_test
     app/src/features/input/TouchControlProfile.cpp
     app/src/features/input)
 
+add_artemis_test(app_locale_preference_test
+    tests/app_locale_preference_test.cpp
+    app/src/features/i18n/AppLocalePreference.cpp
+    app/src/features/i18n)
+
 add_executable(display_coordinate_mapper_test
     "${REPO_ROOT}/tests/display_coordinate_mapper_test.cpp"
     "${REPO_ROOT}/app/src/features/video/DisplayCoordinateMapper.cpp"

@@ -24,6 +24,7 @@ class SettingsTab : public brls::Box {
     BRLS_BIND(brls::SelectorCell, upscalingMode, "upscaling_mode");
     BRLS_BIND(BooleanSliderCell, rcas, "rcas");
     BRLS_BIND(brls::SelectorCell, fps, "fps");
+    BRLS_BIND(brls::SelectorCell, appLocale, "app_locale");
     BRLS_BIND(brls::SelectorCell, codec, "codec");
     BRLS_BIND(brls::BooleanCell, requestHdr, "request_hdr");
     BRLS_BIND(brls::SelectorCell, decoder, "decoder");

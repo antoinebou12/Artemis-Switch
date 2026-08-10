@@ -305,6 +305,12 @@ class Settings : public Singleton<Settings> {
     void set_keyboard_locale(int locale) { m_keyboard_locale = locale; }
     [[nodiscard]] int get_keyboard_locale() const { return m_keyboard_locale; }
 
+    void set_app_locale(const std::string& locale);
+    [[nodiscard]] std::string get_app_locale() const { return m_app_locale; }
+
+    // Reads settings.app_locale before Application::init() when possible.
+    static std::string peek_app_locale();
+
     void set_rumble_force(float rumble_force) { m_rumble_force = int(rumble_force * 100); }
     [[nodiscard]] float get_rumble_force() const { return float(m_rumble_force) / 100.f; }
 
@@ -377,6 +383,7 @@ class Settings : public Singleton<Settings> {
     ButtonOverrideType m_guide_system_button = ButtonOverrideType::NONE;
     int m_keyboard_fingers = 3;
     int m_keyboard_locale = 0;
+    std::string m_app_locale = "auto";
     bool m_volume_amplification = false;
     int m_mouse_speed_multiplier = 47; // ~1.0x with 0.1 + progress*1.9
     int m_current_mapping_layout = 0;
