@@ -27,6 +27,7 @@ class AudrenAudioRenderer : public IAudioRenderer {
 
     OpusMSDecoder* m_decoder = nullptr;
     s16* m_decoded_buffer = nullptr;
+    s16* m_downmix_buffer = nullptr;
     void* mempool_ptr = nullptr;
     void* current_pool_ptr = nullptr;
 
@@ -37,6 +38,7 @@ class AudrenAudioRenderer : public IAudioRenderer {
 
     bool m_inited_driver = false;
     int m_channel_count = 0;
+    int m_sink_channel_count = 2;
     int m_sample_rate = 0;
     int m_buffer_size = 0;
     int m_samples = 0;

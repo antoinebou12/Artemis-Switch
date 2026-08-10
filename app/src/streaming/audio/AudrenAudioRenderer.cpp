@@ -12,6 +12,7 @@
 #include <string.h>
 
 static const uint8_t m_sink_channels[] = {0, 1};
+static constexpr int kSinkChannelCount = 2;
 
 namespace {
 
@@ -19,6 +20,21 @@ void applyVolume(s16* buffer, size_t sampleCount, int volume) {
     for (size_t i = 0; i < sampleCount; i++) {
         const int scaled = (static_cast<int>(buffer[i]) * volume) / 100;
         buffer[i] = static_cast<s16>(std::min<int>(SHRT_MAX, std::max<int>(SHRT_MIN, scaled)));
+    }
+}
+
+// Moonlight 5.1 order: FL, FR, C, LFE, BL, BR → stereo for Switch handheld/dock sink.
+void downmix51ToStereo(const s16* input, s16* output, int frames) {
+    constexpr float center = 0.7071f;
+    constexpr float surround = 0.7071f;
+    for (int i = 0; i < frames; i++) {
+        const s16* frame = input + i * 6;
+        const float left = frame[0] + center * frame[2] + surround * frame[4];
+        const float right = frame[1] + center * frame[2] + surround * frame[5];
+        output[i * 2] = static_cast<s16>(
+            std::min<int>(SHRT_MAX, std::max<int>(SHRT_MIN, static_cast<int>(left))));
+        output[i * 2 + 1] = static_cast<s16>(
+            std::min<int>(SHRT_MAX, std::max<int>(SHRT_MIN, static_cast<int>(right))));
     }
 }
 
@@ -37,18 +53,21 @@ int AudrenAudioRenderer::init(int audio_configuration,
                               const POPUS_MULTISTREAM_CONFIGURATION opus_config,
                               void* context, int ar_flags) {
     m_channel_count = opus_config->channelCount;
+    m_sink_channel_count = kSinkChannelCount;
     m_sample_rate = opus_config->sampleRate;
     m_buffer_size = m_latency * m_samples_per_frame * sizeof(s16);
-    m_samples = m_buffer_size / m_channel_count / sizeof(s16);
+    m_samples = m_buffer_size / m_sink_channel_count / sizeof(s16);
     m_current_size = 0;
 
-    brls::Logger::info("Audren: Init with channels: {}, sample rate: {}",
-                       m_channel_count, m_sample_rate);
+    brls::Logger::info("Audren: Init with channels: {} (sink {}), sample rate: {}",
+                       m_channel_count, m_sink_channel_count, m_sample_rate);
 
     mutexInit(&m_update_lock);
 
     m_decoded_buffer =
         (s16*)malloc(m_channel_count * m_samples_per_frame * sizeof(s16));
+    m_downmix_buffer =
+        (s16*)malloc(m_sink_channel_count * m_samples_per_frame * sizeof(s16));
 
     int error;
     m_decoder = opus_multistream_decoder_create(
@@ -75,7 +94,7 @@ int AudrenAudioRenderer::init(int audio_configuration,
         return -1;
     }
 
-    rc = audrvCreate(&m_driver, &m_ar_config, m_channel_count);
+    rc = audrvCreate(&m_driver, &m_ar_config, m_sink_channel_count);
     if (R_FAILED(rc)) {
         brls::Logger::error("Audren: audrvCreate: %x", rc);
         return -1;
@@ -94,7 +113,7 @@ int AudrenAudioRenderer::init(int audio_configuration,
     int mpid = audrvMemPoolAdd(&m_driver, mempool_ptr, mempool_size);
     audrvMemPoolAttach(&m_driver, mpid);
 
-    audrvDeviceSinkAdd(&m_driver, AUDREN_DEFAULT_DEVICE_NAME, m_channel_count,
+    audrvDeviceSinkAdd(&m_driver, AUDREN_DEFAULT_DEVICE_NAME, m_sink_channel_count,
                        m_sink_channels);
 
     rc = audrenStartAudioRenderer();
@@ -102,12 +121,12 @@ int AudrenAudioRenderer::init(int audio_configuration,
         brls::Logger::error("Audren: audrenStartAudioRenderer: %x", rc);
     }
 
-    audrvVoiceInit(&m_driver, 0, m_channel_count, PcmFormat_Int16,
+    audrvVoiceInit(&m_driver, 0, m_sink_channel_count, PcmFormat_Int16,
                    m_sample_rate);
     audrvVoiceSetDestinationMix(&m_driver, 0, AUDREN_FINAL_MIX_ID);
 
-    for (int i = 0; i < m_channel_count; i++) {
-        for (int j = 0; j < m_channel_count; j++) {
+    for (int i = 0; i < m_sink_channel_count; i++) {
+        for (int j = 0; j < m_sink_channel_count; j++) {
             audrvVoiceSetMixFactor(&m_driver, 0, i == j ? 1.0f : 0.0f, i, j);
         }
     }
@@ -134,6 +153,11 @@ void AudrenAudioRenderer::cleanup() {
         m_decoded_buffer = nullptr;
     }
 
+    if (m_downmix_buffer) {
+        free(m_downmix_buffer);
+        m_downmix_buffer = nullptr;
+    }
+
     if (mempool_ptr) {
         free(mempool_ptr);
         mempool_ptr = nullptr;
@@ -157,11 +181,19 @@ void AudrenAudioRenderer::decode_and_play_sample(char* data, int length) {
                 m_samples_per_frame, 0);
 
             if (decoded_samples > 0) {
-                applyVolume(m_decoded_buffer,
-                            static_cast<size_t>(decoded_samples) * m_channel_count,
+                s16* playback = m_decoded_buffer;
+                int playbackChannels = m_channel_count;
+                if (m_channel_count >= 6 && m_downmix_buffer) {
+                    downmix51ToStereo(m_decoded_buffer, m_downmix_buffer,
+                                      decoded_samples);
+                    playback = m_downmix_buffer;
+                    playbackChannels = m_sink_channel_count;
+                }
+                applyVolume(playback,
+                            static_cast<size_t>(decoded_samples) * playbackChannels,
                             Settings::instance().get_volume());
-                write_audio(m_decoded_buffer,
-                            decoded_samples * m_channel_count * sizeof(s16));
+                write_audio(playback,
+                            decoded_samples * playbackChannels * sizeof(s16));
             }
         }
     } else {
