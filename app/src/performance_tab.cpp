@@ -106,7 +106,38 @@ PerformanceTab::PerformanceTab() {
     autoTuneSummary->detail->setAutoAnimate(false);
     autoTuneSummary->detail->setAnimated(true);
 
-    network->setText("artemis/performance/configured_bitrate"_i18n);
+    network->setText("artemis/performance/live_bitrate"_i18n);
+    network->registerClickAction([this](View*) {
+        auto* session = MoonlightSession::activeSession();
+        if (!session || !session->is_active())
+            return true;
+
+        const int currentMbps =
+            std::max(1, Settings::instance().bitrate() / 1000);
+        Application::getImeManager()->openForNumber(
+            [this](long number) {
+                const int mbps =
+                    std::clamp(static_cast<int>(number), 1, 100);
+                auto* active = MoonlightSession::activeSession();
+                if (!active || !active->is_active()) {
+                    network->setDetailText(
+                        "artemis/performance/no_active_stream"_i18n);
+                    return;
+                }
+
+                bitrateRestartPending =
+                    active->applyBitrateKbps(mbps * 1000);
+                network->setDetailText(
+                    bitrateRestartPending
+                        ? "artemis/performance/reconnecting_bitrate"_i18n
+                        : fmt::format("{:.1f} Mbps",
+                                      static_cast<double>(mbps)));
+            },
+            "artemis/performance/live_bitrate_title"_i18n,
+            "artemis/performance/live_bitrate_hint"_i18n, 3,
+            std::to_string(currentMbps), "", "", 0);
+        return true;
+    });
     receiveLatency->setText("artemis/performance/receive_latency"_i18n);
     decodeLatency->setText("artemis/performance/decode_latency"_i18n);
     renderLatency->setText("artemis/performance/render_latency"_i18n);
@@ -351,7 +382,11 @@ void PerformanceTab::updateAutoTuneStatus() {
 void PerformanceTab::refresh() {
     auto* session = MoonlightSession::activeSession();
     if (!session || !session->is_active()) {
-        network->setDetailText("-");
+        network->setDetailText(
+            bitrateRestartPending && session && !session->is_terminated()
+                ? "artemis/performance/reconnecting_bitrate"_i18n
+                : "-");
+        network->setFocusable(false);
         receiveLatency->setDetailText("-");
         decodeLatency->setDetailText("-");
         renderLatency->setDetailText("-");
@@ -377,6 +412,9 @@ void PerformanceTab::refresh() {
 #endif
         return;
     }
+
+    bitrateRestartPending = false;
+    network->setFocusable(true);
 
     autoTuneSummary->setVisibility(Visibility::VISIBLE);
 

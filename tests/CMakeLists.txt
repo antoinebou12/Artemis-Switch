@@ -70,6 +70,11 @@ add_artemis_test(advanced_stream_options_test
     app/src/features/stream/AdvancedStreamOptions.cpp
     app/src/features/stream)
 
+add_artemis_test(live_bitrate_test
+    tests/live_bitrate_test.cpp
+    app/src/features/stream/LiveBitrate.cpp
+    app/src/features/stream)
+
 add_artemis_test(switch_motion_policy_test
     tests/switch_motion_policy_test.cpp
     app/src/features/input/SwitchMotionPolicy.cpp
@@ -78,6 +83,11 @@ add_artemis_test(switch_motion_policy_test
 add_artemis_test(controller_topology_test
     tests/controller_topology_test.cpp
     app/src/features/input/ControllerTopology.cpp
+    app/src/features/input)
+
+add_artemis_test(host_keyboard_shortcuts_test
+    tests/host_keyboard_shortcuts_test.cpp
+    app/src/features/input/HostKeyboardShortcuts.cpp
     app/src/features/input)
 
 add_artemis_test(quick_stream_menu_test

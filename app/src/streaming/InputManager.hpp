@@ -60,6 +60,7 @@ class MoonlightInputManager : public Singleton<MoonlightInputManager> {
     void setInputEnabled(bool enabled) { inputEnabled = enabled; }
     static void leftMouseClick();
     static void rightMouseClick();
+    static bool moveActiveWindowToDisplay(bool moveRight);
 
   private:
     enum class DesktopScrollAxis {

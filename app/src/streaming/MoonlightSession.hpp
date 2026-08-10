@@ -25,6 +25,7 @@ class MoonlightSession {
     void set_address(const std::string& address) { m_address = address; }
 
     void restart();
+    bool applyBitrateKbps(int bitrateKbps);
 
     void draw(NVGcontext* vg, int width, int height);
 

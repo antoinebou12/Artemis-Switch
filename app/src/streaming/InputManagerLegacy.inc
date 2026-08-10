@@ -644,6 +644,25 @@ void MoonlightInputManager::rightMouseClick() {
     LiSendMouseButtonEvent(BUTTON_ACTION_RELEASE, BUTTON_MOUSE_RIGHT);
 }
 
+bool MoonlightInputManager::moveActiveWindowToDisplay(bool moveRight) {
+    const auto direction = moveRight
+        ? artemis::input::DisplayDirection::Right
+        : artemis::input::DisplayDirection::Left;
+    const auto events = artemis::input::moveActiveWindowShortcut(direction);
+
+    bool sent = true;
+    for (const auto& event : events) {
+        // Supplying no modifier mask keeps the Win key compatible with older
+        // GameStream hosts. The reliable key-down sequence itself holds the
+        // modifiers, and the final events always release them.
+        sent &= LiSendKeyboardEvent(
+                    event.virtualKey,
+                    event.pressed ? KEY_ACTION_DOWN : KEY_ACTION_UP,
+                    0) == 0;
+    }
+    return sent;
+}
+
 short MoonlightInputManager::glfwKeyToVKKey(BrlsKeyboardScancode key) {
     if (BRLS_KBD_KEY_F1 <= key && key <= BRLS_KBD_KEY_F12)
         return key - BRLS_KBD_KEY_F1 + 0x70;

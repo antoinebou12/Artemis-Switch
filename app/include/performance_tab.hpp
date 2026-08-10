@@ -34,4 +34,5 @@ private:
     uint64_t previousReceived = 0;
     uint64_t previousDropped = 0;
     size_t refreshTask = 0;
+    bool bitrateRestartPending = false;
 };

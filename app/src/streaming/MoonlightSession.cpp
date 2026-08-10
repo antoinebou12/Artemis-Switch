@@ -6,6 +6,7 @@
 #include "StreamProfileStore.hpp"
 #include "borealis.hpp"
 #include "../features/stream/AdvancedStreamOptionsStore.hpp"
+#include "../features/stream/LiveBitrate.hpp"
 #include <string.h>
 
 // Moonlight-common-c explicitly negotiates encoder color range through
@@ -26,3 +27,14 @@ static void ArtemisInitializeStreamConfiguration(
 #define LiInitializeStreamConfiguration ArtemisInitializeStreamConfiguration
 #include "MoonlightSessionLegacy.inc"
 #undef LiInitializeStreamConfiguration
+
+bool MoonlightSession::applyBitrateKbps(int bitrateKbps) {
+    const auto plan = artemis::stream::planLiveBitrate(
+        bitrateKbps, is_active(), m_restart_in_progress.load());
+    Settings::instance().set_bitrate(plan.bitrateKbps);
+    Settings::instance().save();
+
+    if (plan.restartActiveStream)
+        restart();
+    return plan.restartActiveStream;
+}

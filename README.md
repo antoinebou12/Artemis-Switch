@@ -44,7 +44,7 @@ It keeps the existing Moonlight-Switch architecture instead of replacing it: **B
 | Feature | Artemis Switch implementation |
 |---|---|
 | Custom resolution | Persistent width / height override used by `MoonlightSession` |
-| Exact bitrate | 1–100 Mbps configuration using the existing Moonlight settings path |
+| Exact bitrate | 1–100 Mbps configuration; the Performance row applies a new value during streaming through a brief controlled reconnect |
 | Frame rates | 30 / 40 / 60 FPS plus gated 90 / 120 FPS options |
 | Video codecs | H.264 and HEVC, using the existing decoder path |
 | Presentation | Fit, Fill, Stretch, Zoom and Pan on the Switch deko3d path |
@@ -55,7 +55,8 @@ It keeps the existing Moonlight-Switch architecture instead of replacing it: **B
 | Export | JSON + CSV files saved under the Artemis working directory |
 | Switch metadata | Handheld/docked mode, battery, charging state and best-effort read-only CPU/GPU/EMC clocks |
 | Auto Tune | Quick and extended profile sweeps with safe profile restore/cancel logic |
-| Quick Actions | Keyboard, display, connected controllers, mouse, touch, disconnect and quit-host actions |
+| Quick Actions | Keyboard, move active PC window, display, connected controllers, mouse, touch, disconnect and quit-host actions |
+| Move game window | Sends `Win + Shift + Left/Right` so the focused Windows game can be pulled onto the Apollo/Sunshine display |
 | Controller list | Shows every currently connected local player in the in-game Options menu |
 | Host capabilities | Sunshine-safe defaults with conservative Apollo feature gating |
 
@@ -153,7 +154,7 @@ French currently covers the Artemis settings page, presentation/motion options, 
 
 | Gate | Purpose |
 |---|---|
-| **Unit Tests** | Portable C++20 policy, controller-topology, statistics, export, stream-profile and geometry tests |
+| **Unit Tests** | Portable C++20 policy, controller topology, host-key shortcut, live-bitrate, statistics, export, stream-profile and geometry tests |
 | **ASan + UBSan** | Memory and undefined-behavior checks for the portable feature suite |
 | **Localization contract** | Every Artemis key referenced by C++/XML must exist in both English and French |
 | **Release contract** | CI verifies the CD workflow still requires NRO, ELF, source archives and checksums |
@@ -163,6 +164,8 @@ French currently covers the Artemis settings page, presentation/motion options, 
 | **Release CD** | Re-runs quality gates and Switch build before publishing a `v*` GitHub Release |
 
 Additional regression coverage includes the five-controller `0x1F` mask, controller-count clamping, benchmark counter reset/NaN/queue-fault behavior, 4:3 Fit/Fill presentation, filtered Fill/Stretch routing, extreme Zoom/Pan clamping, and minimum/maximum stream-profile normalization.
+
+Moonlight/GameStream negotiates bitrate during setup rather than exposing a safe in-band encoder update. Artemis therefore makes bitrate editable from the active Performance view and immediately performs a controlled stream reconnect with the new value.
 
 ## Automatic releases
 

@@ -16,6 +16,7 @@
 #include "UpscalingSupport.hpp"
 #include "video/VideoScaleStore.hpp"
 #include "features/input/ControllerTopology.hpp"
+#include "streaming/InputManager.hpp"
 
 #include <array>
 #include <cmath>
@@ -130,9 +131,9 @@ LogoutTab::LogoutTab(StreamingView* streamView) : streamView(streamView) {
 OptionsTab::OptionsTab(StreamingView* streamView) : streamView(streamView) {
     this->inflateFromXMLRes("xml/views/ingame_overlay/options_tab.xml");
 
-    const std::array<DetailCell*, 7> quickRows = {
-        quickKeyboard, quickDisplay, quickControllers, quickMouse, quickTouch,
-        quickDisconnect, quickQuitHost};
+    const std::array<DetailCell*, 8> quickRows = {
+        quickKeyboard, quickMoveWindow, quickDisplay, quickControllers,
+        quickMouse, quickTouch, quickDisconnect, quickQuitHost};
     for (auto* row : quickRows) {
         row->title->setSingleLine(true);
         row->detail->setSingleLine(true);
@@ -141,6 +142,27 @@ OptionsTab::OptionsTab(StreamingView* streamView) : streamView(streamView) {
     quickKeyboard->setText("artemis/overlay/show_keyboard"_i18n);
     quickKeyboard->registerClickAction([this, streamView](View*) {
         this->dismiss([streamView] { streamView->showKeyboard(); });
+        return true;
+    });
+
+    quickMoveWindow->setText("artemis/overlay/move_window"_i18n);
+    quickMoveWindow->setDetailText("Win + Shift + ← / →");
+    quickMoveWindow->registerClickAction([this](View*) {
+        auto* dialog = new Dialog("artemis/overlay/move_window_help"_i18n);
+        dialog->addButton("artemis/overlay/left_display"_i18n, [this] {
+            quickMoveWindow->setDetailText(
+                MoonlightInputManager::moveActiveWindowToDisplay(false)
+                    ? "artemis/overlay/sent"_i18n
+                    : "artemis/overlay/send_failed"_i18n);
+        });
+        dialog->addButton("artemis/overlay/right_display"_i18n, [this] {
+            quickMoveWindow->setDetailText(
+                MoonlightInputManager::moveActiveWindowToDisplay(true)
+                    ? "artemis/overlay/sent"_i18n
+                    : "artemis/overlay/send_failed"_i18n);
+        });
+        dialog->addButton("common/cancel"_i18n, [] {});
+        dialog->open();
         return true;
     });
 
