@@ -131,7 +131,7 @@ PerformanceTab::PerformanceTab() {
     });
 #else
     benchmarkSummary->setDetailText("artemis/performance/benchmark_unavailable"_i18n);
-    benchmarkAction->setEnabled(false);
+    benchmarkAction->setFocusable(false);
 #endif
 
 #if ARTEMIS_HAS_BENCHMARK_EXPORT
@@ -157,7 +157,7 @@ PerformanceTab::PerformanceTab() {
     });
 #else
     benchmarkSave->setDetailText("artemis/performance/export_unavailable"_i18n);
-    benchmarkSave->setEnabled(false);
+    benchmarkSave->setFocusable(false);
 #endif
 
 #if ARTEMIS_HAS_AUTO_TUNE
@@ -172,7 +172,7 @@ PerformanceTab::PerformanceTab() {
     });
 #else
     autoTuneSummary->setDetailText("artemis/performance/auto_tune_unavailable"_i18n);
-    autoTuneAction->setEnabled(false);
+    autoTuneAction->setFocusable(false);
 #endif
 
     refreshButton->registerClickAction([this](View*) {
@@ -192,11 +192,11 @@ void PerformanceTab::updateBenchmarkStatus() {
         benchmarkSummary->setDetailText(fmt::format(
             "{} samples, {:.1f}/100",
             runtime.sampleCount(), summary.stabilityScore));
-        benchmarkSave->setEnabled(false);
+        benchmarkSave->setFocusable(false);
     } else {
         benchmarkAction->setText("artemis/performance/start_benchmark"_i18n);
 #if ARTEMIS_HAS_BENCHMARK_EXPORT
-        benchmarkSave->setEnabled(runtime.sampleCount() >= 2);
+        benchmarkSave->setFocusable(runtime.sampleCount() >= 2);
 #endif
     }
 #endif
@@ -238,18 +238,18 @@ void PerformanceTab::refresh() {
         packetLoss->setDetailText("-");
         renderedFps->setDetailText("-");
         queueDepth->setDetailText("-");
-        benchmarkAction->setEnabled(false);
-        benchmarkSave->setEnabled(false);
-        autoTuneAction->setEnabled(false);
+        benchmarkAction->setFocusable(false);
+        benchmarkSave->setFocusable(false);
+        autoTuneAction->setFocusable(false);
         return;
     }
 
 #if ARTEMIS_HAS_BENCHMARK_RUNTIME
-    benchmarkAction->setEnabled(true);
+    benchmarkAction->setFocusable(true);
 #endif
 #if ARTEMIS_HAS_AUTO_TUNE
-    autoTuneAction->setEnabled(artemis::benchmark::AutoTuneRuntime::instance().available() ||
-                               artemis::benchmark::AutoTuneRuntime::instance().running());
+    autoTuneAction->setFocusable(artemis::benchmark::AutoTuneRuntime::instance().available() ||
+                                 artemis::benchmark::AutoTuneRuntime::instance().running());
 #endif
 
     const auto* stats = session->session_stats();

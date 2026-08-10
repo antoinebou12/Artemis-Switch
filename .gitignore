@@ -2,5 +2,6 @@ cmake-build-debug
 .DS_Store
 libromfs-generator
 build*
+dist/
 vcpkg_installed
 .psv-logs/

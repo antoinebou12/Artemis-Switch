@@ -204,6 +204,10 @@
                 
             <brls:BooleanCell
                 id="writeLog"/>
+
+            <ArtemisSettingsTab
+                width="100%"
+                height="auto"/>
             
         </brls:Box>
 

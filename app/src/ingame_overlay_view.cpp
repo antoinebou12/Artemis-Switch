@@ -154,7 +154,7 @@ OptionsTab::OptionsTab(StreamingView* streamView) : streamView(streamView) {
     });
 #else
     quickBenchmark->setDetailText("artemis/overlay/requires_benchmark"_i18n);
-    quickBenchmark->setEnabled(false);
+    quickBenchmark->setFocusable(false);
 #endif
 
     quickDisconnect->setText("artemis/overlay/disconnect_stream"_i18n);

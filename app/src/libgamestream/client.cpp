@@ -57,7 +57,7 @@ int extractVersionQuadFromString(const char* string, int* quad) {
     return 0;
 }
 
-bool _SERVER_DATA::isSunshine() {
+bool _SERVER_DATA::isSunshine() const {
     int AppVersionQuad[4];
     extractVersionQuadFromString(serverInfoAppVersion.c_str(), AppVersionQuad);
     return AppVersionQuad[3] < 0;

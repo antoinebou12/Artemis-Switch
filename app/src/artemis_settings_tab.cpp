@@ -234,7 +234,7 @@ ArtemisSettingsTab::ArtemisSettingsTab() {
                           false, [](bool) {});
     rememberZoomPan->setEnabled(false);
     resetZoomPan->setText("artemis/settings/reset_zoom_pan"_i18n);
-    resetZoomPan->setEnabled(false);
+    resetZoomPan->setFocusable(false);
 #endif
 
     refreshValues();
@@ -283,15 +283,13 @@ void ArtemisSettingsTab::refreshValues() {
                              configuredResolution));
 
     activeProfile->setDetailText(fmt::format(
-        "{} @ {} FPS, {}, {:.1f} Mbps, {} decoder threads",
+        "{} · {} FPS · {}",
         resolutionText,
         Settings::instance().fps(),
-        getVideoCodecName(Settings::instance().video_codec()),
-        static_cast<double>(Settings::instance().bitrate()) / 1000.0,
-        Settings::instance().decoder_threads()));
+        getVideoCodecName(Settings::instance().video_codec())));
 
-    width->setEnabled(stored.customResolutionEnabled);
-    height->setEnabled(stored.customResolutionEnabled);
+    width->setFocusable(stored.customResolutionEnabled);
+    height->setFocusable(stored.customResolutionEnabled);
 }
 
 void ArtemisSettingsTab::editWidth() {

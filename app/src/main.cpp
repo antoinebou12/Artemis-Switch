@@ -26,6 +26,7 @@ unsigned int sceLibcHeapSize             = 24 * 1024 * 1024;
 #include <string>
 
 #include "add_host_tab.hpp"
+#include "artemis_settings_tab.hpp"
 #include "host_tab.hpp"
 #include "link_cell.hpp"
 #include "main_activity.hpp"
@@ -152,6 +153,7 @@ int main(int argc, char* argv[]) {
     brls::Application::registerXMLView("MainTabs", MainTabs::create);
     brls::Application::registerXMLView("HostTab", HostTab::create);
     brls::Application::registerXMLView("AddHostTab", AddHostTab::create);
+    brls::Application::registerXMLView("ArtemisSettingsTab", ArtemisSettingsTab::create);
     brls::Application::registerXMLView("SettingsTab", SettingsTab::create);
     brls::Application::registerXMLView("PerformanceTab", PerformanceTab::create);
 

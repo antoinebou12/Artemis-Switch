@@ -9,7 +9,7 @@ jobs:
     timeout-minutes: 60
 
     container:
-      image: docker://devkitpro/devkita64:latest
+      image: devkitpro/devkita64:latest
 
     steps:
       - name: Check out repository
@@ -21,7 +21,10 @@ jobs:
         run: rm -rf ./resources/font
 
       - name: Remove conflicting enet package
-        run: dkp-pacman --noconfirm -R switch-enet
+        run: |
+          if dkp-pacman -Q switch-enet >/dev/null 2>&1; then
+            dkp-pacman --noconfirm -R switch-enet
+          fi
 
       # Keep the upstream two-pass configure behavior until the Switch build
       # has been fully cleaned up. The second pass remains the required one.
@@ -37,13 +40,14 @@ jobs:
 
       - name: Prepare Artemis artifacts
         run: |
-          set -euo pipefail
+          set -eu
           test -s build/switch/Moonlight.nro
           test -s build/switch/Moonlight.elf
           cp build/switch/Moonlight.nro build/switch/Artemis-Switch.nro
           cp build/switch/Moonlight.elf build/switch/Artemis-Switch.elf
 
       - name: Upload Artemis-Switch.nro
+        if: ${{ !env.ACT }}
         uses: actions/upload-artifact@v4
         with:
           name: Artemis-Switch-nro
@@ -52,6 +56,7 @@ jobs:
           retention-days: 14
 
       - name: Upload Artemis-Switch.elf
+        if: ${{ !env.ACT }}
         uses: actions/upload-artifact@v4
         with:
           name: Artemis-Switch-elf
