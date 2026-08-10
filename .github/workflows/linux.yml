@@ -11,6 +11,7 @@ jobs:
   build:
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
     container:
       image: ${{ matrix.container }}
       options: --user 0
