@@ -331,6 +331,7 @@
         "mouse_speed": "Mouse speed",
         "overlay": "Ingame overlay",
         "overlay_buttons": "Buttons combination",
+        "disable_overlay_swipe": "Disable swipe to open overlay",
         "overlay_setup_message": "Press keys you'd like to use to open Overlay:\n\n",
         "overlay_time": "Hold to open in seconds",
         "overlay_zero_time": "0 (Immediately)",

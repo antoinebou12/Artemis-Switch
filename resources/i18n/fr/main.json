@@ -331,6 +331,7 @@
         "mouse_speed": "Vitesse de la souris",
         "overlay": "Overlay en jeu",
         "overlay_buttons": "Combinaison de boutons",
+        "disable_overlay_swipe": "Désactiver le swipe pour ouvrir l'overlay",
         "overlay_setup_message": "Appuyez sur les boutons à utiliser pour ouvrir l'overlay :\n\n",
         "overlay_time": "Temps d'appui avant ouverture (sec)",
         "overlay_zero_time": "0 (immédiatement)",
