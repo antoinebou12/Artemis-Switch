@@ -93,6 +93,9 @@
             <brls:BooleanCell
                 id="pcAudio"/>
 
+            <brls:SelectorCell
+                id="stream_audio_configuration"/>
+
             <brls:BooleanCell
                 id="terminate_app_on_disconnect"/>
                 

@@ -303,7 +303,11 @@ void MoonlightSession::start(ServerCallback<bool> callback, bool is_sunshine) {
         if (m_apollo_launch_options.refreshRate > 0)
             m_config.fps = m_apollo_launch_options.refreshRate;
     }
-    m_config.audioConfiguration = AUDIO_CONFIGURATION_STEREO;
+    m_config.audioConfiguration =
+        Settings::instance().stream_audio_configuration() ==
+                STREAM_AUDIO_51_SURROUND
+            ? AUDIO_CONFIGURATION_51_SURROUND
+            : AUDIO_CONFIGURATION_STEREO;
     m_config.packetSize = 1392;
     m_config.streamingRemotely = STREAM_CFG_AUTO;
     m_config.bitrate = Settings::instance().bitrate();
