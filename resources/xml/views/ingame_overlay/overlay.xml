@@ -1,6 +1,9 @@
 <brls:Box id="backplate" width="auto" height="auto" backgroundColor="@theme/brls/backdrop">
     <brls:AppletFrame id="applet" width="80%" height="auto" backgroundColor="@theme/brls/background">
         <brls:TabFrame>
+            <brls:Tab label="@i18n/artemis/overlay/quick_actions">
+                <QuickTab />
+            </brls:Tab>
             <brls:Tab label="@i18n/artemis/overlay/options">
                 <OptionsTab />
             </brls:Tab>

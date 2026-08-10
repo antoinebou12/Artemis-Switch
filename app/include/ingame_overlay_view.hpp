@@ -39,6 +39,25 @@ class LogoutTab : public brls::Box {
     BRLS_BIND(brls::DetailCell, terminateButton, "terminate");
 };
 
+// MARK: - Quick Tab
+class QuickTab : public brls::Box {
+  public:
+    explicit QuickTab(StreamingView* streamView);
+    ~QuickTab() override = default;
+
+  private:
+    StreamingView* streamView;
+
+    BRLS_BIND(brls::DetailCell, quickKeyboard, "quick_keyboard");
+    BRLS_BIND(brls::DetailCell, quickMoveWindow, "quick_move_window");
+    BRLS_BIND(brls::DetailCell, quickDisplay, "quick_display");
+    BRLS_BIND(brls::DetailCell, quickControllers, "quick_controllers");
+    BRLS_BIND(brls::DetailCell, quickMouse, "quick_mouse");
+    BRLS_BIND(brls::DetailCell, quickTouch, "quick_touch");
+    BRLS_BIND(brls::DetailCell, quickDisconnect, "quick_disconnect");
+    BRLS_BIND(brls::DetailCell, quickQuitHost, "quick_quit_host");
+};
+
 // MARK: - Options Tab
 class OptionsTab : public brls::Box {
   public:
@@ -51,15 +70,6 @@ class OptionsTab : public brls::Box {
     static std::string getTextFromButtons(std::vector<brls::ControllerButton> buttons);
     static NVGcolor getColorFromButtons(const std::vector<brls::ControllerButton>& buttons);
     void setupButtonsSelectorCell(brls::DetailCell* cell, const std::vector<brls::ControllerButton>& buttons);
-
-    BRLS_BIND(brls::DetailCell, quickKeyboard, "quick_keyboard");
-    BRLS_BIND(brls::DetailCell, quickMoveWindow, "quick_move_window");
-    BRLS_BIND(brls::DetailCell, quickDisplay, "quick_display");
-    BRLS_BIND(brls::DetailCell, quickControllers, "quick_controllers");
-    BRLS_BIND(brls::DetailCell, quickMouse, "quick_mouse");
-    BRLS_BIND(brls::DetailCell, quickTouch, "quick_touch");
-    BRLS_BIND(brls::DetailCell, quickDisconnect, "quick_disconnect");
-    BRLS_BIND(brls::DetailCell, quickQuitHost, "quick_quit_host");
 
     BRLS_BIND(brls::DetailCell, inputOverlayButton, "input_overlay");
     BRLS_BIND(brls::SelectorCell, keyboardType, "keyboard_type");

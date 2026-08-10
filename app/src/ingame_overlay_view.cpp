@@ -90,6 +90,8 @@ IngameOverlay::IngameOverlay(StreamingView* streamView)
     brls::Application::registerXMLView(
         "LogoutTab", [streamView]() { return new LogoutTab(streamView); });
     brls::Application::registerXMLView(
+        "QuickTab", [streamView]() { return new QuickTab(streamView); });
+    brls::Application::registerXMLView(
         "OptionsTab", [streamView]() { return new OptionsTab(streamView); });
 
     this->inflateFromXMLRes("xml/views/ingame_overlay/overlay.xml");
@@ -127,9 +129,9 @@ LogoutTab::LogoutTab(StreamingView* streamView) : streamView(streamView) {
     });
 }
 
-// MARK: - Options Tab
-OptionsTab::OptionsTab(StreamingView* streamView) : streamView(streamView) {
-    this->inflateFromXMLRes("xml/views/ingame_overlay/options_tab.xml");
+// MARK: - Quick Tab
+QuickTab::QuickTab(StreamingView* streamView) : streamView(streamView) {
+    this->inflateFromXMLRes("xml/views/ingame_overlay/quick_tab.xml");
 
     const std::array<DetailCell*, 8> quickRows = {
         quickKeyboard, quickMoveWindow, quickDisplay, quickControllers,
@@ -232,7 +234,7 @@ OptionsTab::OptionsTab(StreamingView* streamView) : streamView(streamView) {
     quickTouch->registerClickAction([this](View*) {
         const bool enabled = !Settings::instance().touchscreen_mouse_mode();
         Settings::instance().set_touchscreen_mouse_mode(enabled);
-        touchscreenMouseMode->setOn(enabled);
+        Settings::instance().save();
         quickTouch->setDetailText(enabled ? "hints/on"_i18n
                                           : "hints/off"_i18n);
         return true;
@@ -249,6 +251,11 @@ OptionsTab::OptionsTab(StreamingView* streamView) : streamView(streamView) {
         this->dismiss([streamView] { streamView->terminate(true); });
         return true;
     });
+}
+
+// MARK: - Options Tab
+OptionsTab::OptionsTab(StreamingView* streamView) : streamView(streamView) {
+    this->inflateFromXMLRes("xml/views/ingame_overlay/options_tab.xml");
 
     guideKeyButtons->setText("settings/guide_key_buttons"_i18n);
     setupButtonsSelectorCell(guideKeyButtons,

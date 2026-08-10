@@ -55,7 +55,7 @@ It keeps the existing Moonlight-Switch architecture instead of replacing it: **B
 | Export | JSON + CSV files saved under the Artemis working directory |
 | Switch metadata | Handheld/docked mode, battery, charging state and best-effort read-only CPU/GPU/EMC clocks |
 | Auto Tune | Quick and extended profile sweeps with safe profile restore/cancel logic |
-| Quick Actions | Keyboard, move active PC window, display, connected controllers, mouse, touch, disconnect and quit-host actions |
+| Quick tab | A separate lightweight tab for keyboard, move active PC window, display, controllers, mouse, touch, disconnect and quit-host actions |
 | Move game window | Sends `Win + Shift + Left/Right` so the focused Windows game can be pulled onto the Apollo/Sunshine display |
 | Controller list | Shows every currently connected local player in the in-game Options menu |
 | Host capabilities | Sunshine-safe defaults with conservative Apollo feature gating |
