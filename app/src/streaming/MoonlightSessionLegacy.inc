@@ -86,6 +86,7 @@ void MoonlightSession::connection_started() {
 
     m_active_session->m_stop_requested = false;
     m_active_session->m_is_active = true;
+    m_active_session->m_restart_in_progress = false;
 }
 
 void MoonlightSession::connection_terminated(int error_code) {
@@ -98,6 +99,13 @@ void MoonlightSession::connection_terminated(int error_code) {
         brls::Logger::info("MoonlightSession: Termination acknowledged after stop request");
         m_active_session->m_is_active = false;
         m_active_session->m_is_terminated = true;
+        return;
+    }
+
+    if (m_active_session->m_restart_in_progress && error_code == 0) {
+        brls::Logger::info(
+            "MoonlightSession: Old connection stopped for restart");
+        m_active_session->m_is_active = false;
         return;
     }
 
@@ -369,6 +377,7 @@ void MoonlightSession::stop(int terminate_app) {
         return;
 
     m_stop_requested = true;
+    m_restart_in_progress = false;
 
     if (terminate_app)
         GameStreamClient::instance().quit(m_address, [](auto _) {});
@@ -377,6 +386,12 @@ void MoonlightSession::stop(int terminate_app) {
 }
 
 void MoonlightSession::restart() {
+    // Mark the old stream inactive before stopping it so callers can wait for
+    // the new connection instead of accidentally measuring the old session.
+    m_is_active.store(false);
+    m_is_terminated.store(false);
+    m_restart_in_progress.store(true);
+    m_restart_generation.fetch_add(1);
     LiStopConnection();
 
     start([](const GSResult<bool>& result) {
@@ -385,6 +400,7 @@ void MoonlightSession::restart() {
         } else {
             brls::Logger::info("MoonlightSession: Reconnection failed");
             if (m_active_session) {
+                m_active_session->m_restart_in_progress = false;
                 m_active_session->m_is_active = false;
                 m_active_session->m_is_terminated = true;
             }

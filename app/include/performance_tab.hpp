@@ -5,6 +5,7 @@
 class PerformanceTab : public brls::Box {
 public:
     PerformanceTab();
+    ~PerformanceTab() override;
 
     static brls::View* create() { return new PerformanceTab(); }
 
@@ -12,6 +13,7 @@ private:
     void refresh();
     void updateBenchmarkStatus();
     void updateAutoTuneStatus();
+    void scheduleRefresh();
 
     BRLS_BIND(brls::DetailCell, streamProfile, "stream_profile");
     BRLS_BIND(brls::DetailCell, network, "network");
@@ -32,4 +34,5 @@ private:
 
     uint64_t previousReceived = 0;
     uint64_t previousDropped = 0;
+    size_t refreshTask = 0;
 };

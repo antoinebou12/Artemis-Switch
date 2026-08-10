@@ -9,6 +9,19 @@
 
 namespace artemis::benchmark {
 
+enum class AutoTuneState {
+    Idle,
+    Applying,
+    Reconnecting,
+    WarmingUp,
+    Measuring,
+    ApplyingBest,
+    Complete,
+    Cancelled,
+    NoStableProfile,
+    Failed,
+};
+
 class AutoTuneRuntime {
 public:
     static AutoTuneRuntime& instance();
@@ -20,6 +33,7 @@ public:
 
     [[nodiscard]] bool running() const { return m_running.load(); }
     [[nodiscard]] bool extended() const { return m_extended.load(); }
+    [[nodiscard]] AutoTuneState state() const { return m_state.load(); }
     [[nodiscard]] size_t currentStep() const;
     [[nodiscard]] size_t totalSteps() const;
     [[nodiscard]] std::optional<AutoTuneResult> recommendation() const;
@@ -35,6 +49,7 @@ private:
     std::atomic<bool> m_running{false};
     std::atomic<bool> m_extended{false};
     std::atomic<bool> m_cancelRequested{false};
+    std::atomic<AutoTuneState> m_state{AutoTuneState::Idle};
     std::thread m_worker;
     AutoTuneSession m_session;
     std::optional<AutoTuneResult> m_recommendation;

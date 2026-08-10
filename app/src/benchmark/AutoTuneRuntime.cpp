@@ -53,6 +53,7 @@ bool AutoTuneRuntime::start(bool extended) {
 
     m_extended.store(extended);
     m_cancelRequested.store(false);
+    m_state.store(AutoTuneState::Applying);
     {
         std::lock_guard lock(m_mutex);
         m_recommendation.reset();
@@ -69,9 +70,18 @@ bool AutoTuneRuntime::start(bool extended) {
 }
 
 void AutoTuneRuntime::cancel() {
+    if (!m_running.load() && !m_worker.joinable())
+        return;
+
     m_cancelRequested.store(true);
     if (m_worker.joinable())
         m_worker.join();
+    const auto state = m_state.load();
+    if (state != AutoTuneState::Complete &&
+        state != AutoTuneState::Failed &&
+        state != AutoTuneState::NoStableProfile) {
+        m_state.store(AutoTuneState::Cancelled);
+    }
     m_running.store(false);
 }
 
@@ -120,6 +130,10 @@ void AutoTuneRuntime::worker(bool extended) {
     };
 
     auto applyProfile = [](const AutoTuneProfile& profile) {
+        uint64_t previousGeneration = 0;
+        if (auto* session = MoonlightSession::activeSession())
+            previousGeneration = session->restart_generation();
+
         brls::sync([profile] {
             Settings::instance().set_resolution(profile.height);
             Settings::instance().set_fps(profile.fps);
@@ -130,8 +144,42 @@ void AutoTuneRuntime::worker(bool extended) {
             if (auto* session = MoonlightSession::activeSession())
                 session->restart();
         });
+        return previousGeneration;
     };
 
+    auto waitForRestart = [this, &sleepCancelable](uint64_t previousGeneration) {
+        m_state.store(AutoTuneState::Reconnecting);
+
+        // First wait until the UI thread has applied the profile and requested
+        // a restart. This avoids benchmarking the connection being replaced.
+        int requestWaitMs = 5000;
+        while (requestWaitMs > 0 && !m_cancelRequested.load()) {
+            auto* stream = MoonlightSession::activeSession();
+            if (stream && stream->restart_generation() != previousGeneration)
+                break;
+            if (!sleepCancelable(100))
+                return false;
+            requestWaitMs -= 100;
+        }
+
+        auto* stream = MoonlightSession::activeSession();
+        if (!stream || stream->restart_generation() == previousGeneration)
+            return false;
+
+        // Then wait for the replacement stream to finish connecting.
+        int reconnectWaitMs = 15000;
+        while (reconnectWaitMs > 0 && !m_cancelRequested.load()) {
+            stream = MoonlightSession::activeSession();
+            if (stream && stream->is_active())
+                return true;
+            if (!sleepCancelable(100))
+                return false;
+            reconnectWaitMs -= 100;
+        }
+        return false;
+    };
+
+    bool failed = false;
     while (!m_cancelRequested.load()) {
         AutoTuneStep step;
         {
@@ -142,31 +190,32 @@ void AutoTuneRuntime::worker(bool extended) {
             step = *current;
         }
 
-        applyProfile(step.profile);
-        if (!sleepCancelable(2000))
+        m_state.store(AutoTuneState::Applying);
+        const uint64_t previousGeneration = applyProfile(step.profile);
+        if (!waitForRestart(previousGeneration)) {
+            failed = !m_cancelRequested.load();
             break;
-
-        auto* stream = MoonlightSession::activeSession();
-        int waitMs = 8000;
-        while (waitMs > 0 && !m_cancelRequested.load() &&
-               (!stream || !stream->is_active())) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
-            waitMs -= 100;
-            stream = MoonlightSession::activeSession();
         }
-        if (!stream || !stream->is_active() || m_cancelRequested.load())
-            break;
 
+        m_state.store(AutoTuneState::WarmingUp);
         if (!sleepCancelable(step.warmupSeconds * 1000))
             break;
 
         auto& benchmark = BenchmarkRuntime::instance();
-        benchmark.start(step.profile.fps);
+        if (!benchmark.start(step.profile.fps)) {
+            failed = true;
+            break;
+        }
+        m_state.store(AutoTuneState::Measuring);
         if (!sleepCancelable(step.benchmarkSeconds * 1000)) {
             benchmark.stop();
             break;
         }
         const auto summary = benchmark.stop();
+        if (summary.sampleCount < 2) {
+            failed = true;
+            break;
+        }
 
         AutoTuneResult result;
         result.profile = step.profile;
@@ -186,9 +235,19 @@ void AutoTuneRuntime::worker(bool extended) {
         m_recommendation = best;
     }
 
-    if (!m_cancelRequested.load() && best) {
-        applyProfile(best->profile);
-    } else {
+    bool bestApplied = false;
+    if (!m_cancelRequested.load() && !failed && best) {
+        m_state.store(AutoTuneState::ApplyingBest);
+        const uint64_t previousGeneration = applyProfile(best->profile);
+        if (waitForRestart(previousGeneration)) {
+            bestApplied = true;
+            m_state.store(AutoTuneState::Complete);
+        } else {
+            failed = !m_cancelRequested.load();
+        }
+    }
+
+    if (!bestApplied) {
 #if ARTEMIS_AUTOTUNE_HAS_CUSTOM_PROFILE
         artemis::streaming::StreamProfileStore::instance().setCustomResolution(
             originalCustomProfile.customResolutionEnabled,
@@ -206,6 +265,13 @@ void AutoTuneRuntime::worker(bool extended) {
                 session->restart();
         });
     }
+
+    if (m_cancelRequested.load())
+        m_state.store(AutoTuneState::Cancelled);
+    else if (failed)
+        m_state.store(AutoTuneState::Failed);
+    else if (!best)
+        m_state.store(AutoTuneState::NoStableProfile);
 
     m_running.store(false);
 #else
