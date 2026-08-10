@@ -4,6 +4,8 @@ namespace artemis::video {
 
 enum class ScaleMode { Fit, Fill, Stretch };
 
+ScaleMode nextScaleMode(ScaleMode mode);
+
 struct RectF {
     float x = 0.0f;
     float y = 0.0f;

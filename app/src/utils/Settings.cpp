@@ -404,7 +404,10 @@ void Settings::load() {
 
             if (json_t* keyboard_type = json_object_get(settings, "keyboard_type")) {
                 if (json_typeof(keyboard_type) == JSON_INTEGER) {
-                    m_keyboard_type = (KeyboardType)json_integer_value(keyboard_type);
+                    const int type = static_cast<int>(json_integer_value(keyboard_type));
+                    m_keyboard_type = type >= COMPACT && type <= NUMPAD
+                        ? static_cast<KeyboardType>(type)
+                        : COMPACT;
                 }
             }
 

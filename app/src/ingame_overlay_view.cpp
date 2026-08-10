@@ -14,6 +14,7 @@
 #include "streaming_input_overlay.hpp"
 #include "button_selecting_dialog.hpp"
 #include "UpscalingSupport.hpp"
+#include "video/VideoScaleStore.hpp"
 
 #include <array>
 #include <cmath>
@@ -64,6 +65,19 @@ std::string getDitheringStrengthText(float strength) {
 std::string getRcasStrengthText(float strength) {
     return std::to_string(int(strength * 100.0f)) + "%";
 }
+
+std::string scaleModeText(artemis::video::ScaleMode mode) {
+    switch (mode) {
+    case artemis::video::ScaleMode::Fit:
+        return "artemis/settings/fit"_i18n;
+    case artemis::video::ScaleMode::Stretch:
+        return "artemis/settings/stretch"_i18n;
+    case artemis::video::ScaleMode::Fill:
+    default:
+        return "artemis/settings/fill"_i18n;
+    }
+}
+
 }
 
 bool debug = false;
@@ -115,8 +129,9 @@ LogoutTab::LogoutTab(StreamingView* streamView) : streamView(streamView) {
 OptionsTab::OptionsTab(StreamingView* streamView) : streamView(streamView) {
     this->inflateFromXMLRes("xml/views/ingame_overlay/options_tab.xml");
 
-    const std::array<DetailCell*, 5> quickRows = {
-        quickKeyboard, quickMouse, quickTouch, quickDisconnect, quickQuitHost};
+    const std::array<DetailCell*, 6> quickRows = {
+        quickKeyboard, quickDisplay, quickMouse, quickTouch,
+        quickDisconnect, quickQuitHost};
     for (auto* row : quickRows) {
         row->title->setSingleLine(true);
         row->detail->setSingleLine(true);
@@ -125,6 +140,17 @@ OptionsTab::OptionsTab(StreamingView* streamView) : streamView(streamView) {
     quickKeyboard->setText("artemis/overlay/show_keyboard"_i18n);
     quickKeyboard->registerClickAction([this, streamView](View*) {
         this->dismiss([streamView] { streamView->showKeyboard(); });
+        return true;
+    });
+
+    auto& videoScale = artemis::video::VideoScaleStore::instance();
+    quickDisplay->setText("artemis/overlay/display"_i18n);
+    quickDisplay->setDetailText(scaleModeText(videoScale.get()));
+    quickDisplay->registerClickAction([this](View*) {
+        auto& store = artemis::video::VideoScaleStore::instance();
+        const auto mode = artemis::video::nextScaleMode(store.get());
+        store.set(mode);
+        quickDisplay->setDetailText(scaleModeText(mode));
         return true;
     });
 
@@ -247,18 +273,22 @@ OptionsTab::OptionsTab(StreamingView* streamView) : streamView(streamView) {
     });
 
     std::vector<std::string> keyboardTypes = {
-        "settings/keyboard_compact"_i18n, "settings/keyboard_fullsized"_i18n};
+        "settings/keyboard_compact"_i18n,
+        "settings/keyboard_fullsized"_i18n,
+        "settings/keyboard_numpad"_i18n};
     keyboardType->setText("settings/keyboard_type"_i18n);
     keyboardType->setData(keyboardTypes);
     switch (Settings::instance().get_keyboard_type()) {
         GET_SETTINGS(keyboardType, COMPACT, 0)
         GET_SETTINGS(keyboardType, FULLSIZED, 1)
+        GET_SETTINGS(keyboardType, NUMPAD, 2)
         DEFAULT
     }
     keyboardType->getEvent()->subscribe([](int selected) {
         switch (selected) {
             SET_SETTING(0, set_keyboard_type(COMPACT))
             SET_SETTING(1, set_keyboard_type(FULLSIZED))
+            SET_SETTING(2, set_keyboard_type(NUMPAD))
             DEFAULT
         }
     });

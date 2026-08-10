@@ -4,6 +4,18 @@
 
 namespace artemis::video {
 
+ScaleMode nextScaleMode(ScaleMode mode) {
+    switch (mode) {
+    case ScaleMode::Fit:
+        return ScaleMode::Fill;
+    case ScaleMode::Fill:
+        return ScaleMode::Stretch;
+    case ScaleMode::Stretch:
+    default:
+        return ScaleMode::Fit;
+    }
+}
+
 RectF VideoScale::destinationRect(float sourceWidth, float sourceHeight,
                                   float viewportWidth, float viewportHeight,
                                   ScaleMode mode) {

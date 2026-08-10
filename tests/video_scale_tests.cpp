@@ -10,6 +10,10 @@ static bool near(float a, float b) {
 }
 
 int main() {
+    assert(nextScaleMode(ScaleMode::Fit) == ScaleMode::Fill);
+    assert(nextScaleMode(ScaleMode::Fill) == ScaleMode::Stretch);
+    assert(nextScaleMode(ScaleMode::Stretch) == ScaleMode::Fit);
+
     const auto fit = VideoScale::destinationRect(1920, 1080, 1280, 800, ScaleMode::Fit);
     assert(near(fit.width, 1280.0f));
     assert(near(fit.height, 720.0f));

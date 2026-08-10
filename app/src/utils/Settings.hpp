@@ -20,7 +20,7 @@ enum AudioBackend : int {
 #endif
 };
 
-enum KeyboardType : int { COMPACT, FULLSIZED };
+enum KeyboardType : int { COMPACT, FULLSIZED, NUMPAD };
 
 enum class ButtonOverrideType : int { NONE, SCREENSHOT, HOME };
 

@@ -249,6 +249,12 @@ KeyboardView::KeyboardView(bool focusable)
     case FULLSIZED:
         createFullLayout();
         break;
+    case NUMPAD:
+        createNumpadLayout();
+        break;
+    default:
+        createEnglishLayout();
+        break;
     }
 
     addGestureRecognizer(

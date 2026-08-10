@@ -6,6 +6,7 @@ namespace artemis::ui {
 
 enum class QuickAction {
     ToggleKeyboard,
+    CycleDisplayMode,
     OpenMouseControls,
     ToggleTouchControls,
     SendSpecialKey,

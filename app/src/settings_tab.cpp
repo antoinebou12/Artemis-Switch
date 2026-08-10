@@ -665,18 +665,22 @@ SettingsTab::SettingsTab() {
     });
 
     std::vector<std::string> keyboardTypes = {
-        "settings/keyboard_compact"_i18n, "settings/keyboard_fullsized"_i18n};
+        "settings/keyboard_compact"_i18n,
+        "settings/keyboard_fullsized"_i18n,
+        "settings/keyboard_numpad"_i18n};
     keyboardType->setText("settings/keyboard_type"_i18n);
     keyboardType->setData(keyboardTypes);
     switch (Settings::instance().get_keyboard_type()) {
         GET_SETTINGS(keyboardType, COMPACT, 0);
         GET_SETTINGS(keyboardType, FULLSIZED, 1);
+        GET_SETTINGS(keyboardType, NUMPAD, 2);
         DEFAULT;
     }
     keyboardType->getEvent()->subscribe([](int selected) {
         switch (selected) {
             SET_SETTING(0, set_keyboard_type(COMPACT));
             SET_SETTING(1, set_keyboard_type(FULLSIZED));
+            SET_SETTING(2, set_keyboard_type(NUMPAD));
             DEFAULT;
         }
     });

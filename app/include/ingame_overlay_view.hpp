@@ -53,6 +53,7 @@ class OptionsTab : public brls::Box {
     void setupButtonsSelectorCell(brls::DetailCell* cell, const std::vector<brls::ControllerButton>& buttons);
 
     BRLS_BIND(brls::DetailCell, quickKeyboard, "quick_keyboard");
+    BRLS_BIND(brls::DetailCell, quickDisplay, "quick_display");
     BRLS_BIND(brls::DetailCell, quickMouse, "quick_mouse");
     BRLS_BIND(brls::DetailCell, quickTouch, "quick_touch");
     BRLS_BIND(brls::DetailCell, quickDisconnect, "quick_disconnect");
