@@ -20,13 +20,12 @@ AboutTab::AboutTab() {
     std::string themePart =
         variant == brls::ThemeVariant::DARK ? "_dark" : "_light";
 
-    std::string subtitle = fmt::format(
-        "Artemis Switch v{} by antoinebou12", APP_VERSION);
-    versionLabel->setSubtitle(subtitle);
+    versionLabel->setSubtitle(
+        fmt::format("about/version"_i18n, APP_VERSION));
 
     std::string githubLink = "https://github.com/antoinebou12/Artemis-Switch";
     github->addGestureRecognizer(new TapGestureRecognizer(github));
-    github->title->setText("Artemis Switch repository");
+    github->title->setText("about/link_github"_i18n);
     github->subtitle->setText(githubLink);
     github->image->setImageFromRes("img/links/github" + themePart + ".png");
     github->registerClickAction([githubLink](View* view) {
@@ -34,13 +33,36 @@ AboutTab::AboutTab() {
         return true;
     });
 
+    std::string moonlightSwitchLink =
+        "https://github.com/XITRIX/Moonlight-Switch";
+    moonlightSwitch->addGestureRecognizer(
+        new TapGestureRecognizer(moonlightSwitch));
+    moonlightSwitch->title->setText("about/link_moonlight_switch"_i18n);
+    moonlightSwitch->subtitle->setText(moonlightSwitchLink);
+    moonlightSwitch->image->setImageFromRes(
+        "img/links/github" + themePart + ".png");
+    moonlightSwitch->registerClickAction([moonlightSwitchLink](View* view) {
+        openWebpage(moonlightSwitchLink);
+        return true;
+    });
+
     std::string apolloLink = "https://github.com/ClassicOldSong/Apollo";
     apollo->addGestureRecognizer(new TapGestureRecognizer(apollo));
-    apollo->title->setText("Apollo host for PC");
+    apollo->title->setText("about/link_apollo"_i18n);
     apollo->subtitle->setText(apolloLink);
     apollo->image->setImageFromRes("img/links/github" + themePart + ".png");
     apollo->registerClickAction([apolloLink](View* view) {
         openWebpage(apolloLink);
+        return true;
+    });
+
+    std::string artemisLink = "https://github.com/ClassicOldSong/moonlight-android";
+    artemis->addGestureRecognizer(new TapGestureRecognizer(artemis));
+    artemis->title->setText("about/link_artemis"_i18n);
+    artemis->subtitle->setText(artemisLink);
+    artemis->image->setImageFromRes("img/links/github" + themePart + ".png");
+    artemis->registerClickAction([artemisLink](View* view) {
+        openWebpage(artemisLink);
         return true;
     });
 

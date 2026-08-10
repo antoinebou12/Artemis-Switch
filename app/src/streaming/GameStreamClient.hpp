@@ -47,7 +47,13 @@ using ServerCallback = const std::function<void(GSResult<T>)>;
 struct AppInfo {
     std::string name;
     int app_id;
+    std::string app_uuid;
+    int server_order = 0;
+    bool input_only = false;
 };
+
+inline constexpr const char* ApolloRemoteInputUuid =
+    "8CB5C136-DA67-4F99-B4A1-F9CD35005CF4";
 
 using AppInfoList = std::vector<AppInfo>;
 
@@ -92,9 +98,11 @@ class GameStreamClient : public Singleton<GameStreamClient> {
     void app_boxart(const Host& host, int app_id,
                     ServerCallback<Data>& callback);
     void start(const std::string& address, STREAM_CONFIGURATION config,
-               int app_id, ServerCallback<STREAM_CONFIGURATION>& callback);
+               int app_id, ServerCallback<STREAM_CONFIGURATION>& callback,
+               const APOLLO_LAUNCH_OPTIONS& apolloOptions = {});
     void start(const Host& host, STREAM_CONFIGURATION config,
-               int app_id, ServerCallback<STREAM_CONFIGURATION>& callback);
+               int app_id, ServerCallback<STREAM_CONFIGURATION>& callback,
+               const APOLLO_LAUNCH_OPTIONS& apolloOptions = {});
     void quit(const std::string& address, ServerCallback<bool>& callback);
     void quit(const Host& host, ServerCallback<bool>& callback);
 

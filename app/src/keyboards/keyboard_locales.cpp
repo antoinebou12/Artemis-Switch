@@ -9,7 +9,7 @@
 
 void KeyboardView::createLocales() {
     locales.clear();
-    locales.reserve(6);
+    locales.reserve(10);
     locales.push_back(KeyboardLocale{
         .name = "English",
         .localization = {
@@ -99,6 +99,34 @@ void KeyboardView::createLocales() {
             {"\u2190", "\u2190"}, {"\u2192", "\u2192"}, {"\u2191", "\u2191"}, {"CapsLock", "CapsLock"},
         }
     });
-    
-    // TODO: - Add more languages
+
+    KeyboardLocale englishUk = locales.front();
+    englishUk.name = "English (UK)";
+    englishUk.localization[VK_KEY_2][1] = "\"";
+    englishUk.localization[VK_KEY_3][1] = "£";
+    englishUk.localization[VK_OEM_3][0] = "`";
+    englishUk.localization[VK_OEM_3][1] = "¬";
+    locales.push_back(std::move(englishUk));
+
+    KeyboardLocale portugueseBrazil = locales.front();
+    portugueseBrazil.name = "Português (Brasil)";
+    portugueseBrazil.localization[VK_OEM_1][0] = "ç";
+    portugueseBrazil.localization[VK_OEM_1][1] = "Ç";
+    portugueseBrazil.localization[VK_OEM_7][0] = "~";
+    portugueseBrazil.localization[VK_OEM_7][1] = "^";
+    locales.push_back(std::move(portugueseBrazil));
+
+    KeyboardLocale japaneseJis = locales.front();
+    japaneseJis.name = "日本語 (JIS / host IME)";
+    japaneseJis.localization[VK_OEM_3][0] = "半/全";
+    japaneseJis.localization[VK_OEM_3][1] = "漢字";
+    japaneseJis.localization[VK_OEM_7][0] = ":";
+    japaneseJis.localization[VK_OEM_7][1] = "*";
+    locales.push_back(std::move(japaneseJis));
+
+    KeyboardLocale chineseIme = locales.front();
+    chineseIme.name = "中文 (host IME)";
+    chineseIme.localization[VK_SPACE][0] = "空格";
+    chineseIme.localization[VK_RETURN][0] = "回车";
+    locales.push_back(std::move(chineseIme));
 }

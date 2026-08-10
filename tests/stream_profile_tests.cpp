@@ -15,6 +15,10 @@ int main() {
     assert(SwitchStreamProfile::validate(minimum).valid);
     StreamProfile maximum{1920, 1080, 120, 100000, 4, "HEVC"};
     assert(SwitchStreamProfile::validate(maximum).valid);
+    StreamProfile portraitHandheld{720, 1280, 60, 15000, 2, "HEVC"};
+    assert(SwitchStreamProfile::validate(portraitHandheld).valid);
+    StreamProfile portraitDocked{1080, 1920, 60, 25000, 2, "HEVC"};
+    assert(SwitchStreamProfile::validate(portraitDocked).valid);
 
     StreamProfile high90{1920, 1080, 90, 25000, 2, "HEVC"};
     assert(SwitchStreamProfile::validate(high90).valid);
@@ -34,8 +38,8 @@ int main() {
 
     StreamProfile normal{500, 2000, 55, 500, 9, "H265"};
     normal = SwitchStreamProfile::normalized(normal);
-    assert(normal.width == 640);
-    assert(normal.height == 1080);
+    assert(normal.width >= 360 && normal.height >= 360);
+    assert(static_cast<long long>(normal.width) * normal.height <= 1920LL * 1080LL);
     assert(normal.fps == 60);
     assert(normal.bitrateKbps == 1000);
     assert(normal.decoderThreads == 2);
@@ -47,8 +51,9 @@ int main() {
 
     StreamProfile veryHigh{9000, 9000, 1000, 999999, -4, "unknown"};
     veryHigh = SwitchStreamProfile::normalized(veryHigh);
-    assert(veryHigh.width == 1920);
-    assert(veryHigh.height == 1080);
+    assert(veryHigh.width <= 1920);
+    assert(veryHigh.height <= 1920);
+    assert(static_cast<long long>(veryHigh.width) * veryHigh.height <= 1920LL * 1080LL);
     assert(veryHigh.fps == 120);
     assert(veryHigh.bitrateKbps == 100000);
     assert(veryHigh.decoderThreads == 2);
@@ -56,7 +61,7 @@ int main() {
 
     StreamProfile veryLow{-1, -1, -100, -1, 1, ""};
     veryLow = SwitchStreamProfile::normalized(veryLow);
-    assert(veryLow.width == 640);
+    assert(veryLow.width == 360);
     assert(veryLow.height == 360);
     assert(veryLow.fps == 30);
     assert(veryLow.bitrateKbps == 1000);

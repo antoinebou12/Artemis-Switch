@@ -43,16 +43,22 @@
                 title="@i18n/about/links"
                 paddingTop="60"/>
 
-            <LinkCell 
+            <LinkCell
                 id="github"/>
+
+            <LinkCell
+                id="moonlight_switch"/>
 
             <LinkCell
                 id="apollo"/>
 
-            <LinkCell 
+            <LinkCell
+                id="artemis"/>
+
+            <LinkCell
                 id="patreon"/>
 
-            <LinkCell 
+            <LinkCell
                 id="gbatemp"/>
 
             <brls:Header
@@ -64,7 +70,15 @@
                 height="auto"
                 fontSize="15"
                 textColor="@theme/brls/accent"
-                text=" antoinebou12 for creating and testing Artemis Switch"
+                text="@i18n/about/thanks_xitrix"
+                marginTop="8"/>
+
+            <brls:Label
+                width="100%"
+                height="auto"
+                fontSize="15"
+                textColor="@theme/brls/header/subtitle"
+                text="@i18n/about/thanks_artemis"
                 marginTop="8"/>
 
             <brls:Label
@@ -113,6 +127,14 @@
                 fontSize="15"
                 textColor="@theme/brls/header/subtitle"
                 text="@i18n/about/thanks_6"
+                marginTop="8"/>
+
+            <brls:Label
+                width="auto"
+                height="auto"
+                fontSize="15"
+                textColor="@theme/brls/header/subtitle"
+                text="@i18n/about/thanks_7"
                 marginTop="8"/>
 
         </brls:Box>

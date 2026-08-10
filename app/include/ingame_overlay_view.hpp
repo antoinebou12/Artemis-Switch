@@ -49,13 +49,11 @@ class QuickTab : public brls::Box {
     StreamingView* streamView;
 
     BRLS_BIND(brls::DetailCell, quickKeyboard, "quick_keyboard");
-    BRLS_BIND(brls::DetailCell, quickMoveWindow, "quick_move_window");
-    BRLS_BIND(brls::DetailCell, quickDisplay, "quick_display");
-    BRLS_BIND(brls::DetailCell, quickControllers, "quick_controllers");
+    BRLS_BIND(brls::DetailCell, quickMoveLeft, "quick_move_left");
+    BRLS_BIND(brls::DetailCell, quickMoveRight, "quick_move_right");
+    BRLS_BIND(brls::DetailCell, quickHostShortcuts, "quick_host_shortcuts");
+    BRLS_BIND(brls::DetailCell, quickServerCommands, "quick_server_commands");
     BRLS_BIND(brls::DetailCell, quickMouse, "quick_mouse");
-    BRLS_BIND(brls::DetailCell, quickTouch, "quick_touch");
-    BRLS_BIND(brls::DetailCell, quickDisconnect, "quick_disconnect");
-    BRLS_BIND(brls::DetailCell, quickQuitHost, "quick_quit_host");
 };
 
 // MARK: - Options Tab
@@ -66,15 +64,24 @@ class OptionsTab : public brls::Box {
 
   private:
     StreamingView* streamView;
+    std::string clipboardText;
 
     static std::string getTextFromButtons(std::vector<brls::ControllerButton> buttons);
     static NVGcolor getColorFromButtons(const std::vector<brls::ControllerButton>& buttons);
     void setupButtonsSelectorCell(brls::DetailCell* cell, const std::vector<brls::ControllerButton>& buttons);
+    void openClipboardPanel();
+    void fetchClipboard();
+    void uploadClipboard(bool pasteAfterUpload);
 
     BRLS_BIND(brls::DetailCell, inputOverlayButton, "input_overlay");
     BRLS_BIND(brls::SelectorCell, keyboardType, "keyboard_type");
     BRLS_BIND(brls::SelectorCell, keyboardFingers, "keyboard_fingers");
     BRLS_BIND(brls::BooleanCell, touchscreenMouseMode, "touchscreen_mouse_mode");
+    BRLS_BIND(brls::DetailCell, optionsPointerMode, "options_pointer_mode");
+    BRLS_BIND(brls::DetailCell, optionsControllers, "options_controllers");
+    BRLS_BIND(brls::DetailCell, optionsDiagnostics, "options_diagnostics");
+    BRLS_BIND(brls::DetailCell, optionsClipboard, "options_clipboard");
+    BRLS_BIND(brls::DetailCell, optionsRotation, "options_rotation");
     BRLS_BIND(brls::DetailCell, guideKeyButtons, "guide_key_buttons");
     BRLS_BIND(brls::SelectorCell, guideBySystemButton, "guide_by_system_button");
     BRLS_BIND(brls::Header, volumeHeader, "volume_header");

@@ -11,11 +11,18 @@ layout (std140, binding = 0) uniform Transformation
     mat3 yuvmat;
     vec3 offset;
     vec4 uv_data;
+    vec4 orientation;
 } u;
 
 void main()
 {
     vec2 uv = (vTextureCoord - u.uv_data.xy) * u.uv_data.zw;
+    if (u.orientation.x == 90.0)
+        uv = vec2(uv.y, 1.0 - uv.x);
+    else if (u.orientation.x == 180.0)
+        uv = vec2(1.0 - uv.x, 1.0 - uv.y);
+    else if (u.orientation.x == 270.0)
+        uv = vec2(1.0 - uv.y, uv.x);
 
     vec3 yuv = vec3(texture(plane0, uv).r, texture(plane1, uv).r,
                     texture(plane1, uv).g) - u.offset;

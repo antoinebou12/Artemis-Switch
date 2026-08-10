@@ -21,6 +21,13 @@
             <brls:SelectorCell id="keyboard_type"/>
             <brls:SelectorCell id="keyboard_fingers"/>
             <brls:BooleanCell id="touchscreen_mouse_mode"/>
+            <brls:DetailCell id="options_pointer_mode"/>
+            <brls:DetailCell id="options_controllers"/>
+            <brls:DetailCell id="options_diagnostics"/>
+
+            <brls:Header title="@i18n/artemis/overlay/apollo_options" paddingTop="60"/>
+            <brls:DetailCell id="options_clipboard"/>
+            <brls:DetailCell id="options_rotation"/>
 
             <brls:Header title="@i18n/settings/guide_key" paddingTop="60"/>
             <brls:DetailCell id="guide_key_buttons"/>

@@ -85,14 +85,17 @@ namespace
         alignas(16) float yuvmat_col2[4];
         alignas(16) float offset[4];
         alignas(16) float uv_data[4];
+        alignas(16) float orientation[4];
     };
 
-    static_assert(sizeof(Transformation) == 80,
+    static_assert(sizeof(Transformation) == 96,
                   "Transformation must match std140 layout");
     static_assert(offsetof(Transformation, offset) == 48,
                   "Unexpected std140 offset for offset");
     static_assert(offsetof(Transformation, uv_data) == 64,
                   "Unexpected std140 offset for uv_data");
+    static_assert(offsetof(Transformation, orientation) == 80,
+                  "Unexpected std140 offset for orientation");
 
 #ifdef SUPPORT_UPSCALING
     struct EasuConstants
@@ -528,13 +531,23 @@ bool DKVideoRenderer::ensureUpscalingResources() {
 
     const bool wantRcas = shouldUseRcas() && rcasTextureId >= 0 &&
                           rcasFragmentShader && rcasUniformBuffer;
+    const auto rotation =
+        artemis::video::DisplayTransformStore::instance().get().rotation;
+    const int sourceWidth = artemis::video::swapsDimensions(rotation)
+        ? m_frame_height : m_frame_width;
+    const int sourceHeight = artemis::video::swapsDimensions(rotation)
+        ? m_frame_width : m_frame_height;
+    const int targetWidth = std::max(1, static_cast<int>(
+        std::lround(m_present_width > 0.0f ? m_present_width : m_screen_width)));
+    const int targetHeight = std::max(1, static_cast<int>(
+        std::lround(m_present_height > 0.0f ? m_present_height : m_screen_height)));
 
     const bool sourceSizeChanged =
         wantUpscaling &&
-        (m_source_target_width != m_frame_width ||
-         m_source_target_height != m_frame_height);
-    const bool sizeChanged = m_upscaling_target_width != m_screen_width ||
-                             m_upscaling_target_height != m_screen_height;
+        (m_source_target_width != sourceWidth ||
+         m_source_target_height != sourceHeight);
+    const bool sizeChanged = m_upscaling_target_width != targetWidth ||
+                             m_upscaling_target_height != targetHeight;
     const bool upscalingUsageChanged =
         wantUpscaling != static_cast<bool>(sourceTargetHandle);
     const bool rcasUsageChanged = wantRcas != static_cast<bool>(rcasTargetHandle);
@@ -549,7 +562,7 @@ bool DKVideoRenderer::ensureUpscalingResources() {
         dk::ImageLayoutMaker{dev}
             .setType(DkImageType_2D)
             .setFormat(DkImageFormat_RGBA8_Unorm)
-            .setDimensions(m_frame_width, m_frame_height, 1)
+            .setDimensions(sourceWidth, sourceHeight, 1)
             .setFlags(DkImageFlags_UsageRender | DkImageFlags_UsageLoadStore |
                       DkImageFlags_Usage2DEngine)
             .initialize(sourceTargetLayout);
@@ -571,7 +584,7 @@ bool DKVideoRenderer::ensureUpscalingResources() {
     dk::ImageLayoutMaker{dev}
         .setType(DkImageType_2D)
         .setFormat(DkImageFormat_RGBA8_Unorm)
-        .setDimensions(m_screen_width, m_screen_height, 1)
+        .setDimensions(targetWidth, targetHeight, 1)
         .setFlags(DkImageFlags_UsageRender | DkImageFlags_UsageLoadStore |
                   DkImageFlags_Usage2DEngine)
         .initialize(upscalingTargetLayout);
@@ -645,10 +658,10 @@ bool DKVideoRenderer::ensureUpscalingResources() {
         rcasTargetLayout = dk::ImageLayout{};
         rcasTargetDesc = dk::ImageDescriptor{};
     }
-    m_source_target_width = wantUpscaling ? m_frame_width : 0;
-    m_source_target_height = wantUpscaling ? m_frame_height : 0;
-    m_upscaling_target_width = m_screen_width;
-    m_upscaling_target_height = m_screen_height;
+    m_source_target_width = wantUpscaling ? sourceWidth : 0;
+    m_source_target_height = wantUpscaling ? sourceHeight : 0;
+    m_upscaling_target_width = targetWidth;
+    m_upscaling_target_height = targetHeight;
     return true;
 }
 
@@ -720,11 +733,11 @@ bool DKVideoRenderer::submitUpscalingPresentPass() {
 
         presentCmdbuf.bindRenderTargets(&rcasTarget);
         presentCmdbuf.setViewports(
-            0, {{{0.0f, 0.0f, static_cast<float>(m_screen_width),
-                  static_cast<float>(m_screen_height), 0.0f, 1.0f}}});
+            0, {{{0.0f, 0.0f, static_cast<float>(m_upscaling_target_width),
+                  static_cast<float>(m_upscaling_target_height), 0.0f, 1.0f}}});
         presentCmdbuf.setScissors(
-            0, {{{0, 0, static_cast<uint32_t>(m_screen_width),
-                  static_cast<uint32_t>(m_screen_height)}}});
+            0, {{{0, 0, static_cast<uint32_t>(m_upscaling_target_width),
+                  static_cast<uint32_t>(m_upscaling_target_height)}}});
         presentCmdbuf.bindShaders(DkStageFlag_GraphicsMask,
                                   {vertexShader, rcasFragmentShader});
         presentCmdbuf.bindTextures(DkStage_Fragment, 0,
@@ -749,6 +762,15 @@ bool DKVideoRenderer::submitUpscalingPresentPass() {
     presentCmdbuf.setScissors(
         0, {{{0, 0, static_cast<uint32_t>(m_screen_width),
               static_cast<uint32_t>(m_screen_height)}}});
+    presentCmdbuf.clearColor(0, DkColorMask_RGBA, 0.0f, 0.0f, 0.0f, 1.0f);
+    presentCmdbuf.setViewports(
+        0, {{{m_present_x, m_present_y, m_present_width,
+              m_present_height, 0.0f, 1.0f}}});
+    presentCmdbuf.setScissors(
+        0, {{{static_cast<uint32_t>(std::max(0.0f, std::floor(m_present_x))),
+              static_cast<uint32_t>(std::max(0.0f, std::floor(m_present_y))),
+              static_cast<uint32_t>(std::max(1.0f, std::ceil(m_present_width))),
+              static_cast<uint32_t>(std::max(1.0f, std::ceil(m_present_height)))}}});
     presentCmdbuf.bindShaders(DkStageFlag_GraphicsMask,
                               {vertexShader, upscalingPassFragmentShader});
     presentCmdbuf.bindTextures(DkStage_Fragment, 0,
@@ -773,6 +795,31 @@ void DKVideoRenderer::recordStaticCommands(AVFrame* frame) {
     AVColorSpace colorSpace = AVCOL_SPC_UNSPECIFIED;
     bool colorFull = false;
     getFrameColorInfo(frame, colorSpace, colorFull);
+    const bool forceFullRange =
+        artemis::stream::AdvancedStreamOptionsStore::instance()
+            .get().forceFullRangeVideo;
+    if (forceFullRange)
+        colorFull = true;
+
+    const auto zoomPan = artemis::video::normalizeZoomPan(
+        artemis::video::ZoomPanStore::instance().get().state);
+    const auto rotation =
+        artemis::video::DisplayTransformStore::instance().get().rotation;
+    const int logicalWidth = artemis::video::swapsDimensions(rotation)
+        ? m_frame_height : m_frame_width;
+    const int logicalHeight = artemis::video::swapsDimensions(rotation)
+        ? m_frame_width : m_frame_height;
+    const auto scaleMode = artemis::video::VideoScaleStore::instance().get();
+    const auto geometry = artemis::video::VideoScale::presentationGeometry(
+        static_cast<float>(logicalWidth),
+        static_cast<float>(logicalHeight),
+        static_cast<float>(m_screen_width),
+        static_cast<float>(m_screen_height), scaleMode,
+        zoomPan.zoom, zoomPan.panX, zoomPan.panY);
+    m_present_x = geometry.destination.x;
+    m_present_y = geometry.destination.y;
+    m_present_width = geometry.destination.width;
+    m_present_height = geometry.destination.height;
 #ifdef SUPPORT_UPSCALING
     const bool requestedDithering = shouldUseDithering();
 #else
@@ -820,23 +867,26 @@ void DKVideoRenderer::recordStaticCommands(AVFrame* frame) {
     displayTransformState.offset[1] = colorOffset[1];
     displayTransformState.offset[2] = colorOffset[2];
     displayTransformState.offset[3] = 0.0f;
+    displayTransformState.orientation[0] = static_cast<float>(rotation);
 
-    const SourceViewport sourceViewport = getSourceViewport(
-        m_frame_width, m_frame_height, m_screen_width, m_screen_height);
-    setTransformUvData(displayTransformState, sourceViewport, m_frame_width,
-                       m_frame_height);
+    const SourceViewport sourceViewport = {
+        geometry.source.x, geometry.source.y,
+        geometry.source.width, geometry.source.height};
+    setTransformUvData(displayTransformState, sourceViewport, logicalWidth,
+                       logicalHeight);
 
     Transformation sourceTransformState = displayTransformState;
     setTransformUvData(
         sourceTransformState,
-        SourceViewport{0.0f, 0.0f, static_cast<float>(m_frame_width),
-                       static_cast<float>(m_frame_height)},
-        m_frame_width, m_frame_height);
+        SourceViewport{0.0f, 0.0f, static_cast<float>(logicalWidth),
+                       static_cast<float>(logicalHeight)},
+        logicalWidth, logicalHeight);
 
     if (useUpscaling && easuUniformBuffer) {
         EasuConstants easuConstants = {};
-        populateEasuConstants(easuConstants, sourceViewport, m_frame_width,
-                              m_frame_height, m_screen_width, m_screen_height);
+        populateEasuConstants(easuConstants, sourceViewport, logicalWidth,
+                              logicalHeight, m_upscaling_target_width,
+                              m_upscaling_target_height);
         memcpy(easuUniformBuffer.getCpuAddr(), &easuConstants,
                sizeof(easuConstants));
     }
@@ -890,6 +940,32 @@ void DKVideoRenderer::recordStaticCommands(AVFrame* frame) {
         cmdbuf.draw(DkPrimitive_Quads, QuadVertexData.size(), 1, 0, 0);
     };
 
+    auto bindFramebufferContent = [&]() {
+        dk::Image* framebuffer = vctx->getFramebuffer();
+        dk::Image* depthBuffer = vctx->getDepthBuffer();
+        if (!framebuffer || !depthBuffer)
+            return false;
+        dk::ImageView colorTarget{*framebuffer};
+        dk::ImageView depthTarget{*depthBuffer};
+        cmdbuf.bindRenderTargets(&colorTarget, &depthTarget);
+        cmdbuf.setViewports(
+            0, {{{0.0f, 0.0f, static_cast<float>(m_screen_width),
+                  static_cast<float>(m_screen_height), 0.0f, 1.0f}}});
+        cmdbuf.setScissors(
+            0, {{{0, 0, static_cast<uint32_t>(m_screen_width),
+                  static_cast<uint32_t>(m_screen_height)}}});
+        cmdbuf.clearColor(0, DkColorMask_RGBA, 0.0f, 0.0f, 0.0f, 1.0f);
+        cmdbuf.setViewports(
+            0, {{{m_present_x, m_present_y, m_present_width,
+                  m_present_height, 0.0f, 1.0f}}});
+        cmdbuf.setScissors(
+            0, {{{static_cast<uint32_t>(std::max(0.0f, std::floor(m_present_x))),
+                  static_cast<uint32_t>(std::max(0.0f, std::floor(m_present_y))),
+                  static_cast<uint32_t>(std::max(1.0f, std::ceil(m_present_width))),
+                  static_cast<uint32_t>(std::max(1.0f, std::ceil(m_present_height)))}}});
+        return true;
+    };
+
 #ifdef SUPPORT_UPSCALING
     if (useUpscaling && sourceTargetHandle && upscalingTargetHandle &&
         sourceTextureId >= 0 && upscalingFragmentShader && easuUniformBuffer) {
@@ -913,6 +989,7 @@ void DKVideoRenderer::recordStaticCommands(AVFrame* frame) {
                          m_upscaling_target_height);
         drawDecodePass(displayTransformState);
     } else {
+        bindFramebufferContent();
         drawDecodePass(displayTransformState);
     }
 
@@ -951,6 +1028,18 @@ void DKVideoRenderer::updateRenderState(int width, int height, AVFrame* frame) {
     const int artemisScaleMode = static_cast<int>(
         artemis::video::VideoScaleStore::instance().get());
     const bool scaleModeChanged = m_artemis_scale_mode != artemisScaleMode;
+    const auto zoomPan = artemis::video::normalizeZoomPan(
+        artemis::video::ZoomPanStore::instance().get().state);
+    const bool zoomPanChanged = m_artemis_zoom != zoomPan.zoom ||
+        m_artemis_pan_x != zoomPan.panX || m_artemis_pan_y != zoomPan.panY;
+    const bool forceFullRange =
+        artemis::stream::AdvancedStreamOptionsStore::instance()
+            .get().forceFullRangeVideo;
+    const bool fullRangeChanged =
+        m_artemis_force_full_range != forceFullRange;
+    const int rotation = static_cast<int>(
+        artemis::video::DisplayTransformStore::instance().get().rotation);
+    const bool rotationChanged = m_artemis_rotation != rotation;
 #ifdef SUPPORT_UPSCALING
     const bool requestedDithering =
         Settings::instance().dithering() && frame->width > 0 && frame->height > 0 &&
@@ -971,7 +1060,8 @@ void DKVideoRenderer::updateRenderState(int width, int height, AVFrame* frame) {
     const bool rcasChanged = m_rcas_requested != requestedRcas;
 
     if (!frameSizeChanged && !screenSizeChanged && !colorChanged &&
-        !scaleModeChanged &&
+        !scaleModeChanged && !zoomPanChanged && !fullRangeChanged &&
+        !rotationChanged &&
         !ditheringChanged && !upscalingChanged && !rcasChanged) {
         return;
     }
@@ -989,6 +1079,11 @@ void DKVideoRenderer::updateRenderState(int width, int height, AVFrame* frame) {
     m_screen_width = width;
     m_screen_height = height;
     m_artemis_scale_mode = artemisScaleMode;
+    m_artemis_zoom = zoomPan.zoom;
+    m_artemis_pan_x = zoomPan.panX;
+    m_artemis_pan_y = zoomPan.panY;
+    m_artemis_force_full_range = forceFullRange;
+    m_artemis_rotation = rotation;
     recordStaticCommands(frame);
 }
 

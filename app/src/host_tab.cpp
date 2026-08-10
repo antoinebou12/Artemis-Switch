@@ -33,6 +33,22 @@ HostTab::HostTab(const Host& host) : host(host) {
 
     reloadHost();
 
+    hostWebConfig->setText("host/web_config"_i18n);
+    hostWebConfig->setDetailText("host/web_config_hint"_i18n);
+    hostWebConfig->registerClickAction([this](View*) {
+        const std::string address = this->host.preferred_address();
+        if (address.empty()) {
+            showError("host/web_config_no_address"_i18n);
+            return true;
+        }
+        const std::string url = "https://" + address + ":47990/";
+        Application::getPlatform()->openBrowser(url);
+        auto* dialog = new Dialog("host/web_config_message"_i18n + "\n\n" + url);
+        dialog->addButton("common/close"_i18n, [] {});
+        dialog->open();
+        return true;
+    });
+
     registerAction("host/rename"_i18n, ControllerButton::BUTTON_START,
                    [this](View* view) {
                        std::string title = this->host.hostname;

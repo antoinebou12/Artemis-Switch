@@ -17,6 +17,10 @@
 #include "MoonlightSession.hpp"
 #include "two_finger_scroll_recognizer.hpp"
 
+namespace artemis::apollo {
+struct ApolloHostOptions;
+}
+
 class StreamingView : public brls::Box {
   public:
     StreamingView(const Host& host, const AppInfo& app);
@@ -30,6 +34,8 @@ class StreamingView : public brls::Box {
 
     void terminate(bool terminateApp);
     void showKeyboard() { addKeyboard(); }
+    void applyVirtualDisplay(
+        const artemis::apollo::ApolloHostOptions& options);
 
     bool draw_stats = false;
 

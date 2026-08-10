@@ -678,19 +678,21 @@ void GameStreamClient::applist(const std::string& address,
             AppInfoList app_list;
 
             while (list) {
-                std::string name = std::string(list->name);
+                PAPP_LIST current = list;
+                std::string name = current->name ? current->name : "";
                 int id = list->id;
                 AppInfo info;
                 info.name = name;
                 info.app_id = id;
+                info.app_uuid = current->uuid ? current->uuid : "";
+                info.server_order = current->server_order;
+                info.input_only = info.app_uuid == ApolloRemoteInputUuid;
                 app_list.push_back(info);
                 list = list->next;
+                free(current->name);
+                free(current->uuid);
+                free(current);
             }
-
-            std::sort(app_list.begin(), app_list.end(),
-                      [](const AppInfo& a, const AppInfo& b) {
-                          return a.name < b.name;
-                      });
 
             brls::sync([app_list, callback, status] {
                 if (status == GS_OK) {
@@ -734,16 +736,18 @@ void GameStreamClient::app_boxart(const Host& host, int app_id,
 
 void GameStreamClient::start(const std::string& address,
                              STREAM_CONFIGURATION config, int app_id,
-                             ServerCallback<STREAM_CONFIGURATION>& callback) {
+                             ServerCallback<STREAM_CONFIGURATION>& callback,
+                             const APOLLO_LAUNCH_OPTIONS& apolloOptions) {
     m_config = config;
 
     with_cached_server_data<STREAM_CONFIGURATION>(
         address, "Firstly call connect() & pair()...", callback,
-        [this, app_id](const std::string& cachedAddress,
+        [this, app_id, apolloOptions](const std::string& cachedAddress,
                        ServerCallback<STREAM_CONFIGURATION>& callback) {
             int status = gs_start_app(&m_server_data[cachedAddress], &m_config,
                                       app_id, Settings::instance().sops(),
-                                      Settings::instance().play_audio(), 0x1);
+                                      Settings::instance().play_audio(), 0x1,
+                                      &apolloOptions);
 
             brls::sync([this, callback, status] {
                 if (status == GS_OK) {
@@ -757,8 +761,9 @@ void GameStreamClient::start(const std::string& address,
 
 void GameStreamClient::start(const Host& host, STREAM_CONFIGURATION config,
                              int app_id,
-                             ServerCallback<STREAM_CONFIGURATION>& callback) {
-    start(active_address(host), config, app_id, callback);
+                             ServerCallback<STREAM_CONFIGURATION>& callback,
+                             const APOLLO_LAUNCH_OPTIONS& apolloOptions) {
+    start(active_address(host), config, app_id, callback, apolloOptions);
 }
 
 void GameStreamClient::quit(const std::string& address,

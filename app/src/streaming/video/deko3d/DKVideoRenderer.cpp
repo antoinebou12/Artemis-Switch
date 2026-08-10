@@ -3,6 +3,12 @@
 #include "ArtemisDKVideoRenderer.hpp"
 #include "../../../video/VideoScale.hpp"
 #include "../../../video/VideoScaleStore.hpp"
+#include "../../../features/stream/AdvancedStreamOptionsStore.hpp"
+#include "../../../features/video/ZoomPanState.hpp"
+#include "../../../features/video/ZoomPanStore.hpp"
+#include "../../../features/video/DisplayTransformStore.hpp"
+#include "../../../features/video/DisplayCoordinateMapper.hpp"
+#include "../../../features/video/RendererPresentationPolicy.hpp"
 
 // Preload the dependencies used by the legacy source before temporarily
 // exposing its private implementation. This avoids leaking the private/public
@@ -36,10 +42,6 @@
 #include "DKVideoRendererLegacy.inc"
 #undef DKVideoRenderer
 #undef private
-
-#include "../../../features/stream/AdvancedStreamOptionsStore.hpp"
-#include "../../../features/video/ZoomPanState.hpp"
-#include "../../../features/video/ZoomPanStore.hpp"
 
 namespace {
 
@@ -95,6 +97,11 @@ void populateUvTransform(Transformation& transform,
     transform.uv_data[3] = static_cast<float>(frameHeight) / source.height;
 }
 
+void populateRotation(Transformation& transform,
+                      artemis::video::Rotation rotation) {
+    transform.orientation[0] = static_cast<float>(rotation);
+}
+
 } // namespace
 
 class ArtemisDKVideoRenderer::Impl {
@@ -113,16 +120,17 @@ public:
     float cachedPanX = 0.0f;
     float cachedPanY = 0.0f;
     bool cachedForceFullRange = false;
+    artemis::video::Rotation cachedRotation = artemis::video::Rotation::Deg0;
 
     bool wantsCustomPresentation(
         ScaleMode scaleMode,
         const artemis::video::ZoomPanState& zoomPan,
-        bool forceFullRange) const {
-        return !artemis::video::usesFilteredFullScreenPath(scaleMode) ||
-               !nearlyEqual(zoomPan.zoom, 1.0f) ||
-               !nearlyEqual(zoomPan.panX, 0.0f) ||
-               !nearlyEqual(zoomPan.panY, 0.0f) ||
-               forceFullRange;
+        bool forceFullRange, artemis::video::Rotation rotation) const {
+        (void)scaleMode;
+        (void)zoomPan;
+        (void)forceFullRange;
+        (void)rotation;
+        return false;
     }
 
     void restoreLegacyCommands(int width, int height, AVFrame* frame) {
@@ -140,6 +148,7 @@ public:
                             ScaleMode scaleMode,
                             const artemis::video::ZoomPanState& zoomPan,
                             bool forceFullRange,
+                            artemis::video::Rotation rotation,
                             AVColorSpace colorSpace,
                             bool colorFull) const {
         return !customPathActive ||
@@ -153,7 +162,8 @@ public:
                !nearlyEqual(cachedZoom, zoomPan.zoom) ||
                !nearlyEqual(cachedPanX, zoomPan.panX) ||
                !nearlyEqual(cachedPanY, zoomPan.panY) ||
-               cachedForceFullRange != forceFullRange;
+               cachedForceFullRange != forceFullRange ||
+               cachedRotation != rotation;
     }
 
     void prepareLegacyFrameState(int width, int height, AVFrame* frame) {
@@ -178,14 +188,18 @@ public:
                               ScaleMode scaleMode,
                               const artemis::video::ZoomPanState& zoomPan,
                               bool forceFullRange,
+                              artemis::video::Rotation rotation,
                               AVColorSpace colorSpace,
                               bool colorFull) {
         if (width <= 0 || height <= 0 || frame->width <= 0 || frame->height <= 0)
             return false;
 
+        const bool swap = artemis::video::swapsDimensions(rotation);
+        const int logicalWidth = swap ? frame->height : frame->width;
+        const int logicalHeight = swap ? frame->width : frame->height;
         const PresentationGeometry geometry = VideoScale::presentationGeometry(
-            static_cast<float>(frame->width),
-            static_cast<float>(frame->height),
+            static_cast<float>(logicalWidth),
+            static_cast<float>(logicalHeight),
             static_cast<float>(width),
             static_cast<float>(height),
             scaleMode, zoomPan.zoom, zoomPan.panX, zoomPan.panY);
@@ -203,7 +217,8 @@ public:
 
         Transformation transform{};
         populateColorTransform(transform, colorSpace, colorFull);
-        populateUvTransform(transform, geometry.source, frame->width, frame->height);
+        populateUvTransform(transform, geometry.source, logicalWidth, logicalHeight);
+        populateRotation(transform, rotation);
 
         dk::ImageView colorTarget{*framebuffer};
         dk::ImageView depthTarget{*depthBuffer};
@@ -296,6 +311,7 @@ public:
         cachedPanX = zoomPan.panX;
         cachedPanY = zoomPan.panY;
         cachedForceFullRange = forceFullRange;
+        cachedRotation = rotation;
         customPathActive = true;
         return true;
     }
@@ -335,7 +351,8 @@ public:
     void drawCustom(NVGcontext* vg, int width, int height, AVFrame* frame,
                     int imageFormat, ScaleMode scaleMode,
                     const artemis::video::ZoomPanState& zoomPan,
-                    bool forceFullRange) {
+                    bool forceFullRange,
+                    artemis::video::Rotation rotation) {
         (void)vg;
         (void)imageFormat;
 
@@ -358,10 +375,11 @@ public:
             colorFull = true;
 
         if (customStateChanged(width, height, frame, scaleMode, zoomPan,
-                               forceFullRange, colorSpace, colorFull)) {
+                               forceFullRange, rotation, colorSpace, colorFull)) {
             legacy.queue.waitIdle();
             if (!recordCustomCommands(width, height, frame, scaleMode, zoomPan,
-                                      forceFullRange, colorSpace, colorFull)) {
+                                      forceFullRange, rotation, colorSpace,
+                                      colorFull)) {
                 brls::Logger::warning(
                     "Artemis deko3D presentation setup failed; falling back to legacy renderer");
                 customPathActive = false;
@@ -399,15 +417,28 @@ void ArtemisDKVideoRenderer::draw(NVGcontext* vg, int width, int height,
         artemis::stream::AdvancedStreamOptionsStore::instance()
             .get()
             .forceFullRangeVideo;
+    const auto rotation =
+        artemis::video::DisplayTransformStore::instance().get().rotation;
+    artemis::video::DisplayTransform mappingTransform;
+    mappingTransform.rotation = rotation;
+    mappingTransform.zoom = zoomPan.zoom;
+    mappingTransform.panX = zoomPan.panX;
+    mappingTransform.panY = zoomPan.panY;
+    const auto mappingPlan = artemis::video::makeRendererPresentationPlan(
+        frame->width, frame->height, width, height, scaleMode,
+        mappingTransform, false);
+    artemis::video::DisplayCoordinateMapper::instance().update(
+        width, height, mappingPlan, rotation);
 
-    if (!impl->wantsCustomPresentation(scaleMode, zoomPan, forceFullRange)) {
+    if (!impl->wantsCustomPresentation(scaleMode, zoomPan, forceFullRange,
+                                       rotation)) {
         impl->restoreLegacyCommands(width, height, frame);
         impl->legacy.draw(vg, width, height, frame, imageFormat);
         return;
     }
 
     impl->drawCustom(vg, width, height, frame, imageFormat, scaleMode,
-                     zoomPan, forceFullRange);
+                     zoomPan, forceFullRange, rotation);
 }
 
 VideoRenderStats* ArtemisDKVideoRenderer::video_render_stats() {

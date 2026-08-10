@@ -66,4 +66,33 @@ HostCapabilities HostCapabilityPolicy::detect(const HostMetadata& metadata) {
     return result;
 }
 
+HostCapabilities HostCapabilityPolicy::fromApolloServerInfo(
+    bool virtualDisplayCapable, bool virtualDisplayDriverReady,
+    bool permissionAdvertised, uint32_t permissions,
+    std::vector<std::string> serverCommands,
+    bool currentAppHasUuid) {
+    constexpr uint32_t clipboardSet = 0x00010000;
+    constexpr uint32_t clipboardRead = 0x00020000;
+    constexpr uint32_t serverCommand = 0x00100000;
+    HostCapabilities result;
+    const bool apolloFieldPresent = virtualDisplayCapable ||
+        virtualDisplayDriverReady || permissionAdvertised ||
+        !serverCommands.empty() || currentAppHasUuid;
+    if (!apolloFieldPresent) return standardSunshine();
+
+    result.kind = HostKind::Apollo;
+    result.virtualDisplay = virtualDisplayCapable;
+    result.virtualDisplayDriverReady = virtualDisplayDriverReady;
+    result.permissionAdvertised = permissionAdvertised;
+    result.permissions = permissions;
+    result.serverCommandList = std::move(serverCommands);
+    result.serverCommands = !result.serverCommandList.empty() &&
+        (!permissionAdvertised || (permissions & serverCommand) != 0);
+    result.clipboardSync = !permissionAdvertised ||
+        (permissions & (clipboardSet | clipboardRead)) != 0;
+    result.inputOnly = true;
+    result.detectionReason = "Apollo server-info extension fields";
+    return result;
+}
+
 } // namespace artemis::host

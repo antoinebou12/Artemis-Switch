@@ -15,7 +15,8 @@ class MoonlightSession {
     static void
     set_provider(MoonlightSessionDecoderAndRenderProvider* provider);
 
-    MoonlightSession(const std::string& address, int app_id);
+    MoonlightSession(const std::string& address, int app_id,
+                     std::string appUuid = {});
     ~MoonlightSession();
 
     static MoonlightSession* activeSession();
@@ -23,8 +24,14 @@ class MoonlightSession {
     void start(ServerCallback<bool> callback, bool is_sunshine);
     void stop(int terminate_app);
     void set_address(const std::string& address) { m_address = address; }
+    void setApolloLaunchOptions(APOLLO_LAUNCH_OPTIONS options) {
+        m_apollo_launch_options = std::move(options);
+    }
+    bool is_input_only() const { return m_input_only; }
 
     void restart();
+    void restartWithApolloOptions(APOLLO_LAUNCH_OPTIONS options,
+                                  ServerCallback<bool> callback);
 
     void draw(NVGcontext* vg, int width, int height);
 
@@ -71,6 +78,9 @@ class MoonlightSession {
 
     std::string m_address;
     int m_app_id;
+    std::string m_app_uuid;
+    bool m_input_only = false;
+    APOLLO_LAUNCH_OPTIONS m_apollo_launch_options;
     bool m_is_sunshine = false;
     STREAM_CONFIGURATION m_config;
     CONNECTION_LISTENER_CALLBACKS m_connection_callbacks;

@@ -309,6 +309,10 @@ class Settings : public Singleton<Settings> {
 
     void set_mouse_speed_multiplier(int mouse_speed_multiplier) { m_mouse_speed_multiplier = mouse_speed_multiplier; }
     [[nodiscard]] int get_mouse_speed_multiplier() const { return m_mouse_speed_multiplier; }
+    // Slider 0..100 maps to effective mouse speed 0.1x .. 2.0x.
+    [[nodiscard]] float mouse_speed_scale() const {
+        return 0.1f + (static_cast<float>(m_mouse_speed_multiplier) / 100.f) * 1.9f;
+    }
 
     void set_deadzone_stick_left(float deadzone) { m_deadzone_stick_left = deadzone; }
     [[nodiscard]] float get_deadzone_stick_left() const { return m_deadzone_stick_left; }
@@ -373,7 +377,7 @@ class Settings : public Singleton<Settings> {
     int m_keyboard_fingers = 3;
     int m_keyboard_locale = 0;
     bool m_volume_amplification = false;
-    int m_mouse_speed_multiplier = 34;
+    int m_mouse_speed_multiplier = 47; // ~1.0x with 0.1 + progress*1.9
     int m_current_mapping_layout = 0;
     std::vector<KeyMappingLayout> m_mapping_laouts;
     KeyComboOptions m_guide_key_options{

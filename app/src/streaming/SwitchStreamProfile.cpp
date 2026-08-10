@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <array>
 #include <cstdlib>
+#include <cmath>
 
 namespace artemis::streaming {
 namespace {
@@ -37,10 +38,12 @@ ValidationResult SwitchStreamProfile::validate(const StreamProfile& profile) {
         result.errors.push_back(std::move(message));
     };
 
-    if (profile.width < 640 || profile.width > 1920)
-        fail("width must be between 640 and 1920");
-    if (profile.height < 360 || profile.height > 1080)
-        fail("height must be between 360 and 1080");
+    if (profile.width < 360 || profile.width > 1920)
+        fail("width must be between 360 and 1920");
+    if (profile.height < 360 || profile.height > 1920)
+        fail("height must be between 360 and 1920");
+    if (static_cast<long long>(profile.width) * profile.height > 1920LL * 1080LL)
+        fail("resolution exceeds the Switch 1080p decode pixel budget");
     if (!validFps(profile.fps))
         fail("fps must be 30, 40, 60, 90, or 120");
     if (profile.bitrateKbps < 1000 || profile.bitrateKbps > 100000)
@@ -54,8 +57,15 @@ ValidationResult SwitchStreamProfile::validate(const StreamProfile& profile) {
 }
 
 StreamProfile SwitchStreamProfile::normalized(StreamProfile profile) {
-    profile.width = std::clamp(profile.width, 640, 1920);
-    profile.height = std::clamp(profile.height, 360, 1080);
+    profile.width = std::clamp(profile.width, 360, 1920);
+    profile.height = std::clamp(profile.height, 360, 1920);
+    constexpr double pixelBudget = 1920.0 * 1080.0;
+    const double pixels = static_cast<double>(profile.width) * profile.height;
+    if (pixels > pixelBudget) {
+        const double scale = std::sqrt(pixelBudget / pixels);
+        profile.width = std::max(360, static_cast<int>(profile.width * scale) & ~1);
+        profile.height = std::max(360, static_cast<int>(profile.height * scale) & ~1);
+    }
     profile.bitrateKbps = std::clamp(profile.bitrateKbps, 1000, 100000);
     if (!validFps(profile.fps))
         profile.fps = nearestFps(profile.fps);

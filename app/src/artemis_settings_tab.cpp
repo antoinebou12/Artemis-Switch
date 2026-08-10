@@ -31,6 +31,14 @@
 #define ARTEMIS_HAS_ZOOM_PAN 0
 #endif
 
+#if __has_include("features/apollo/ApolloHostOptions.hpp")
+#include "features/apollo/ApolloHostOptions.hpp"
+#include "features/apollo/ApolloHostOptionsStore.hpp"
+#define ARTEMIS_HAS_APOLLO_HOST_OPTIONS 1
+#else
+#define ARTEMIS_HAS_APOLLO_HOST_OPTIONS 0
+#endif
+
 #include <algorithm>
 #include <array>
 #include <cstdlib>
@@ -45,7 +53,7 @@ std::vector<int> activeFrameRates() {
     return artemis::stream::availableFrameRates(
         artemis::stream::AdvancedStreamOptionsStore::instance().get());
 #else
-    return {30, 40, 60, 120};
+    return {30, 40, 60, 90, 120};
 #endif
 }
 
@@ -73,14 +81,53 @@ int frameRateSelection(const std::vector<int>& values, int current) {
     }
     return best;
 }
+
+int resolutionPresetIndex(int width, int height) {
+    if (width == 1280 && height == 720)
+        return 1; // Handheld
+    if (width == 1920 && height == 1080)
+        return 2; // Docked
+    return 0; // Custom
+}
+
+void applyResolutionPreset(int selected) {
+    auto stored = artemis::streaming::StreamProfileStore::instance().get();
+    int width = stored.width;
+    int height = stored.height;
+    if (selected == 1) {
+        width = 1280;
+        height = 720;
+    } else if (selected == 2) {
+        width = 1920;
+        height = 1080;
+    }
+    artemis::streaming::StreamProfileStore::instance().setCustomResolution(
+        true, width, height);
+
+#if ARTEMIS_HAS_APOLLO_HOST_OPTIONS
+    // Persist preferred Apollo virtual-display target for the next connection.
+    auto options = artemis::apollo::ApolloHostOptions{};
+    if (selected == 1)
+        options.target = artemis::apollo::VirtualDisplayTarget::Handheld;
+    else if (selected == 2)
+        options.target = artemis::apollo::VirtualDisplayTarget::Docked;
+    else
+        options.target = artemis::apollo::VirtualDisplayTarget::Custom;
+    options.customWidth = width;
+    options.customHeight = height;
+    options.refreshRate = Settings::instance().fps();
+    // Use a shared default key until a host is selected for streaming.
+    artemis::apollo::ApolloHostOptionsStore::instance().set("default", options);
+#endif
+}
 }
 
 ArtemisSettingsTab::ArtemisSettingsTab() {
     inflateFromXMLRes("xml/tabs/artemis_settings.xml");
 
-    const std::array<DetailCell*, 13> compactRows = {
+    const std::array<DetailCell*, 12> compactRows = {
         customResolution, width, height, exactBitrate,
-        frameRate, unlockHighFps, forceFullRange, preventPacketLoss,
+        frameRate, forceFullRange, preventPacketLoss,
         scaleMode, rememberZoomPan, resetZoomPan, forwardMotion,
         consoleMotionFallback};
     for (auto* row : compactRows) {
@@ -117,23 +164,20 @@ ArtemisSettingsTab::ArtemisSettingsTab() {
     frameRate->setText("artemis/settings/stream_frame_rate"_i18n);
     refreshFrameRateSelector();
 
+    resolutionPreset->init(
+        "artemis/settings/resolution_preset"_i18n,
+        {"artemis/settings/preset_custom"_i18n,
+         "artemis/settings/preset_handheld"_i18n,
+         "artemis/settings/preset_docked"_i18n},
+        resolutionPresetIndex(stored.width, stored.height),
+        [this](int selected) {
+            applyResolutionPreset(selected);
+            customResolution->setOn(true);
+            refreshValues();
+        });
+
 #if ARTEMIS_HAS_ADVANCED_STREAM
     const auto advanced = artemis::stream::AdvancedStreamOptionsStore::instance().get();
-    unlockHighFps->init("artemis/settings/unlock_high_fps"_i18n,
-                        advanced.unlockAllFrameRates,
-                        [this](bool enabled) {
-        auto options = artemis::stream::AdvancedStreamOptionsStore::instance().get();
-        options.unlockAllFrameRates = enabled;
-        artemis::stream::AdvancedStreamOptionsStore::instance().set(options);
-        if (!enabled) {
-            const int normalized = artemis::stream::normalizeFrameRate(
-                Settings::instance().fps(), options);
-            Settings::instance().set_fps(normalized);
-            Settings::instance().save();
-        }
-        refreshFrameRateSelector();
-        refreshValues();
-    });
     forceFullRange->init("artemis/settings/force_full_range"_i18n,
                          advanced.forceFullRangeVideo, [](bool enabled) {
         auto options = artemis::stream::AdvancedStreamOptionsStore::instance().get();
@@ -147,10 +191,8 @@ ArtemisSettingsTab::ArtemisSettingsTab() {
         artemis::stream::AdvancedStreamOptionsStore::instance().set(options);
     });
 #else
-    unlockHighFps->init("artemis/settings/unlock_high_fps"_i18n, false, [](bool) {});
     forceFullRange->init("artemis/settings/force_full_range"_i18n, false, [](bool) {});
     preventPacketLoss->init("artemis/settings/prevent_packet_loss"_i18n, false, [](bool) {});
-    unlockHighFps->setEnabled(false);
     forceFullRange->setEnabled(false);
     preventPacketLoss->setEnabled(false);
 #endif
@@ -189,9 +231,6 @@ ArtemisSettingsTab::ArtemisSettingsTab() {
     const bool consoleFallbackSupported =
         artemis::input::canEnableConsoleMotionFallback(capabilities);
 
-    // Always force an unsupported saved value back to OFF. This makes console
-    // fallback disabled by default and prevents stale/manual settings from
-    // enabling a path for which libnx does not yet expose mapped motion vectors.
     if (!consoleFallbackSupported && motion.allowConsoleMotionFallback) {
         motion.allowConsoleMotionFallback = false;
         artemis::input::SwitchMotionPolicyStore::instance().set(motion);
@@ -273,6 +312,8 @@ void ArtemisSettingsTab::refreshValues() {
     height->setDetailText(std::to_string(stored.height));
     exactBitrate->setDetailText(fmt::format("{:.1f} Mbps",
         static_cast<double>(Settings::instance().bitrate()) / 1000.0));
+    resolutionPreset->setSelection(
+        resolutionPresetIndex(stored.width, stored.height), true);
 
     width->setFocusable(stored.customResolutionEnabled);
     height->setFocusable(stored.customResolutionEnabled);

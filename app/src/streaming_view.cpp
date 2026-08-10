@@ -17,6 +17,9 @@
 #include "ingame_overlay_view.hpp"
 #include "streaming_input_overlay.hpp"
 #include "two_finger_scroll_recognizer.hpp"
+#include "features/input/InputSettingsStore.hpp"
+#include "features/apollo/ApolloHostOptionsStore.hpp"
+#include "streaming/StreamProfileStore.hpp"
 #include <Limelight.h>
 #include <chrono>
 #include <nanovg.h>
@@ -80,7 +83,8 @@ StreamingView::StreamingView(const Host& host, const AppInfo& app) : host(host),
     keyboardHolder->setAlignItems(AlignItems::STRETCH);
     addView(keyboardHolder);
 
-    session = new MoonlightSession(host.preferred_address(), app.app_id);
+    session = new MoonlightSession(host.preferred_address(), app.app_id,
+                                   app.app_uuid);
 
 #ifdef PLATFORM_TVOS
         updatePreferredDisplayMode(true);
@@ -97,6 +101,30 @@ StreamingView::StreamingView(const Host& host, const AppInfo& app) : host(host),
 
             session->set_address(
                 GameStreamClient::instance().active_address(this->host));
+
+            const auto hostKey = !result.value().mac.empty()
+                                     ? result.value().mac
+                                     : this->host.preferred_address();
+            const auto stored = artemis::apollo::ApolloHostOptionsStore::instance().get(hostKey);
+            int profileWidth = Application::windowWidth;
+            int profileHeight = Application::windowHeight;
+            const auto customProfile = artemis::streaming::StreamProfileStore::instance().get();
+            if (customProfile.customResolutionEnabled) {
+                profileWidth = customProfile.width;
+                profileHeight = customProfile.height;
+            } else if (Settings::instance().resolution() > 0) {
+                profileHeight = Settings::instance().resolution();
+                profileWidth = profileHeight * 16 / 9;
+            }
+            const auto profile = artemis::apollo::resolveVirtualDisplay(
+                stored, profileWidth, profileHeight);
+            APOLLO_LAUNCH_OPTIONS launch;
+            launch.virtualDisplay = profile.enabled && !this->app.input_only;
+            launch.appUuid = this->app.app_uuid;
+            launch.width = profile.width;
+            launch.height = profile.height;
+            launch.refreshRate = profile.refreshRate;
+            session->setApolloLaunchOptions(std::move(launch));
 
             ASYNC_RETAIN
             session->start([ASYNC_TOKEN](GSResult<bool> result) {
@@ -119,7 +147,8 @@ StreamingView::StreamingView(const Host& host, const AppInfo& app) : host(host),
 
     addGestureRecognizer(
         new ClickGestureRecognizer(1, [](TapGestureStatus status) {
-            if (Settings::instance().touchscreen_mouse_mode()) return;
+            const auto& pointer = artemis::input::InputSettingsStore::instance().pointer();
+            if (!artemis::input::isTrackpadMode(pointer.mode) || !pointer.tapToClick) return;
 
             if (status.state == brls::GestureState::END) {
                 Logger::debug("Left mouse click");
@@ -131,7 +160,9 @@ StreamingView::StreamingView(const Host& host, const AppInfo& app) : host(host),
 
     addGestureRecognizer(
         new ClickGestureRecognizer(2, [](TapGestureStatus status) {
-            if (Settings::instance().touchscreen_mouse_mode()) return;
+            const auto& pointer = artemis::input::InputSettingsStore::instance().pointer();
+            if (!artemis::input::isTrackpadMode(pointer.mode) ||
+                !pointer.twoFingerRightClick) return;
 
             if (status.state == brls::GestureState::END) {
                 Logger::debug("Right mouse click");
@@ -157,7 +188,8 @@ StreamingView::StreamingView(const Host& host, const AppInfo& app) : host(host),
                 Application::pushActivity(new Activity(overlay));
             }
 
-            if (Settings::instance().touchscreen_mouse_mode()) return;
+            if (!artemis::input::isTrackpadMode(
+                    artemis::input::InputSettingsStore::instance().pointer().mode)) return;
 
             if (status.state == brls::GestureState::UNSURE && lMouseKeyGate) {
                 lMouseKeyGate = false;
@@ -188,7 +220,8 @@ StreamingView::StreamingView(const Host& host, const AppInfo& app) : host(host),
 
     scrollTouchRecognizer = new TwoFingerScrollGestureRecognizer(
             [this](TwoFingerScrollState state) {
-                if (Settings::instance().touchscreen_mouse_mode()) return;
+                const auto& pointer = artemis::input::InputSettingsStore::instance().pointer();
+                if (!artemis::input::isTrackpadMode(pointer.mode)) return;
 
                 if (state.state == brls::GestureState::START)
                     this->touchScrollCounter = 0;
@@ -197,9 +230,10 @@ StreamingView::StreamingView(const Host& host, const AppInfo& app) : host(host),
                 if (threshold != this->touchScrollCounter) {
                     Logger::debug("Scroll on: {}",
                                   threshold - this->touchScrollCounter);
-                    int invert = Settings::instance().swap_mouse_scroll() ? -1 : 1;
+                    int invert = (Settings::instance().swap_mouse_scroll() ? -1 : 1) *
+                                 (pointer.naturalScrolling ? -1 : 1);
                     char scrollCount = threshold - this->touchScrollCounter;
-                    LiSendScrollEvent(scrollCount * invert);
+                    LiSendScrollEvent(scrollCount * invert * pointer.scrollSensitivity);
                     this->touchScrollCounter = threshold;
                 }
             });
@@ -438,6 +472,91 @@ void StreamingView::terminate(bool terminateApp) {
         if (hasOverlays)
             this->dismiss();
     });
+}
+
+void StreamingView::applyVirtualDisplay(
+    const artemis::apollo::ApolloHostOptions& requested) {
+    const auto server = GameStreamClient::instance().server_data(host);
+    const auto options = artemis::apollo::validateApolloHostOptions(requested);
+    if (!server.isApollo()) {
+        showError("artemis/overlay/apollo_only"_i18n);
+        return;
+    }
+    if (options.target != artemis::apollo::VirtualDisplayTarget::Off &&
+        (!server.virtualDisplayCapable ||
+         !server.virtualDisplayDriverReady)) {
+        showError(!server.virtualDisplayCapable
+                      ? "artemis/overlay/virtual_display_unsupported"_i18n
+                      : "artemis/overlay/virtual_display_driver_not_ready"_i18n);
+        return;
+    }
+
+    const std::string hostKey = !server.mac.empty()
+        ? server.mac
+        : host.preferred_address();
+    auto& store = artemis::apollo::ApolloHostOptionsStore::instance();
+    const auto previous = store.get(hostKey);
+
+    int profileWidth = Application::windowWidth;
+    int profileHeight = Application::windowHeight;
+    const auto custom = artemis::streaming::StreamProfileStore::instance().get();
+    if (custom.customResolutionEnabled) {
+        profileWidth = custom.width;
+        profileHeight = custom.height;
+    } else if (Settings::instance().resolution() > 0) {
+        profileHeight = Settings::instance().resolution();
+        profileWidth = profileHeight * 16 / 9;
+    }
+
+    const auto makeLaunch = [this, profileWidth, profileHeight](
+                                const auto& value) {
+        const auto resolved = artemis::apollo::resolveVirtualDisplay(
+            value, profileWidth, profileHeight);
+        APOLLO_LAUNCH_OPTIONS launch;
+        launch.virtualDisplay = resolved.enabled && !app.input_only;
+        launch.appUuid = app.app_uuid;
+        launch.width = resolved.width;
+        launch.height = resolved.height;
+        launch.refreshRate = resolved.refreshRate;
+        return launch;
+    };
+
+    MoonlightInputManager::instance().dropInput();
+    loader->setHidden(false);
+    ASYNC_RETAIN
+    session->restartWithApolloOptions(
+        makeLaunch(options),
+        [ASYNC_TOKEN, options, previous, hostKey, makeLaunch](
+            GSResult<bool> result) mutable {
+            ASYNC_RELEASE
+            if (result.isSuccess()) {
+                artemis::apollo::ApolloHostOptionsStore::instance().set(
+                    hostKey, options);
+                loader->setHidden(true);
+                auto* dialog = new Dialog(
+                    "artemis/overlay/virtual_display_applied"_i18n);
+                dialog->addButton("common/close"_i18n, [] {});
+                dialog->open();
+                return;
+            }
+
+            const std::string applyError = result.error();
+            session->restartWithApolloOptions(
+                makeLaunch(previous),
+                [this, applyError](GSResult<bool> rollback) {
+                    loader->setHidden(true);
+                    if (rollback.isSuccess()) {
+                        showError(
+                            "artemis/overlay/virtual_display_rollback"_i18n +
+                            "\n\n" + applyError);
+                    } else {
+                        showError(
+                            "artemis/overlay/virtual_display_rollback_failed"_i18n +
+                            "\n\n" + applyError + "\n" + rollback.error(),
+                            [this] { terminate(false); });
+                    }
+                });
+        });
 }
 
 void StreamingView::handleInput() {

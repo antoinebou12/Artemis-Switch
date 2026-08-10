@@ -84,6 +84,7 @@ class KeyboardView : public brls::Box {
     void createEnglishLayout();
     void createNumpadLayout();
     void createFullLayout();
+    ButtonView* createLocaleSelectorButton(float width);
     static void changeLang(int lang);
     void createLocales();
     inline static std::vector<KeyboardLocale> locales;

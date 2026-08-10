@@ -1,0 +1,33 @@
+diff --git a/library/lib/platforms/switch/switch_input.cpp b/library/lib/platforms/switch/switch_input.cpp
+index 195b4c35..f4518c8f 100644
+--- a/library/lib/platforms/switch/switch_input.cpp
++++ b/library/lib/platforms/switch/switch_input.cpp
+@@ -462,6 +462,10 @@ void SwitchInputManager::handleControllerSensors()
+ {
+     HidSixAxisSensorState sixaxis = { 0 };
+ 
++    // A negative callback index is an Artemis-local source marker. It lets
++    // the client distinguish the documented handheld Npad sensor from a
++    // player-one controller without changing Borealis' public event ABI.
++    const int motionSourceIndex = padStateHandheld.active_handheld ? -1 : 0;
+     uint64_t style_set = padGetStyleSet(&padsState[0]);
+     if (padStateHandheld.active_handheld)
+         hidGetSixAxisSensorStates(this->m_six_axis_sensor_handle[0], &sixaxis, 1);
+@@ -478,7 +482,7 @@ void SwitchInputManager::handleControllerSensors()
+     }
+ 
+     auto accelState = SensorEvent{
+-        0,
++        motionSourceIndex,
+         SensorEventType::ACCEL,
+         { -sixaxis.acceleration.x,
+           -sixaxis.acceleration.z,
+@@ -487,7 +491,7 @@ void SwitchInputManager::handleControllerSensors()
+         0
+     };
+     auto gyroState = SensorEvent{
+-        0,
++        motionSourceIndex,
+         SensorEventType::GYRO,
+         { static_cast<float>(sixaxis.angular_velocity.x * 2.0f * M_PI),
+           static_cast<float>(sixaxis.angular_velocity.z * 2.0f * M_PI),

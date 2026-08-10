@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+
 namespace artemis::input {
 
 enum class MotionSource {
@@ -16,13 +18,9 @@ struct SwitchMotionOptions {
 };
 
 struct SwitchMotionCapabilities {
-    // libnx exposes SevenSixAxisSensor / ConsoleSixAxisSensor on HOS 5.0+.
-    bool libnxSevenSixAxisApiAvailable = false;
-
-    // Keep this separate from API availability. Current libnx exposes the
-    // SevenSixAxis state vector as undocumented fields, so Artemis must not
-    // pretend those values are acceleration/gyro until their mapping is known.
-    bool consoleMotionVectorsMapped = false;
+    // Borealis exposes the documented libnx HidSixAxisSensorState for the
+    // handheld Npad sensor handle. No SevenSixAxis payload is used.
+    bool documentedHandheldSixAxisAvailable = false;
 };
 
 SwitchMotionCapabilities detectSwitchMotionCapabilities();
@@ -31,5 +29,21 @@ bool canEnableConsoleMotionFallback(const SwitchMotionCapabilities& capabilities
 bool shouldForwardMotion(MotionSource source,
                          bool controllerReportsMotion,
                          const SwitchMotionOptions& options);
+
+class MotionFallbackGate {
+public:
+    static constexpr uint64_t FALLBACK_DELAY_MS = 500;
+
+    bool shouldForward(MotionSource source, uint64_t nowMs, bool handheld,
+                       const SwitchMotionOptions& options);
+    void reset();
+    [[nodiscard]] bool controllerRecentlyActive(uint64_t nowMs) const;
+
+private:
+    uint64_t m_lastControllerSampleMs = 0;
+    uint64_t m_observationStartMs = 0;
+    bool m_hasControllerSample = false;
+    bool m_hasObservationStart = false;
+};
 
 } // namespace artemis::input

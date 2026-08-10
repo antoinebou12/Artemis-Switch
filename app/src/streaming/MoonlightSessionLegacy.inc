@@ -26,9 +26,13 @@ void MoonlightSession::set_provider(
     m_provider = provider;
 }
 
-MoonlightSession::MoonlightSession(const std::string& address, int app_id) {
+MoonlightSession::MoonlightSession(const std::string& address, int app_id,
+                                   std::string appUuid) {
     m_address = address;
     m_app_id = app_id;
+    m_app_uuid = std::move(appUuid);
+    m_input_only = m_app_uuid == ApolloRemoteInputUuid;
+    m_apollo_launch_options.appUuid = m_app_uuid;
     m_active_session = this;
 
     m_video_decoder = m_provider->video_decoder();
@@ -174,7 +178,8 @@ int MoonlightSession::video_decoder_setup(int video_format, int width,
                                           int height, int redraw_rate,
                                           void* context, int dr_flags) {
     m_video_format = video_format;
-    if (m_active_session && m_active_session->m_video_decoder) {
+    if (m_active_session && !m_active_session->m_input_only &&
+        m_active_session->m_video_decoder) {
         return m_active_session->m_video_decoder->setup(
             video_format, width, height, redraw_rate, context, dr_flags);
     }
@@ -211,7 +216,8 @@ int MoonlightSession::video_decoder_submit_decode_unit(PDECODE_UNIT decode_unit)
 int MoonlightSession::audio_renderer_init(
     int audio_configuration, const POPUS_MULTISTREAM_CONFIGURATION opus_config,
     void* context, int ar_flags) {
-    if (m_active_session && m_active_session->m_audio_renderer) {
+    if (m_active_session && !m_active_session->m_input_only &&
+        m_active_session->m_audio_renderer) {
         return m_active_session->m_audio_renderer->init(
             audio_configuration, opus_config, context, ar_flags);
     }
@@ -289,6 +295,14 @@ void MoonlightSession::start(ServerCallback<bool> callback, bool is_sunshine) {
     m_config.width = w;
     m_config.height = h;
     m_config.fps = Settings::instance().fps();
+    if (m_apollo_launch_options.virtualDisplay &&
+        m_apollo_launch_options.width > 0 &&
+        m_apollo_launch_options.height > 0) {
+        m_config.width = m_apollo_launch_options.width;
+        m_config.height = m_apollo_launch_options.height;
+        if (m_apollo_launch_options.refreshRate > 0)
+            m_config.fps = m_apollo_launch_options.refreshRate;
+    }
     m_config.audioConfiguration = AUDIO_CONFIGURATION_STEREO;
     m_config.packetSize = 1392;
     m_config.streamingRemotely = STREAM_CFG_AUTO;
@@ -369,7 +383,7 @@ void MoonlightSession::start(ServerCallback<bool> callback, bool is_sunshine) {
                     result.error().c_str());
                 callback(GSResult<bool>::failure(result.error()));
             }
-        });
+        }, m_apollo_launch_options);
 }
 
 void MoonlightSession::stop(int terminate_app) {
@@ -407,8 +421,23 @@ void MoonlightSession::restart() {
     }, m_active_session->m_is_sunshine);
 }
 
+void MoonlightSession::restartWithApolloOptions(
+    APOLLO_LAUNCH_OPTIONS options, ServerCallback<bool> callback) {
+    m_is_active.store(false);
+    m_is_terminated.store(false);
+    m_restart_in_progress.store(true);
+    LiStopConnection();
+    m_apollo_launch_options = std::move(options);
+
+    start([callback](const GSResult<bool>& result) {
+        if (m_active_session)
+            m_active_session->m_restart_in_progress = false;
+        callback(result);
+    }, m_is_sunshine);
+}
+
 void MoonlightSession::draw(NVGcontext* vg, int width, int height) {
-    if (m_video_decoder && m_video_renderer) {
+    if (!m_input_only && m_video_decoder && m_video_renderer) {
         AVFrameHolder::instance().get(
             [this, vg, width, height](AVFrame* frame) {
                 m_video_renderer->draw(vg, width, height, frame, m_video_format);

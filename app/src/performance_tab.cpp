@@ -29,6 +29,34 @@
 #define ARTEMIS_HAS_CUSTOM_STREAM_PROFILE 0
 #endif
 
+#if __has_include("AVFrameHolder.hpp")
+#include "AVFrameHolder.hpp"
+#define ARTEMIS_HAS_FRAME_QUEUE 1
+#else
+#define ARTEMIS_HAS_FRAME_QUEUE 0
+#endif
+
+#if __has_include("video/VideoScaleStore.hpp")
+#include "video/VideoScaleStore.hpp"
+#define ARTEMIS_HAS_VIDEO_SCALE 1
+#else
+#define ARTEMIS_HAS_VIDEO_SCALE 0
+#endif
+
+#if __has_include("features/stream/AdvancedStreamOptionsStore.hpp")
+#include "features/stream/AdvancedStreamOptionsStore.hpp"
+#define ARTEMIS_HAS_ADVANCED_STREAM 1
+#else
+#define ARTEMIS_HAS_ADVANCED_STREAM 0
+#endif
+
+#if __has_include("benchmark/SwitchRuntimeMetadata.hpp")
+#include "benchmark/SwitchRuntimeMetadata.hpp"
+#define ARTEMIS_HAS_SWITCH_RUNTIME 1
+#else
+#define ARTEMIS_HAS_SWITCH_RUNTIME 0
+#endif
+
 #include <algorithm>
 #include <array>
 #include <atomic>
@@ -107,6 +135,34 @@ std::pair<int, int> configuredDimensions() {
     return {resolution * 16 / 9, resolution};
 }
 
+std::string scaleModeLabel() {
+#if ARTEMIS_HAS_VIDEO_SCALE
+    switch (artemis::video::VideoScaleStore::instance().get()) {
+    case artemis::video::ScaleMode::Fit:
+        return "Fit";
+    case artemis::video::ScaleMode::Stretch:
+        return "Stretch";
+    case artemis::video::ScaleMode::Fill:
+    default:
+        return "Fill";
+    }
+#else
+    return "Fill";
+#endif
+}
+
+std::string colorRangeLabel() {
+#if ARTEMIS_HAS_ADVANCED_STREAM
+    return artemis::stream::AdvancedStreamOptionsStore::instance()
+                   .get()
+                   .forceFullRangeVideo
+               ? "Full"
+               : "Limited";
+#else
+    return "Limited";
+#endif
+}
+
 #if ARTEMIS_HAS_BENCHMARK_EXPORT
 artemis::benchmark::ExportProfile exportProfile() {
     const auto [width, height] = configuredDimensions();
@@ -139,9 +195,11 @@ artemis::benchmark::ExportSummary exportSummary(
 PerformanceTab::PerformanceTab() {
     inflateFromXMLRes("xml/views/ingame_overlay/performance_tab.xml");
 
-    const std::array<DetailCell*, 9> compactRows = {
-        network, wifiSignal, receiveLatency, packetLoss, renderedFps,
-        benchmarkSummary, benchmarkAction, benchmarkSave, benchmarkReset};
+    const std::array<DetailCell*, 22> compactRows = {
+        network, wifiSignal, receiveLatency, decodeLatency, renderLatency,
+        packetLoss, hostFps, receivedFps, decodedFps, renderedFps, frameQueue,
+        gpuRender, presentation, operationMode, cpuClock, gpuClock, memoryClock,
+        battery, benchmarkSummary, benchmarkAction, benchmarkSave, benchmarkReset};
     for (auto* row : compactRows) {
         row->title->setSingleLine(true);
         row->detail->setSingleLine(true);
@@ -151,8 +209,21 @@ PerformanceTab::PerformanceTab() {
     network->setFocusable(false);
     wifiSignal->setText("artemis/performance/wifi_signal"_i18n);
     receiveLatency->setText("artemis/performance/receive_latency"_i18n);
+    decodeLatency->setText("artemis/performance/decode_latency"_i18n);
+    renderLatency->setText("artemis/performance/render_latency"_i18n);
     packetLoss->setText("artemis/performance/packet_loss"_i18n);
+    hostFps->setText("artemis/performance/host_fps"_i18n);
+    receivedFps->setText("artemis/performance/received_fps"_i18n);
+    decodedFps->setText("artemis/performance/decoded_fps"_i18n);
     renderedFps->setText("artemis/performance/rendered_fps"_i18n);
+    frameQueue->setText("artemis/performance/frame_queue"_i18n);
+    gpuRender->setText("artemis/performance/gpu_render"_i18n);
+    presentation->setText("artemis/performance/presentation"_i18n);
+    operationMode->setText("artemis/performance/operation_mode"_i18n);
+    cpuClock->setText("artemis/performance/cpu_clock"_i18n);
+    gpuClock->setText("artemis/performance/gpu_clock"_i18n);
+    memoryClock->setText("artemis/performance/memory_clock"_i18n);
+    battery->setText("artemis/performance/battery"_i18n);
     benchmarkSummary->setText("artemis/performance/benchmark"_i18n);
     benchmarkAction->setText("artemis/performance/start_benchmark"_i18n);
     benchmarkSave->setText("artemis/performance/save_benchmark"_i18n);
@@ -223,7 +294,7 @@ PerformanceTab::~PerformanceTab() {
 }
 
 void PerformanceTab::scheduleRefresh() {
-    refreshTask = delay(1000, [this] {
+    refreshTask = delay(250, [this] {
         refreshTask = 0;
         refresh();
         scheduleRefresh();
@@ -255,7 +326,7 @@ void PerformanceTab::updateBenchmarkStatus() {
 
 void PerformanceTab::refresh() {
     wifiQueryTicks++;
-    if (wifiQueryTicks >= 2) {
+    if (wifiQueryTicks >= 8) {
         wifiQueryTicks = 0;
         requestConnectionStatus();
     }
@@ -279,11 +350,59 @@ void PerformanceTab::refresh() {
         static_cast<double>(Settings::instance().bitrate()) / 1000.0));
 
     auto* session = MoonlightSession::activeSession();
+
+#if ARTEMIS_HAS_SWITCH_RUNTIME
+    const auto runtime = artemis::benchmark::collectSwitchRuntimeMetadata();
+    setDetailTextIfChanged(operationMode, runtime.operationMode);
+    setDetailTextIfChanged(
+        cpuClock,
+        runtime.cpuClockHz == 0
+            ? "-"
+            : fmt::format("{:.0f} MHz", runtime.cpuClockHz / 1000000.0));
+    setDetailTextIfChanged(
+        gpuClock,
+        runtime.gpuClockHz == 0
+            ? "-"
+            : fmt::format("{:.0f} MHz", runtime.gpuClockHz / 1000000.0));
+    setDetailTextIfChanged(
+        memoryClock,
+        runtime.memoryClockHz == 0
+            ? "-"
+            : fmt::format("{:.0f} MHz", runtime.memoryClockHz / 1000000.0));
+    if (runtime.batteryPercent < 0) {
+        setDetailTextIfChanged(battery, "-");
+    } else if (runtime.batteryChargingKnown) {
+        setDetailTextIfChanged(
+            battery,
+            fmt::format("{}% · {}", runtime.batteryPercent,
+                        runtime.batteryCharging
+                            ? "artemis/performance/charging"_i18n
+                            : "artemis/performance/on_battery"_i18n));
+    } else {
+        setDetailTextIfChanged(battery,
+                               fmt::format("{}%", runtime.batteryPercent));
+    }
+#else
+    setDetailTextIfChanged(operationMode, "-");
+    setDetailTextIfChanged(cpuClock, "-");
+    setDetailTextIfChanged(gpuClock, "-");
+    setDetailTextIfChanged(memoryClock, "-");
+    setDetailTextIfChanged(battery, "-");
+#endif
+
     if (!session || !session->is_active()) {
         network->setFocusable(false);
         setDetailTextIfChanged(receiveLatency, "-");
+        setDetailTextIfChanged(decodeLatency, "-");
+        setDetailTextIfChanged(renderLatency, "-");
         setDetailTextIfChanged(packetLoss, "-");
+        setDetailTextIfChanged(hostFps, "-");
+        setDetailTextIfChanged(receivedFps, "-");
+        setDetailTextIfChanged(decodedFps, "-");
         setDetailTextIfChanged(renderedFps, "-");
+        setDetailTextIfChanged(frameQueue, "-");
+        setDetailTextIfChanged(gpuRender, "-");
+        setDetailTextIfChanged(presentation, "-");
         benchmarkAction->setFocusable(false);
         benchmarkSave->setFocusable(false);
         benchmarkReset->setFocusable(false);
@@ -321,13 +440,33 @@ void PerformanceTab::refresh() {
     snapshot.networkMbps = static_cast<double>(Settings::instance().bitrate()) / 1000.0;
     snapshot.receiveLatencyMs = decode.current_receive_time;
     snapshot.decodeLatencyMs = decode.current_decoding_time;
+    snapshot.renderLatencyMs = render.rendering_time;
     snapshot.packetLossPercent = lossPercent;
+    snapshot.hostFps = decode.current_host_fps;
+    snapshot.receivedFps = decode.current_received_fps;
+    snapshot.decodedFps = decode.current_decoded_fps;
     snapshot.renderedFps = render.rendered_fps;
+    snapshot.gpuRenderMs = render.gpu_rendering_time;
+#if ARTEMIS_HAS_FRAME_QUEUE
+    snapshot.queueDepth = AVFrameHolder::instance().getFrameQueueSize();
+    snapshot.queueTarget = AVFrameHolder::instance().getFrameQueueTargetDepth();
+    snapshot.queueCapacity = AVFrameHolder::instance().getFrameQueueCapacity();
+#endif
+    snapshot.presentationMode = scaleModeLabel();
+    snapshot.colorRange = colorRangeLabel();
     const auto lite = artemis::performance::buildLiteStatus(snapshot);
 
     setDetailTextIfChanged(receiveLatency, lite.latencyText);
+    setDetailTextIfChanged(decodeLatency, lite.decodeText);
+    setDetailTextIfChanged(renderLatency, lite.renderText);
     setDetailTextIfChanged(packetLoss, lite.packetLossText);
+    setDetailTextIfChanged(hostFps, lite.hostFpsText);
+    setDetailTextIfChanged(receivedFps, lite.receivedFpsText);
+    setDetailTextIfChanged(decodedFps, lite.decodedFpsText);
     setDetailTextIfChanged(renderedFps, lite.fpsText);
+    setDetailTextIfChanged(frameQueue, lite.frameQueueText);
+    setDetailTextIfChanged(gpuRender, lite.gpuText);
+    setDetailTextIfChanged(presentation, lite.presentationText);
 
     const auto color = lite.healthy
         ? Application::getTheme()["brls/list/listItem_value_color"]

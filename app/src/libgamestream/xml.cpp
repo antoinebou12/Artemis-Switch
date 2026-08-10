@@ -59,9 +59,12 @@ static void XMLCALL _xml_start_applist_element(void* userData, const char* name,
 
         app->id = 0;
         app->name = NULL;
+        app->uuid = NULL;
+        app->server_order = 0;
         app->next = (PAPP_LIST)search->data;
         search->data = app;
-    } else if (strcmp("ID", name) == 0 || strcmp("AppTitle", name) == 0) {
+    } else if (strcmp("ID", name) == 0 || strcmp("AppTitle", name) == 0 ||
+               strcmp("UUID", name) == 0) {
         search->memory = (char*)malloc(1);
         search->size = 0;
         search->start = 1;
@@ -80,6 +83,8 @@ static void XMLCALL _xml_end_applist_element(void* userData, const char* name) {
             free(search->memory);
         } else if (strcmp("AppTitle", name) == 0) {
             list->name = search->memory;
+        } else if (strcmp("UUID", name) == 0) {
+            list->uuid = search->memory;
         }
         search->start = 0;
     }
@@ -121,7 +126,12 @@ static void XMLCALL _xml_write_data(void* userData, const XML_Char* s,
 int xml_search(const Data& data, const std::string node, int* result) {
     std::string text;
     auto res = xml_search(data, node, &text);
-    *result = std::stoi(text);
+    if (res != GS_OK || text.empty()) return GS_INVALID;
+    try {
+        *result = std::stoi(text);
+    } catch (...) {
+        return GS_INVALID;
+    }
     return res;
 }
 
@@ -150,6 +160,58 @@ int xml_search(const Data& data, const std::string node, std::string* result) {
 
     XML_ParserFree(parser);
     *result = std::string(search.memory);
+    free(search.memory);
+    return GS_OK;
+}
+
+namespace {
+struct xml_array_query {
+    std::string node;
+    std::vector<std::string>* values;
+    std::string current;
+    int depth = 0;
+};
+
+void XMLCALL _xml_array_start(void* userData, const char* name,
+                              const char** atts) {
+    auto* query = static_cast<xml_array_query*>(userData);
+    if (query->node == name) {
+        if (query->depth == 0) query->current.clear();
+        query->depth++;
+    }
+}
+
+void XMLCALL _xml_array_end(void* userData, const char* name) {
+    auto* query = static_cast<xml_array_query*>(userData);
+    if (query->node == name && query->depth > 0) {
+        query->depth--;
+        if (query->depth == 0) query->values->push_back(query->current);
+    }
+}
+
+void XMLCALL _xml_array_text(void* userData, const XML_Char* text, int length) {
+    auto* query = static_cast<xml_array_query*>(userData);
+    if (query->depth > 0) query->current.append(text, length);
+}
+} // namespace
+
+int xml_search_all(const Data& data, const std::string node,
+                   std::vector<std::string>* results) {
+    if (!results) return GS_INVALID;
+    results->clear();
+    xml_array_query query{node, results};
+    XML_Parser parser = XML_ParserCreate("UTF-8");
+    if (!parser) return GS_OUT_OF_MEMORY;
+    XML_SetUserData(parser, &query);
+    XML_SetElementHandler(parser, _xml_array_start, _xml_array_end);
+    XML_SetCharacterDataHandler(parser, _xml_array_text);
+    if (!XML_Parse(parser, reinterpret_cast<const char*>(data.bytes()),
+                   static_cast<int>(data.size()), 1)) {
+        gs_set_error(XML_ErrorString(XML_GetErrorCode(parser)));
+        XML_ParserFree(parser);
+        return GS_INVALID;
+    }
+    XML_ParserFree(parser);
     return GS_OK;
 }
 
@@ -174,7 +236,20 @@ int xml_applist(const Data& data, PAPP_LIST* app_list) {
     }
 
     XML_ParserFree(parser);
-    *app_list = (PAPP_LIST)query.data;
+    // The parser prepends for O(1) insertion. Reverse once so Apollo's server
+    // order and numeric command/app associations remain intact.
+    PAPP_LIST reversed = (PAPP_LIST)query.data;
+    PAPP_LIST ordered = NULL;
+    while (reversed) {
+        PAPP_LIST next = reversed->next;
+        reversed->next = ordered;
+        ordered = reversed;
+        reversed = next;
+    }
+    int order = 0;
+    for (PAPP_LIST item = ordered; item; item = item->next)
+        item->server_order = order++;
+    *app_list = ordered;
     return GS_OK;
 }
 

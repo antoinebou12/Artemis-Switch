@@ -1,7 +1,53 @@
 cmake_minimum_required(VERSION 3.10)
 
 set(EXTERN_PATH ${CMAKE_CURRENT_SOURCE_DIR}/extern)
-set(BOREALIS_LIBRARY ${EXTERN_PATH}/borealis/library)
+set(ARTEMIS_BOREALIS_SOURCE ${EXTERN_PATH}/borealis)
+set(ARTEMIS_BOREALIS_PATCHED ${CMAKE_BINARY_DIR}/extern/borealis-patched)
+set(ARTEMIS_BOREALIS_PATCH
+    ${CMAKE_CURRENT_SOURCE_DIR}/patches/borealis-handheld-motion-source.patch)
+
+# The source submodule stays pinned and clean. Apply the narrow handheld motion
+# source marker to a build-directory copy, just like the common-C protocol patch.
+if(NOT EXISTS "${ARTEMIS_BOREALIS_PATCHED}/library/CMakeLists.txt")
+    file(COPY "${ARTEMIS_BOREALIS_SOURCE}/"
+         DESTINATION "${ARTEMIS_BOREALIS_PATCHED}")
+    file(REMOVE_RECURSE "${ARTEMIS_BOREALIS_PATCHED}/.git")
+endif()
+find_program(ARTEMIS_GIT_EXECUTABLE git)
+if(NOT ARTEMIS_GIT_EXECUTABLE)
+    message(FATAL_ERROR "Git is required to apply Artemis dependency patches")
+endif()
+execute_process(
+    COMMAND "${ARTEMIS_GIT_EXECUTABLE}" init --quiet
+    WORKING_DIRECTORY "${ARTEMIS_BOREALIS_PATCHED}"
+    RESULT_VARIABLE ARTEMIS_BOREALIS_PATCH_REPO_INIT)
+if(NOT ARTEMIS_BOREALIS_PATCH_REPO_INIT EQUAL 0)
+    message(FATAL_ERROR "Failed to initialize Borealis build patch workspace")
+endif()
+execute_process(
+    COMMAND "${ARTEMIS_GIT_EXECUTABLE}" apply --check "${ARTEMIS_BOREALIS_PATCH}"
+    WORKING_DIRECTORY "${ARTEMIS_BOREALIS_PATCHED}"
+    RESULT_VARIABLE ARTEMIS_BOREALIS_PATCH_CHECK
+    OUTPUT_QUIET ERROR_QUIET)
+if(ARTEMIS_BOREALIS_PATCH_CHECK EQUAL 0)
+    execute_process(
+        COMMAND "${ARTEMIS_GIT_EXECUTABLE}" apply "${ARTEMIS_BOREALIS_PATCH}"
+        WORKING_DIRECTORY "${ARTEMIS_BOREALIS_PATCHED}"
+        RESULT_VARIABLE ARTEMIS_BOREALIS_PATCH_RESULT)
+    if(NOT ARTEMIS_BOREALIS_PATCH_RESULT EQUAL 0)
+        message(FATAL_ERROR "Failed to apply Borealis handheld motion patch")
+    endif()
+else()
+    execute_process(
+        COMMAND "${ARTEMIS_GIT_EXECUTABLE}" apply --reverse --check "${ARTEMIS_BOREALIS_PATCH}"
+        WORKING_DIRECTORY "${ARTEMIS_BOREALIS_PATCHED}"
+        RESULT_VARIABLE ARTEMIS_BOREALIS_PATCH_ALREADY_APPLIED
+        OUTPUT_QUIET ERROR_QUIET)
+    if(NOT ARTEMIS_BOREALIS_PATCH_ALREADY_APPLIED EQUAL 0)
+        message(FATAL_ERROR "Borealis handheld motion patch no longer applies")
+    endif()
+endif()
+set(BOREALIS_LIBRARY ${ARTEMIS_BOREALIS_PATCHED}/library)
 
 # build options
 include(${EXTERN_PATH}/cmake/commonOption.cmake)
@@ -70,12 +116,12 @@ endif ()
 
 set(VERSION_MAJOR "1")
 set(VERSION_MINOR "5")
-set(VERSION_ALTER "0")
+set(VERSION_ALTER "1")
 set(VERSION_BUILD "1")
 set(PACKAGE_NAME "ru.xitrix.Moonlight")
 set(PSN_TITLE_ID  "MNTL00000")
 set(PSN_VERSION  "01.00")
-set(PROJECT_AUTHOR "XITRIX")
+set(PROJECT_AUTHOR "antoinebou12")
 set(PROJECT_DISPLAY_NAME "Artemis Switch")
 set(PROJECT_ICON ${CMAKE_CURRENT_SOURCE_DIR}/resources/img/moonlight_icon.jpg)
 set(PROJECT_RESOURCES ${CMAKE_CURRENT_SOURCE_DIR}/resources)
