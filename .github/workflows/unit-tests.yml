@@ -2,12 +2,14 @@ name: Unit tests
 
 on:
   push:
-    branches: ["master", "agent/**"]
+    branches: ["main", "agent/**"]
   pull_request:
+    branches: ["main"]
 
 jobs:
   portable-tests:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
 
@@ -28,6 +30,7 @@ jobs:
 
   portable-sanitizers:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     env:
       CXXFLAGS: -fsanitize=address,undefined -fno-omit-frame-pointer
       LDFLAGS: -fsanitize=address,undefined

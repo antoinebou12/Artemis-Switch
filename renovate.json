@@ -3,6 +3,9 @@
   "extends": [
     "config:best-practices"
   ],
+  "baseBranches": [
+    "main"
+  ],
   "dependencyDashboard": true,
   "timezone": "America/Toronto",
   "prConcurrentLimit": 5,
