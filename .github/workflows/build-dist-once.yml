@@ -1,5 +1,6 @@
 name: Build Artemis Switch NRO into dist (one-shot)
 
+# Retriggered through a server-side PR merge so GitHub emits a normal push event.
 on:
   push:
     branches:
