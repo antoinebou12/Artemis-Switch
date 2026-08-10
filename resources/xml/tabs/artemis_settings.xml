@@ -33,7 +33,7 @@
         text="@i18n/artemis/settings/notes_text"
         width="100%"
         height="auto"
-        fontSize="18"
+        fontSize="16"
         lineHeight="1.25"
         marginTop="16"
         marginBottom="24"/>

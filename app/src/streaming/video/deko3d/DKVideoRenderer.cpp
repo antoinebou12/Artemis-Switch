@@ -118,16 +118,10 @@ public:
         const ScaleMode scaleMode = artemis::video::VideoScaleStore::instance().get();
         const auto zoomPan = artemis::video::normalizeZoomPan(
             artemis::video::ZoomPanStore::instance().get().state);
-        const bool forceFullRange =
-            artemis::stream::AdvancedStreamOptionsStore::instance()
-                .get()
-                .forceFullRangeVideo;
-
         return scaleMode != ScaleMode::Fill ||
                !nearlyEqual(zoomPan.zoom, 1.0f) ||
                !nearlyEqual(zoomPan.panX, 0.0f) ||
-               !nearlyEqual(zoomPan.panY, 0.0f) ||
-               forceFullRange;
+               !nearlyEqual(zoomPan.panY, 0.0f);
     }
 
     void restoreLegacyCommands(int width, int height, AVFrame* frame) {

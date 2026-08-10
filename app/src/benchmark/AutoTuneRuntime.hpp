@@ -19,6 +19,7 @@ public:
     void cancel();
 
     [[nodiscard]] bool running() const { return m_running.load(); }
+    [[nodiscard]] bool extended() const { return m_extended.load(); }
     [[nodiscard]] size_t currentStep() const;
     [[nodiscard]] size_t totalSteps() const;
     [[nodiscard]] std::optional<AutoTuneResult> recommendation() const;
@@ -32,6 +33,7 @@ private:
 
     mutable std::mutex m_mutex;
     std::atomic<bool> m_running{false};
+    std::atomic<bool> m_extended{false};
     std::atomic<bool> m_cancelRequested{false};
     std::thread m_worker;
     AutoTuneSession m_session;

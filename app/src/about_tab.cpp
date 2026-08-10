@@ -20,16 +20,27 @@ AboutTab::AboutTab() {
     std::string themePart =
         variant == brls::ThemeVariant::DARK ? "_dark" : "_light";
 
-    std::string subtitle = fmt::format(fmt::runtime("about/version"_i18n), APP_VERSION);
+    std::string subtitle = fmt::format(
+        "Artemis Switch v{} by antoinebou12", APP_VERSION);
     versionLabel->setSubtitle(subtitle);
 
-    std::string githubLink = "https://github.com/XITRIX/Moonlight-Switch";
+    std::string githubLink = "https://github.com/antoinebou12/Artemis-Switch";
     github->addGestureRecognizer(new TapGestureRecognizer(github));
-    github->title->setText("about/link_github"_i18n);
+    github->title->setText("Artemis Switch repository");
     github->subtitle->setText(githubLink);
     github->image->setImageFromRes("img/links/github" + themePart + ".png");
     github->registerClickAction([githubLink](View* view) {
         openWebpage(githubLink);
+        return true;
+    });
+
+    std::string apolloLink = "https://github.com/ClassicOldSong/Apollo";
+    apollo->addGestureRecognizer(new TapGestureRecognizer(apollo));
+    apollo->title->setText("Apollo host for PC");
+    apollo->subtitle->setText(apolloLink);
+    apollo->image->setImageFromRes("img/links/github" + themePart + ".png");
+    apollo->registerClickAction([apolloLink](View* view) {
+        openWebpage(apolloLink);
         return true;
     });
 

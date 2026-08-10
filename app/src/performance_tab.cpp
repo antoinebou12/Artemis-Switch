@@ -34,6 +34,7 @@
 #endif
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <filesystem>
 #include <fmt/format.h>
@@ -98,6 +99,26 @@ artemis::benchmark::ExportSummary exportSummary(
 PerformanceTab::PerformanceTab() {
     inflateFromXMLRes("xml/views/ingame_overlay/performance_tab.xml");
 
+    const std::array<DetailCell*, 16> compactRows = {
+        streamProfile, network, receiveLatency, decodeLatency, renderLatency,
+        packetLoss, renderedFps, queueDepth, benchmarkSummary,
+        benchmarkAction, benchmarkSave, benchmarkReset, autoTuneSummary,
+        autoTuneAction, autoTuneAdvanced, refreshButton};
+    for (auto* row : compactRows) {
+        row->title->setSingleLine(true);
+        row->title->setFontSize(18);
+        row->detail->setSingleLine(true);
+        row->detail->setFontSize(18);
+    }
+
+    // Auto Tune results can still be wider than the Switch overlay. Keep the
+    // status in one clipped column and continuously marquee it in accent blue.
+    autoTuneSummary->detail->setHorizontalAlign(HorizontalAlign::LEFT);
+    autoTuneSummary->detail->setTextColor(
+        Application::getTheme()["brls/accent"]);
+    autoTuneSummary->detail->setAutoAnimate(false);
+    autoTuneSummary->detail->setAnimated(true);
+
     streamProfile->setText("artemis/performance/stream_profile"_i18n);
     network->setText("artemis/performance/configured_bitrate"_i18n);
     receiveLatency->setText("artemis/performance/receive_latency"_i18n);
@@ -109,29 +130,49 @@ PerformanceTab::PerformanceTab() {
     benchmarkSummary->setText("artemis/performance/benchmark"_i18n);
     benchmarkAction->setText("artemis/performance/start_benchmark"_i18n);
     benchmarkSave->setText("artemis/performance/save_benchmark"_i18n);
+    benchmarkReset->setText("artemis/performance/reset_benchmark"_i18n);
     autoTuneSummary->setText("artemis/performance/auto_tune_status"_i18n);
-    autoTuneAction->setText("artemis/performance/start_auto_tune"_i18n);
+    autoTuneAction->setText("artemis/performance/quick_auto_tune"_i18n);
+    autoTuneAdvanced->setText("artemis/performance/advanced_auto_tune"_i18n);
     refreshButton->setText("artemis/performance/refresh"_i18n);
 
 #if ARTEMIS_HAS_BENCHMARK_RUNTIME
     benchmarkSummary->setDetailText("artemis/performance/ready"_i18n);
     benchmarkAction->registerClickAction([this](View*) {
+#if ARTEMIS_HAS_AUTO_TUNE
+        if (artemis::benchmark::AutoTuneRuntime::instance().running())
+            return true;
+#endif
         auto& runtime = artemis::benchmark::BenchmarkRuntime::instance();
         if (runtime.running()) {
             const auto result = runtime.stop();
             benchmarkSummary->setDetailText(fmt::format(
-                "{:.1f}/100, {:.2f}% loss, P99 {:.2f} ms",
+                "{:.0f}/100 · {:.2f}% · {:.1f} ms",
                 result.stabilityScore, result.networkDropPercent,
                 result.clientProcessingMs.p99));
         } else {
             runtime.start(Settings::instance().fps());
         }
         updateBenchmarkStatus();
+        updateAutoTuneStatus();
+        return true;
+    });
+    benchmarkReset->registerClickAction([this](View*) {
+#if ARTEMIS_HAS_AUTO_TUNE
+        if (artemis::benchmark::AutoTuneRuntime::instance().running())
+            return true;
+#endif
+        auto& runtime = artemis::benchmark::BenchmarkRuntime::instance();
+        runtime.reset();
+        benchmarkSummary->setDetailText(
+            "artemis/performance/reset_done"_i18n);
+        updateBenchmarkStatus();
         return true;
     });
 #else
     benchmarkSummary->setDetailText("artemis/performance/benchmark_unavailable"_i18n);
     benchmarkAction->setFocusable(false);
+    benchmarkReset->setFocusable(false);
 #endif
 
 #if ARTEMIS_HAS_BENCHMARK_EXPORT
@@ -163,16 +204,38 @@ PerformanceTab::PerformanceTab() {
 #if ARTEMIS_HAS_AUTO_TUNE
     autoTuneAction->registerClickAction([this](View*) {
         auto& runtime = artemis::benchmark::AutoTuneRuntime::instance();
+#if ARTEMIS_HAS_BENCHMARK_RUNTIME
+        if (!runtime.running() &&
+            artemis::benchmark::BenchmarkRuntime::instance().running())
+            return true;
+#endif
         if (runtime.running())
             runtime.cancel();
         else
             runtime.start(false);
         updateAutoTuneStatus();
+        updateBenchmarkStatus();
+        return true;
+    });
+    autoTuneAdvanced->registerClickAction([this](View*) {
+        auto& runtime = artemis::benchmark::AutoTuneRuntime::instance();
+#if ARTEMIS_HAS_BENCHMARK_RUNTIME
+        if (!runtime.running() &&
+            artemis::benchmark::BenchmarkRuntime::instance().running())
+            return true;
+#endif
+        if (runtime.running())
+            runtime.cancel();
+        else
+            runtime.start(true);
+        updateAutoTuneStatus();
+        updateBenchmarkStatus();
         return true;
     });
 #else
     autoTuneSummary->setDetailText("artemis/performance/auto_tune_unavailable"_i18n);
     autoTuneAction->setFocusable(false);
+    autoTuneAdvanced->setFocusable(false);
 #endif
 
     refreshButton->registerClickAction([this](View*) {
@@ -186,18 +249,28 @@ PerformanceTab::PerformanceTab() {
 void PerformanceTab::updateBenchmarkStatus() {
 #if ARTEMIS_HAS_BENCHMARK_RUNTIME
     auto& runtime = artemis::benchmark::BenchmarkRuntime::instance();
+#if ARTEMIS_HAS_AUTO_TUNE
+    const bool tuneRunning =
+        artemis::benchmark::AutoTuneRuntime::instance().running();
+#else
+    const bool tuneRunning = false;
+#endif
     if (runtime.running()) {
         const auto summary = runtime.snapshot();
         benchmarkAction->setText("artemis/performance/stop_benchmark"_i18n);
+        benchmarkAction->setFocusable(!tuneRunning);
         benchmarkSummary->setDetailText(fmt::format(
-            "{} samples, {:.1f}/100",
+            "{} · {:.0f}/100",
             runtime.sampleCount(), summary.stabilityScore));
         benchmarkSave->setFocusable(false);
+        benchmarkReset->setFocusable(false);
     } else {
         benchmarkAction->setText("artemis/performance/start_benchmark"_i18n);
+        benchmarkAction->setFocusable(!tuneRunning);
 #if ARTEMIS_HAS_BENCHMARK_EXPORT
-        benchmarkSave->setFocusable(runtime.sampleCount() >= 2);
+        benchmarkSave->setFocusable(!tuneRunning && runtime.sampleCount() >= 2);
 #endif
+        benchmarkReset->setFocusable(!tuneRunning && runtime.sampleCount() > 0);
     }
 #endif
 }
@@ -205,20 +278,39 @@ void PerformanceTab::updateBenchmarkStatus() {
 void PerformanceTab::updateAutoTuneStatus() {
 #if ARTEMIS_HAS_AUTO_TUNE
     auto& runtime = artemis::benchmark::AutoTuneRuntime::instance();
+#if ARTEMIS_HAS_BENCHMARK_RUNTIME
+    const bool benchmarkRunning =
+        artemis::benchmark::BenchmarkRuntime::instance().running();
+#else
+    const bool benchmarkRunning = false;
+#endif
     if (runtime.running()) {
-        autoTuneAction->setText("artemis/performance/cancel_auto_tune"_i18n);
+        const bool advanced = runtime.extended();
+        autoTuneAction->setText(advanced
+            ? "artemis/performance/quick_auto_tune"_i18n
+            : "artemis/performance/cancel_auto_tune"_i18n);
+        autoTuneAdvanced->setText(advanced
+            ? "artemis/performance/cancel_auto_tune"_i18n
+            : "artemis/performance/advanced_auto_tune"_i18n);
+        autoTuneAction->setFocusable(!advanced);
+        autoTuneAdvanced->setFocusable(advanced);
         autoTuneSummary->setDetailText(fmt::format(
-            "{} / {}", runtime.currentStep() + 1, runtime.totalSteps()));
+            "{} · {} / {}",
+            advanced ? "artemis/performance/advanced_mode"_i18n
+                     : "artemis/performance/quick_mode"_i18n,
+            runtime.currentStep() + 1, runtime.totalSteps()));
         return;
     }
 
-    autoTuneAction->setText("artemis/performance/start_auto_tune"_i18n);
+    autoTuneAction->setText("artemis/performance/quick_auto_tune"_i18n);
+    autoTuneAdvanced->setText("artemis/performance/advanced_auto_tune"_i18n);
+    autoTuneAction->setFocusable(runtime.available() && !benchmarkRunning);
+    autoTuneAdvanced->setFocusable(runtime.available() && !benchmarkRunning);
     if (const auto best = runtime.recommendation()) {
         autoTuneSummary->setDetailText(fmt::format(
-            "{}x{} @ {} FPS, {:.1f} Mbps, {} threads",
+            "{}x{} · {} FPS · {:.0f} Mbps",
             best->profile.width, best->profile.height, best->profile.fps,
-            static_cast<double>(best->profile.bitrateKbps) / 1000.0,
-            best->profile.decoderThreads));
+            static_cast<double>(best->profile.bitrateKbps) / 1000.0));
     } else if (runtime.available()) {
         autoTuneSummary->setDetailText("artemis/performance/auto_tune_ready"_i18n);
     } else {
@@ -238,9 +330,13 @@ void PerformanceTab::refresh() {
         packetLoss->setDetailText("-");
         renderedFps->setDetailText("-");
         queueDepth->setDetailText("-");
+        autoTuneSummary->setDetailText(
+            "artemis/performance/auto_tune_requires_stream"_i18n);
         benchmarkAction->setFocusable(false);
         benchmarkSave->setFocusable(false);
+        benchmarkReset->setFocusable(false);
         autoTuneAction->setFocusable(false);
+        autoTuneAdvanced->setFocusable(false);
         return;
     }
 
@@ -250,6 +346,9 @@ void PerformanceTab::refresh() {
 #if ARTEMIS_HAS_AUTO_TUNE
     autoTuneAction->setFocusable(artemis::benchmark::AutoTuneRuntime::instance().available() ||
                                  artemis::benchmark::AutoTuneRuntime::instance().running());
+    autoTuneAdvanced->setFocusable(
+        artemis::benchmark::AutoTuneRuntime::instance().available() ||
+        artemis::benchmark::AutoTuneRuntime::instance().running());
 #endif
 
     const auto* stats = session->session_stats();

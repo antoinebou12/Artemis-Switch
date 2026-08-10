@@ -15,13 +15,7 @@
 #include "button_selecting_dialog.hpp"
 #include "UpscalingSupport.hpp"
 
-#if __has_include("benchmark/BenchmarkRuntime.hpp")
-#include "benchmark/BenchmarkRuntime.hpp"
-#define ARTEMIS_QUICK_HAS_BENCHMARK 1
-#else
-#define ARTEMIS_QUICK_HAS_BENCHMARK 0
-#endif
-
+#include <array>
 #include <cmath>
 #include <iomanip>
 #include <sstream>
@@ -121,6 +115,14 @@ LogoutTab::LogoutTab(StreamingView* streamView) : streamView(streamView) {
 OptionsTab::OptionsTab(StreamingView* streamView) : streamView(streamView) {
     this->inflateFromXMLRes("xml/views/ingame_overlay/options_tab.xml");
 
+    const std::array<DetailCell*, 4> quickRows = {
+        quickKeyboard, quickPerformance, quickDisconnect, quickQuitHost};
+    for (auto* row : quickRows) {
+        row->title->setSingleLine(true);
+        row->title->setFontSize(18);
+        row->detail->setSingleLine(true);
+    }
+
     quickKeyboard->setText("artemis/overlay/show_keyboard"_i18n);
     quickKeyboard->registerClickAction([this, streamView](View*) {
         this->dismiss([streamView] { streamView->showKeyboard(); });
@@ -134,28 +136,6 @@ OptionsTab::OptionsTab(StreamingView* streamView) : streamView(streamView) {
         quickPerformance->setDetailText(streamView->draw_stats ? "hints/on"_i18n : "hints/off"_i18n);
         return true;
     });
-
-    quickBenchmark->setText("artemis/overlay/benchmark"_i18n);
-#if ARTEMIS_QUICK_HAS_BENCHMARK
-    quickBenchmark->setDetailText(
-        artemis::benchmark::BenchmarkRuntime::instance().running()
-            ? "artemis/overlay/stop"_i18n
-            : "artemis/overlay/start"_i18n);
-    quickBenchmark->registerClickAction([this](View*) {
-        auto& benchmark = artemis::benchmark::BenchmarkRuntime::instance();
-        if (benchmark.running())
-            benchmark.stop();
-        else
-            benchmark.start(Settings::instance().fps());
-        quickBenchmark->setDetailText(benchmark.running()
-            ? "artemis/overlay/stop"_i18n
-            : "artemis/overlay/start"_i18n);
-        return true;
-    });
-#else
-    quickBenchmark->setDetailText("artemis/overlay/requires_benchmark"_i18n);
-    quickBenchmark->setFocusable(false);
-#endif
 
     quickDisconnect->setText("artemis/overlay/disconnect_stream"_i18n);
     quickDisconnect->registerClickAction([this, streamView](View*) {

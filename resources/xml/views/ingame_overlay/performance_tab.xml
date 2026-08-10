@@ -27,9 +27,11 @@
             <brls:DetailCell id="benchmark_summary"/>
             <brls:DetailCell id="benchmark_action"/>
             <brls:DetailCell id="benchmark_save"/>
+            <brls:DetailCell id="benchmark_reset"/>
             <brls:Header title="Auto Tune" paddingTop="60" lineTop="1px"/>
             <brls:DetailCell id="auto_tune_summary"/>
             <brls:DetailCell id="auto_tune_action"/>
+            <brls:DetailCell id="auto_tune_advanced"/>
             <brls:Header title="@i18n/artemis/performance/actions" paddingTop="60" lineTop="1px"/>
             <brls:DetailCell id="refresh"/>
         </brls:Box>

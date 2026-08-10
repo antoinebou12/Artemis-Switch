@@ -136,6 +136,12 @@ int main(int argc, char* argv[]) {
 
     brls::Application::createWindow("title"_i18n);
 
+#ifdef __SWITCH__
+    // Present once per display refresh. This keeps both the UI and streamed
+    // video synchronized to the Switch display instead of exposing partial frames.
+    brls::Application::setSwapInterval(1);
+#endif
+
     auto home = Application::getPlatform()->getHomeDirectory("Moonlight-Switch");
     Settings::instance().set_working_dir(home);
     Settings::instance().set_launch_path(argc > 0 ? argv[0] : "");

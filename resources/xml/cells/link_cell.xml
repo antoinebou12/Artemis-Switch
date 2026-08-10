@@ -28,7 +28,8 @@
             width="auto"
             height="auto"
             text="GitHub Page"
-            fontSize="21" />
+            fontSize="19"
+            singleLine="true" />
 
         <brls:Label
             id="subtitle"
@@ -36,6 +37,7 @@
             height="auto"
             text="https://github.com/XITRIX/Moonlight-Switch"
             fontSize="12"
+            singleLine="true"
             textColor="@theme/brls/header/subtitle" />
 
     </brls:Box>

@@ -31,9 +31,10 @@
                 paddingTop="40"/>
 
             <brls:Label
-                width="auto"
+                width="100%"
                 height="auto"
                 fontSize="15"
+                lineHeight="1.2"
                 textColor="@theme/brls/header/subtitle"
                 text="@i18n/about/about"
                 marginTop="8"/>
@@ -45,6 +46,9 @@
             <LinkCell 
                 id="github"/>
 
+            <LinkCell
+                id="apollo"/>
+
             <LinkCell 
                 id="patreon"/>
 
@@ -54,6 +58,14 @@
             <brls:Header
                 title="@i18n/about/thanks"
                 paddingTop="60"/>
+
+            <brls:Label
+                width="100%"
+                height="auto"
+                fontSize="15"
+                textColor="@theme/brls/accent"
+                text=" antoinebou12 for creating and testing Artemis Switch"
+                marginTop="8"/>
 
             <brls:Label
                 width="auto"

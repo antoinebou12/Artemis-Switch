@@ -54,7 +54,6 @@ class OptionsTab : public brls::Box {
 
     BRLS_BIND(brls::DetailCell, quickKeyboard, "quick_keyboard");
     BRLS_BIND(brls::DetailCell, quickPerformance, "quick_performance");
-    BRLS_BIND(brls::DetailCell, quickBenchmark, "quick_benchmark");
     BRLS_BIND(brls::DetailCell, quickDisconnect, "quick_disconnect");
     BRLS_BIND(brls::DetailCell, quickQuitHost, "quick_quit_host");
 

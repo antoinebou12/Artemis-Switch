@@ -51,6 +51,7 @@ bool AutoTuneRuntime::start(bool extended) {
     if (m_worker.joinable())
         m_worker.join();
 
+    m_extended.store(extended);
     m_cancelRequested.store(false);
     {
         std::lock_guard lock(m_mutex);

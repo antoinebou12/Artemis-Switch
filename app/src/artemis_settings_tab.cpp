@@ -32,6 +32,7 @@
 #endif
 
 #include <algorithm>
+#include <array>
 #include <cstdlib>
 #include <fmt/format.h>
 #include <vector>
@@ -76,6 +77,17 @@ int frameRateSelection(const std::vector<int>& values, int current) {
 
 ArtemisSettingsTab::ArtemisSettingsTab() {
     inflateFromXMLRes("xml/tabs/artemis_settings.xml");
+
+    const std::array<DetailCell*, 14> compactRows = {
+        activeProfile, customResolution, width, height, exactBitrate,
+        frameRate, unlockHighFps, forceFullRange, preventPacketLoss,
+        scaleMode, rememberZoomPan, resetZoomPan, forwardMotion,
+        consoleMotionFallback};
+    for (auto* row : compactRows) {
+        row->title->setSingleLine(true);
+        row->title->setFontSize(18);
+        row->detail->setSingleLine(true);
+    }
 
     const auto stored = artemis::streaming::StreamProfileStore::instance().get();
     customResolution->init("artemis/settings/use_custom_resolution"_i18n,
@@ -131,15 +143,12 @@ ArtemisSettingsTab::ArtemisSettingsTab() {
         options.forceFullRangeVideo = enabled;
         artemis::stream::AdvancedStreamOptionsStore::instance().set(options);
     });
-    forceFullRange->setDetailText(
-        "Requests full range from the host on the next stream start/restart");
     preventPacketLoss->init("artemis/settings/prevent_packet_loss"_i18n,
                             advanced.preventPacketLoss, [](bool enabled) {
         auto options = artemis::stream::AdvancedStreamOptionsStore::instance().get();
         options.preventPacketLoss = enabled;
         artemis::stream::AdvancedStreamOptionsStore::instance().set(options);
     });
-    preventPacketLoss->setDetailText("artemis/settings/packet_loss_unverified"_i18n);
 #else
     unlockHighFps->init("artemis/settings/unlock_high_fps"_i18n, false, [](bool) {});
     forceFullRange->init("artemis/settings/force_full_range"_i18n, false, [](bool) {});
@@ -202,12 +211,6 @@ ArtemisSettingsTab::ArtemisSettingsTab() {
         artemis::input::SwitchMotionPolicyStore::instance().set(options);
     });
     consoleMotionFallback->setEnabled(consoleFallbackSupported);
-    if (!consoleFallbackSupported) {
-        consoleMotionFallback->setDetailText(
-            capabilities.libnxSevenSixAxisApiAvailable
-                ? "artemis/settings/console_motion_api_unmapped"_i18n
-                : "artemis/settings/console_motion_unavailable"_i18n);
-    }
 #else
     forwardMotion->init("artemis/settings/forward_motion"_i18n, true, [](bool) {});
     consoleMotionFallback->init("artemis/settings/console_motion_fallback"_i18n,
