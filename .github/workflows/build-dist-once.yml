@@ -1,10 +1,9 @@
 name: Build Artemis Switch NRO into dist (one-shot)
 
-# Retriggered through a server-side PR merge so GitHub emits a normal push event.
 on:
   push:
     branches:
-      - master
+      - main
     paths:
       - .github/workflows/build-dist-once.yml
 
@@ -51,7 +50,7 @@ jobs:
           printf '%s\n' "$build_rc" > /tmp/artemis-switch-build.rc
           exit 0
 
-      - name: Publish NRO or failure log to master
+      - name: Publish NRO or failure log to main
         shell: bash
         run: |
           set -euo pipefail
@@ -62,7 +61,7 @@ jobs:
 
           rc="$(cat /tmp/artemis-switch-build.rc)"
           git reset --hard HEAD
-          git pull --rebase origin master
+          git pull --rebase origin main
 
           mkdir -p dist
           if [ "$rc" = "0" ] && [ -s /tmp/Artemis-Switch.nro ]; then
@@ -79,7 +78,7 @@ jobs:
           git add -f dist/Artemis-Switch.nro dist/Artemis-Switch-build.log dist/Artemis-Switch-build-status.txt 2>/dev/null || true
           git commit -m "$message"
 
-          git push origin HEAD:master || {
-            git pull --rebase origin master
-            git push origin HEAD:master
+          git push origin HEAD:main || {
+            git pull --rebase origin main
+            git push origin HEAD:main
           }
