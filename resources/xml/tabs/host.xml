@@ -30,6 +30,9 @@
                 id="host_web_config"/>
 
             <brls:DetailCell
+                id="stream_profile"/>
+
+            <brls:DetailCell
                 id="remove"
                 lineTop="1px"
                 marginTop="24"/>

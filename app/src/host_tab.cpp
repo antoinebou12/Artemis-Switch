@@ -10,6 +10,8 @@
 #include "app_list_view.hpp"
 #include "helper.hpp"
 #include "main_tabs_view.hpp"
+#include "features/ui/QrCodeView.hpp"
+#include "streaming/StreamProfileStore.hpp"
 
 using namespace brls::literals;
 
@@ -25,7 +27,20 @@ std::string host_subtitle(const Host& host) {
     return addresses.front() + " | +" +
            std::to_string(addresses.size() - 1) + " more";
 }
+
+std::string host_profile_key(const Host& host) {
+    if (is_usable_mac(host.mac))
+        return host.mac;
+    return host.preferred_address();
 }
+
+std::string host_web_config_url(const Host& host) {
+    const std::string address = host.preferred_address();
+    if (address.empty())
+        return {};
+    return "https://" + address + ":47990/";
+}
+} // namespace
 
 HostTab::HostTab(const Host& host) : host(host) {
     // Inflate the tab from the XML file
@@ -39,18 +54,59 @@ HostTab::HostTab(const Host& host) : host(host) {
     hostWebConfig->setText("host/web_config"_i18n);
     hostWebConfig->setDetailText("host/web_config_hint"_i18n);
     hostWebConfig->registerClickAction([this](View*) {
-        const std::string address = this->host.preferred_address();
-        if (address.empty()) {
+        const std::string url = host_web_config_url(this->host);
+        if (url.empty()) {
             showError("host/web_config_no_address"_i18n);
             return true;
         }
-        const std::string url = "https://" + address + ":47990/";
         Application::getPlatform()->openBrowser(url);
-        auto* dialog = new Dialog("host/web_config_message"_i18n + "\n\n" + url);
-        dialog->addButton("common/close"_i18n, [] {});
-        dialog->open();
+        artemis::ui::showUrlQrDialog("host/web_config"_i18n, url);
         return true;
     });
+
+    streamProfile->setText("host/stream_profile"_i18n);
+    {
+        const auto key = host_profile_key(this->host);
+        const auto profile =
+            artemis::streaming::StreamProfileStore::instance().get(key);
+        streamProfile->setDetailText(
+            profile.customResolutionEnabled
+                ? (std::to_string(profile.width) + "x" +
+                   std::to_string(profile.height))
+                : "host/stream_profile_global"_i18n);
+        streamProfile->registerClickAction([this, key](View*) {
+            const std::vector<std::string> options = {
+                "host/stream_profile_global"_i18n, "720p", "1080p",
+                std::to_string(Application::windowWidth) + "x" +
+                    std::to_string(Application::windowHeight)};
+            auto* dropdown = new Dropdown(
+                "host/stream_profile"_i18n, options,
+                [this, key](int selected) {
+                    auto& store = artemis::streaming::StreamProfileStore::instance();
+                    if (selected <= 0) {
+                        store.setCustomResolution(key, false, 1920, 1080);
+                        streamProfile->setDetailText(
+                            "host/stream_profile_global"_i18n);
+                        return;
+                    }
+                    int width = 1280;
+                    int height = 720;
+                    if (selected == 2) {
+                        width = 1920;
+                        height = 1080;
+                    } else if (selected == 3) {
+                        width = Application::windowWidth;
+                        height = Application::windowHeight;
+                    }
+                    store.setCustomResolution(key, true, width, height);
+                    streamProfile->setDetailText(std::to_string(width) + "x" +
+                                                 std::to_string(height));
+                },
+                0);
+            Application::pushActivity(new Activity(dropdown));
+            return true;
+        });
+    }
 
     registerAction("host/rename"_i18n, ControllerButton::BUTTON_START,
                    [this](View* view) {

@@ -299,6 +299,16 @@ class Settings : public Singleton<Settings> {
         return m_wireguard_config_path;
     }
 
+    void set_easytier_enabled(bool enabled) { m_easytier_enabled = enabled; }
+    [[nodiscard]] bool easytier_enabled() const { return m_easytier_enabled; }
+
+    void set_easytier_config_path(std::string path) {
+        m_easytier_config_path = std::move(path);
+    }
+    [[nodiscard]] std::string easytier_config_path() const {
+        return m_easytier_config_path;
+    }
+
     void set_stream_audio_configuration(StreamAudioConfiguration config) {
         m_stream_audio_configuration = config;
     }
@@ -449,6 +459,8 @@ class Settings : public Singleton<Settings> {
     bool m_play_audio = false;
     bool m_wireguard_enabled = false;
     std::string m_wireguard_config_path;
+    bool m_easytier_enabled = false;
+    std::string m_easytier_config_path;
     StreamAudioConfiguration m_stream_audio_configuration = STREAM_AUDIO_STEREO;
     bool m_terminate_app_on_disconnect = false;
     bool m_write_log = false;

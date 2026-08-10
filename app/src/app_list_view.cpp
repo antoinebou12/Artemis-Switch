@@ -8,6 +8,7 @@
 #include "app_list_view.hpp"
 #include "helper.hpp"
 #include "main_tabs_view.hpp"
+#include "features/ui/QrCodeView.hpp"
 
 AppListView::AppListView(const Host& host) : host(host) {
     this->inflateFromXMLRes("xml/views/app_list_view.xml");
@@ -42,9 +43,7 @@ AppListView::AppListView(const Host& host) : host(host) {
         }
         const std::string url = "https://" + address + ":47990/";
         Application::getPlatform()->openBrowser(url);
-        auto* dialog = new Dialog("host/web_config_message"_i18n + "\n\n" + url);
-        dialog->addButton("common/close"_i18n, [] {});
-        dialog->open();
+        artemis::ui::showUrlQrDialog("host/web_config"_i18n, url);
         return true;
     });
     container->addView(webConfig);

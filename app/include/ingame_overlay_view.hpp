@@ -77,6 +77,7 @@ class OptionsTab : public brls::Box {
     BRLS_BIND(brls::SelectorCell, keyboardType, "keyboard_type");
     BRLS_BIND(brls::SelectorCell, keyboardFingers, "keyboard_fingers");
     BRLS_BIND(brls::BooleanCell, touchscreenMouseMode, "touchscreen_mouse_mode");
+    BRLS_BIND(brls::SelectorCell, switchDisplay, "switch_display");
     BRLS_BIND(brls::DetailCell, optionsPointerMode, "options_pointer_mode");
     BRLS_BIND(brls::DetailCell, optionsControllers, "options_controllers");
     BRLS_BIND(brls::DetailCell, optionsDiagnostics, "options_diagnostics");

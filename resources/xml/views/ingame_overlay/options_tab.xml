@@ -21,6 +21,7 @@
             <brls:SelectorCell id="keyboard_type"/>
             <brls:SelectorCell id="keyboard_fingers"/>
             <brls:BooleanCell id="touchscreen_mouse_mode"/>
+            <brls:SelectorCell id="switch_display"/>
             <brls:DetailCell id="options_pointer_mode"/>
             <brls:DetailCell id="options_controllers"/>
             <brls:DetailCell id="options_diagnostics"/>

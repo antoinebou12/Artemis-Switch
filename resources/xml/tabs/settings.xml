@@ -94,7 +94,7 @@
                 id="pcAudio"/>
 
             <brls:Header
-                title="@i18n/settings/wireguard"
+                title="@i18n/settings/vpn"
                 paddingTop="60"/>
 
             <brls:BooleanCell
@@ -105,6 +105,15 @@
 
             <brls:DetailCell
                 id="wireguard_status"/>
+
+            <brls:BooleanCell
+                id="easytier_enabled"/>
+
+            <brls:DetailCell
+                id="easytier_config_path"/>
+
+            <brls:DetailCell
+                id="easytier_status"/>
 
             <brls:SelectorCell
                 id="stream_audio_configuration"/>

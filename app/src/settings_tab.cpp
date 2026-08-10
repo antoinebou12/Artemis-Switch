@@ -510,6 +510,39 @@ SettingsTab::SettingsTab() {
     wireguardStatus->removeFromSuperView(true);
 #endif
 
+    easytierEnabled->init(
+        "settings/easytier_enabled"_i18n,
+        Settings::instance().easytier_enabled(), [this](bool value) {
+            Settings::instance().set_easytier_enabled(value);
+            easytierStatus->setDetailText(
+                value ? "settings/easytier_status_stub"_i18n
+                      : "settings/easytier_status_off"_i18n);
+        });
+    easytierConfigPath->setText("settings/easytier_config_path"_i18n);
+    easytierConfigPath->setDetailText(
+        Settings::instance().easytier_config_path().empty()
+            ? "sdmc:/switch/Moonlight-Switch/easytier.toml"
+            : Settings::instance().easytier_config_path());
+    easytierConfigPath->registerClickAction([this](View*) {
+        const std::string current =
+            Settings::instance().easytier_config_path();
+        Application::getPlatform()->getImeManager()->openForText(
+            [this](const std::string& text) {
+                Settings::instance().set_easytier_config_path(text);
+                easytierConfigPath->setDetailText(text);
+            },
+            "settings/easytier_config_path_title"_i18n, "", 120,
+            current.empty() ? "sdmc:/switch/Moonlight-Switch/easytier.toml"
+                            : current,
+            0);
+        return true;
+    });
+    easytierStatus->setText("settings/easytier_status"_i18n);
+    easytierStatus->setDetailText(
+        Settings::instance().easytier_enabled()
+            ? "settings/easytier_status_stub"_i18n
+            : "settings/easytier_status_off"_i18n);
+
     streamAudioConfiguration->init(
         "settings/stream_audio_configuration"_i18n,
         {"settings/audio_stereo"_i18n, "settings/audio_51_surround"_i18n},

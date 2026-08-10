@@ -37,6 +37,9 @@ class SettingsTab : public brls::Box {
     BRLS_BIND(brls::BooleanCell, wireguardEnabled, "wireguard_enabled");
     BRLS_BIND(brls::DetailCell, wireguardConfigPath, "wireguard_config_path");
     BRLS_BIND(brls::DetailCell, wireguardStatus, "wireguard_status");
+    BRLS_BIND(brls::BooleanCell, easytierEnabled, "easytier_enabled");
+    BRLS_BIND(brls::DetailCell, easytierConfigPath, "easytier_config_path");
+    BRLS_BIND(brls::DetailCell, easytierStatus, "easytier_status");
     BRLS_BIND(brls::SelectorCell, streamAudioConfiguration,
               "stream_audio_configuration");
     BRLS_BIND(brls::BooleanCell, terminateAppOnDisconnect,

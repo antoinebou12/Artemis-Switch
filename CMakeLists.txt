@@ -593,6 +593,7 @@ target_include_directories(${PROJECT_NAME} PUBLIC
         app/src/streaming/video/OpenGL
         app/src/streaming/video/Metal
         app/src/utils
+        app/src/features/ui
         extern/CImg
         ${MBEDTLS_INCLUDE_DIRS}
         ${APP_PLATFORM_INCLUDE})

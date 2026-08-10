@@ -647,6 +647,28 @@ OptionsTab::OptionsTab(StreamingView* streamView) : streamView(streamView) {
         return true;
     });
 
+    // Sunshine/Apollo: Ctrl+Alt+Shift+F1..F12 switches the streamed display.
+    {
+        const auto server =
+            GameStreamClient::instance().server_data(streamView->getHost());
+        if (server.isSunshine()) {
+            std::vector<std::string> switchDisplayOptions;
+            switchDisplayOptions.reserve(12);
+            for (int i = 1; i <= 12; i++) {
+                switchDisplayOptions.push_back("streaming/display"_i18n + " " +
+                                               std::to_string(i));
+            }
+            switchDisplay->setText("streaming/switch_display"_i18n);
+            switchDisplay->setData(switchDisplayOptions);
+            switchDisplay->setSelection(0, true);
+            switchDisplay->getEvent()->subscribe([](int selected) {
+                MoonlightInputManager::switchDisplay(selected + 1);
+            });
+        } else {
+            switchDisplay->removeFromSuperView();
+        }
+    }
+
     std::vector<std::string> keyboardTypes = {
         "settings/keyboard_compact"_i18n,
         "settings/keyboard_fullsized"_i18n,

@@ -124,7 +124,8 @@ StreamingView::StreamingView(const Host& host, const AppInfo& app) : host(host),
             const auto stored = artemis::apollo::ApolloHostOptionsStore::instance().get(hostKey);
             int profileWidth = Application::windowWidth;
             int profileHeight = Application::windowHeight;
-            const auto customProfile = artemis::streaming::StreamProfileStore::instance().get();
+            const auto customProfile =
+                artemis::streaming::StreamProfileStore::instance().get(hostKey);
             if (customProfile.customResolutionEnabled) {
                 profileWidth = customProfile.width;
                 profileHeight = customProfile.height;
@@ -559,7 +560,8 @@ void StreamingView::applyVirtualDisplay(
 
     int profileWidth = Application::windowWidth;
     int profileHeight = Application::windowHeight;
-    const auto custom = artemis::streaming::StreamProfileStore::instance().get();
+    const auto custom =
+        artemis::streaming::StreamProfileStore::instance().get(hostKey);
     if (custom.customResolutionEnabled) {
         profileWidth = custom.width;
         profileHeight = custom.height;

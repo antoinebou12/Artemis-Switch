@@ -20,6 +20,7 @@ class HostTab : public brls::Box {
 
     BRLS_BIND(brls::DetailCell, connect, "connect");
     BRLS_BIND(brls::DetailCell, hostWebConfig, "host_web_config");
+    BRLS_BIND(brls::DetailCell, streamProfile, "stream_profile");
     BRLS_BIND(brls::DetailCell, remove, "remove");
     BRLS_BIND(brls::Header, header, "header");
 
