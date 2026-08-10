@@ -20,7 +20,14 @@
             paddingLeft="@style/brls/tab_details/padding_left">
             
             <brls:Header
-                title="@i18n/settings/quality"/>
+                title="@i18n/settings/language"/>
+
+            <brls:SelectorCell
+                id="app_locale"/>
+
+            <brls:Header
+                title="@i18n/settings/quality"
+                paddingTop="60"/>
                 
             <brls:SelectorCell
                 id="fps"/>

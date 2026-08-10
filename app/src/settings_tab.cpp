@@ -15,6 +15,7 @@
 #include "button_selecting_dialog.hpp"
 #include "mapping_layout_editor.hpp"
 #include "UpscalingSupport.hpp"
+#include "features/i18n/AppLocalePreference.hpp"
 #include "features/input/InputSettingsStore.hpp"
 #include <cmath>
 #include <iomanip>
@@ -86,6 +87,35 @@ std::vector<std::string> audio_backends;
 SettingsTab::SettingsTab() {
     // Inflate the tab from the XML file
     this->inflateFromXMLRes("xml/tabs/settings.xml");
+
+    {
+        const auto locales = artemis::i18n::available_app_locales();
+        std::vector<std::string> labels;
+        labels.reserve(locales.size());
+        int selected = 0;
+        const auto current = Settings::instance().get_app_locale();
+        for (size_t i = 0; i < locales.size(); i++) {
+            if (locales[i].code == "auto") {
+                labels.push_back("settings/language_system"_i18n);
+            } else {
+                labels.push_back(locales[i].label);
+            }
+            if (locales[i].code == current) {
+                selected = static_cast<int>(i);
+            }
+        }
+        appLocale->init("settings/language"_i18n, labels, selected,
+                        [locales](int index) {
+                            if (index < 0 ||
+                                index >= static_cast<int>(locales.size())) {
+                                return;
+                            }
+                            Settings::instance().set_app_locale(
+                                locales[static_cast<size_t>(index)].code);
+                            Settings::instance().save();
+                            showAlert("settings/language_restart"_i18n);
+                        });
+    }
 
     std::vector<std::string> resolutions = {
         "settings/resolution_native"_i18n, "360p", "480p", "540p", "720p", "1080p",
