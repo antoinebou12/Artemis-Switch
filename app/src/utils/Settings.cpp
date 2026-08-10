@@ -391,6 +391,10 @@ void Settings::load() {
             if (json_t* swap_mouse_scroll = json_object_get(settings, "swap_mouse_scroll")) {
                 m_swap_mouse_scroll = json_typeof(swap_mouse_scroll) == JSON_TRUE;
             }
+
+            if (json_t* disable_overlay_swipe = json_object_get(settings, "disable_overlay_swipe")) {
+                m_disable_overlay_swipe = json_typeof(disable_overlay_swipe) == JSON_TRUE;
+            }
             
             if (json_t* volume_amplification = json_object_get(settings, "volume_amplification")) {
                 m_volume_amplification = json_typeof(volume_amplification) == JSON_TRUE;
@@ -629,6 +633,7 @@ void Settings::save() {
             json_object_set_new(settings, "touchscreen_mouse_mode", m_touchscreen_mouse_mode ? json_true() : json_false());
             json_object_set_new(settings, "swap_mouse_keys", m_swap_mouse_keys ? json_true() : json_false());
             json_object_set_new(settings, "swap_mouse_scroll", m_swap_mouse_scroll ? json_true() : json_false());
+            json_object_set_new(settings, "disable_overlay_swipe", m_disable_overlay_swipe ? json_true() : json_false());
             json_object_set_new(settings, "volume_amplification", m_volume_amplification ? json_true() : json_false());
             json_object_set_new(settings, "stream_volume", json_integer(m_volume));
             json_object_set_new(settings, "overlay_hold_time", json_integer(m_overlay_options.holdTime));
