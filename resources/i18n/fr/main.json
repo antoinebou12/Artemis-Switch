@@ -329,6 +329,7 @@
         "overlay_time": "Temps d'appui avant ouverture (sec)",
         "overlay_zero_time": "0 (immédiatement)",
         "paop": "Jouer l'audio sur la machine hôte",
+        "terminate_app_on_disconnect": "Quitter l'app hôte à la déconnexion",
         "quality": "Qualité (Des paramètres plus élevés nécessitent un overclock CPU)",
         "request_hdr": "Demander une vidéo HDR",
         "resolution": "Résolution",
