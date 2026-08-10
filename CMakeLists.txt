@@ -126,6 +126,21 @@ set(PROJECT_DISPLAY_NAME "Artemis Switch")
 set(PROJECT_ICON ${CMAKE_CURRENT_SOURCE_DIR}/resources/img/moonlight_icon.jpg)
 set(PROJECT_RESOURCES ${CMAKE_CURRENT_SOURCE_DIR}/resources)
 
+# Artemis platform feature flags (Switch-centric defaults; portable elsewhere).
+if (PLATFORM_SWITCH)
+    option(ARTEMIS_END_STREAM_ON_FOCUS_LOSS
+        "End the stream when the app window loses focus (Switch sleep/HOME)" ON)
+    option(ARTEMIS_SWITCH_RUNTIME_CLOCKS
+        "Expose read-only Switch CPU/GPU/EMC/battery metadata in Performance UI" ON)
+else ()
+    option(ARTEMIS_END_STREAM_ON_FOCUS_LOSS
+        "End the stream when the app window loses focus (Switch sleep/HOME)" OFF)
+    option(ARTEMIS_SWITCH_RUNTIME_CLOCKS
+        "Expose read-only Switch CPU/GPU/EMC/battery metadata in Performance UI" OFF)
+endif ()
+option(ARTEMIS_CLEAR_RUMBLE_ON_STREAM_START
+    "Clear controller rumble once when a stream view starts" ON)
+
 if (PLATFORM_DESKTOP AND CMAKE_SYSTEM_NAME STREQUAL "Linux" AND NOT USE_LIBROMFS)
     # Borealis appends "/resources/" to this prefix. This keeps non-embedded
     # installed builds FHS-compliant instead of depending on their working
@@ -188,6 +203,22 @@ add_definitions(
         -Dcimg_use_png
         -Dcimg_no_system_calls
         -DBRLS_I18N_PREFIX=\"main/\")
+
+if (ARTEMIS_END_STREAM_ON_FOCUS_LOSS)
+    add_compile_definitions(ARTEMIS_END_STREAM_ON_FOCUS_LOSS=1)
+else ()
+    add_compile_definitions(ARTEMIS_END_STREAM_ON_FOCUS_LOSS=0)
+endif ()
+if (ARTEMIS_SWITCH_RUNTIME_CLOCKS)
+    add_compile_definitions(ARTEMIS_SWITCH_RUNTIME_CLOCKS=1)
+else ()
+    add_compile_definitions(ARTEMIS_SWITCH_RUNTIME_CLOCKS=0)
+endif ()
+if (ARTEMIS_CLEAR_RUMBLE_ON_STREAM_START)
+    add_compile_definitions(ARTEMIS_CLEAR_RUMBLE_ON_STREAM_START=1)
+else ()
+    add_compile_definitions(ARTEMIS_CLEAR_RUMBLE_ON_STREAM_START=0)
+endif ()
 
 if (PLATFORM_PSV OR PLATFORM_ANDROID)
     set(USE_OPENSSL_CRYPTO ON)

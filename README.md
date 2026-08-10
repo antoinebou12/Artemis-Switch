@@ -218,6 +218,12 @@ cmake --build build/tests --parallel
 ctest --test-dir build/tests --output-on-failure
 ```
 
+### Other platforms (Linux, Windows, macOS, Android, Vita)
+
+Artemis is Switch-first. Desktop and other ports keep Sunshine/GameStream streaming, but Switch-only behaviors (end stream on focus loss, Switch clock/battery Performance rows) are **off by default** via CMake feature flags.
+
+See **[docs/OTHER_PLATFORMS.md](docs/OTHER_PLATFORMS.md)** for flags, build sketches, and links to Linux packaging docs.
+
 ### Cross-feature integration tests
 
 ```bash

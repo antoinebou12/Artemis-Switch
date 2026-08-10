@@ -20,6 +20,8 @@
 #include "features/input/InputSettingsStore.hpp"
 #include "features/apollo/ApolloHostOptionsStore.hpp"
 #include "streaming/StreamProfileStore.hpp"
+#include "utils/ArtemisPlatformFeatures.hpp"
+#include "utils/UsableMac.hpp"
 #include <Limelight.h>
 #include <chrono>
 #include <nanovg.h>
@@ -86,13 +88,18 @@ StreamingView::StreamingView(const Host& host, const AppInfo& app) : host(host),
     session = new MoonlightSession(host.preferred_address(), app.app_id,
                                    app.app_uuid);
 
-    // Subscribe once here, not in onFocusGained (that fires when overlays close).
+#if ARTEMIS_END_STREAM_ON_FOCUS_LOSS
+    // Switch sleep/HOME: subscribe once here, not in onFocusGained (that fires
+    // when overlays close). Disabled on desktop so alt-tab does not kill streams.
     windowFocusSubscription =
         Application::getWindowFocusChangedEvent()->subscribe(
             [this](bool focused) { this->onWindowFocusChanged(focused); });
+#endif
 
+#if ARTEMIS_CLEAR_RUMBLE_ON_STREAM_START
     // Clear any rumble left from wireless pads connected before launch.
     clearControllerRumble();
+#endif
 
 #ifdef PLATFORM_TVOS
         updatePreferredDisplayMode(true);
@@ -328,12 +335,14 @@ void StreamingView::onFocusLost() {
 
 void StreamingView::draw(NVGcontext* vg, float x, float y, float width,
                          float height, Style style, FrameContext* ctx) {
+#if ARTEMIS_END_STREAM_ON_FOCUS_LOSS
     if (pendingSuspendTerminate) {
         // Focus callback only records intent; tear down here on the main loop.
         pendingSuspendTerminate = false;
         terminate(false);
         return;
     }
+#endif
 
     if (session->is_terminated()) {
         terminate(false);
@@ -479,6 +488,10 @@ void StreamingView::clearControllerRumble() {
 }
 
 void StreamingView::onWindowFocusChanged(bool focused) {
+#if !ARTEMIS_END_STREAM_ON_FOCUS_LOSS
+    (void)focused;
+    return;
+#else
     if (focused || terminated)
         return;
 
@@ -488,6 +501,7 @@ void StreamingView::onWindowFocusChanged(bool focused) {
     MoonlightInputManager::instance().setInputEnabled(false);
     MoonlightInputManager::instance().dropInput();
     pendingSuspendTerminate = true;
+#endif
 }
 
 void StreamingView::terminate(bool terminateApp) {
@@ -746,8 +760,10 @@ StreamingView::~StreamingView() {
         ->getInputManager()
         ->getKeyboardKeyStateChanged()
         ->unsubscribe(keysSubscription);
+#if ARTEMIS_END_STREAM_ON_FOCUS_LOSS
     Application::getWindowFocusChangedEvent()->unsubscribe(
         windowFocusSubscription);
+#endif
     session->stop(false);
     delete session;
 }
