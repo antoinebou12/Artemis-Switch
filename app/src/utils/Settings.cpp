@@ -469,6 +469,15 @@ void Settings::load() {
                 }
             }
 
+            if (json_t* debug_stats_corner = json_object_get(settings, "debug_stats_corner")) {
+                if (json_typeof(debug_stats_corner) == JSON_INTEGER) {
+                    const int corner = static_cast<int>(json_integer_value(debug_stats_corner));
+                    if (corner >= 0 && corner <= 3) {
+                        m_debug_stats_corner = static_cast<DebugStatsCorner>(corner);
+                    }
+                }
+            }
+
             if (json_t* overlay_system_button = json_object_get(settings, "overlay_system_button")) {
                 if (json_typeof(overlay_system_button) == JSON_INTEGER) {
                     m_overlay_system_button = (ButtonOverrideType) json_integer_value(overlay_system_button);
@@ -624,6 +633,8 @@ void Settings::save() {
             json_object_set_new(settings, "keyboard_fingers", json_integer(m_keyboard_fingers));
             json_object_set_new(settings, "app_locale", json_string(m_app_locale.c_str()));
             json_object_set_new(settings, "keyboard_locale", json_integer(m_keyboard_locale));
+            json_object_set_new(settings, "debug_stats_corner",
+                                json_integer(static_cast<int>(m_debug_stats_corner)));
             json_object_set_new(settings, "overlay_system_button", json_integer((int)m_overlay_system_button));
             json_object_set_new(settings, "guide_system_button", json_integer((int)m_guide_system_button));
 
