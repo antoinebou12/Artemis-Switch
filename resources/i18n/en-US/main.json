@@ -42,7 +42,6 @@
         "tab": "Artemis",
         "settings": {
             "title": "Artemis Stream Tuning",
-            "active_profile": "Configured stream",
             "use_custom_resolution": "Use custom resolution",
             "custom_width": "Custom width",
             "custom_height": "Custom height",
@@ -81,7 +80,8 @@
             "disconnect": "Disconnect",
             "quick_actions": "Quick",
             "show_keyboard": "Keyboard",
-            "toggle_performance": "Stats",
+            "mouse_controls": "Mouse",
+            "touch_controls": "Touch",
             "benchmark": "Benchmark",
             "disconnect_stream": "Disconnect",
             "quit_host_app": "Quit PC app",
@@ -91,7 +91,6 @@
         },
         "performance": {
             "title": "Performance",
-            "stream_profile": "Stream profile",
             "configured_bitrate": "Bitrate",
             "receive_latency": "Receive",
             "decode_latency": "Decode",
@@ -129,8 +128,7 @@
             "no_stable_profile": "No stable profile · settings restored",
             "stop_collect_first": "Stop the test first",
             "save_failed": "Failed to save benchmark",
-            "auto_tune_ready": "Ready · 1-2 min",
-            "auto_tune_requires_stream": "Start a stream first"
+            "auto_tune_ready": "Ready · 1-2 min"
         }
     },
     "common": {

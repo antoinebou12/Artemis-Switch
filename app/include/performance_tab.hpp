@@ -15,7 +15,6 @@ private:
     void updateAutoTuneStatus();
     void scheduleRefresh();
 
-    BRLS_BIND(brls::DetailCell, streamProfile, "stream_profile");
     BRLS_BIND(brls::DetailCell, network, "network");
     BRLS_BIND(brls::DetailCell, receiveLatency, "receive_latency");
     BRLS_BIND(brls::DetailCell, decodeLatency, "decode_latency");

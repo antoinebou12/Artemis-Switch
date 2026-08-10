@@ -115,11 +115,10 @@ LogoutTab::LogoutTab(StreamingView* streamView) : streamView(streamView) {
 OptionsTab::OptionsTab(StreamingView* streamView) : streamView(streamView) {
     this->inflateFromXMLRes("xml/views/ingame_overlay/options_tab.xml");
 
-    const std::array<DetailCell*, 4> quickRows = {
-        quickKeyboard, quickPerformance, quickDisconnect, quickQuitHost};
+    const std::array<DetailCell*, 5> quickRows = {
+        quickKeyboard, quickMouse, quickTouch, quickDisconnect, quickQuitHost};
     for (auto* row : quickRows) {
         row->title->setSingleLine(true);
-        row->title->setFontSize(18);
         row->detail->setSingleLine(true);
     }
 
@@ -129,11 +128,25 @@ OptionsTab::OptionsTab(StreamingView* streamView) : streamView(streamView) {
         return true;
     });
 
-    quickPerformance->setText("artemis/overlay/toggle_performance"_i18n);
-    quickPerformance->setDetailText(streamView->draw_stats ? "hints/on"_i18n : "hints/off"_i18n);
-    quickPerformance->registerClickAction([this, streamView](View*) {
-        streamView->draw_stats = !streamView->draw_stats;
-        quickPerformance->setDetailText(streamView->draw_stats ? "hints/on"_i18n : "hints/off"_i18n);
+    quickMouse->setText("artemis/overlay/mouse_controls"_i18n);
+    quickMouse->registerClickAction([this](View*) {
+        this->dismiss([this]() {
+            auto* overlay = new StreamingInputOverlay(this->streamView);
+            Application::pushActivity(new Activity(overlay));
+        });
+        return true;
+    });
+
+    quickTouch->setText("artemis/overlay/touch_controls"_i18n);
+    quickTouch->setDetailText(Settings::instance().touchscreen_mouse_mode()
+                                  ? "hints/on"_i18n
+                                  : "hints/off"_i18n);
+    quickTouch->registerClickAction([this](View*) {
+        const bool enabled = !Settings::instance().touchscreen_mouse_mode();
+        Settings::instance().set_touchscreen_mouse_mode(enabled);
+        touchscreenMouseMode->setOn(enabled);
+        quickTouch->setDetailText(enabled ? "hints/on"_i18n
+                                          : "hints/off"_i18n);
         return true;
     });
 

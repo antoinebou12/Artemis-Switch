@@ -20,8 +20,6 @@ private:
     BRLS_BIND(brls::DetailCell, width, "custom_width");
     BRLS_BIND(brls::DetailCell, height, "custom_height");
     BRLS_BIND(brls::DetailCell, exactBitrate, "exact_bitrate");
-    BRLS_BIND(brls::DetailCell, activeProfile, "active_profile");
-
     BRLS_BIND(brls::SelectorCell, frameRate, "frame_rate");
     BRLS_BIND(brls::BooleanCell, unlockHighFps, "unlock_high_fps");
     BRLS_BIND(brls::BooleanCell, forceFullRange, "force_full_range");

@@ -56,17 +56,6 @@ std::pair<int, int> configuredDimensions() {
     return {resolution * 16 / 9, resolution};
 }
 
-std::string configuredResolutionText() {
-    const auto [width, height] = configuredDimensions();
-    if (Settings::instance().resolution() == -1
-#if ARTEMIS_HAS_CUSTOM_STREAM_PROFILE
-        && !artemis::streaming::StreamProfileStore::instance().get().customResolutionEnabled
-#endif
-    )
-        return fmt::format("{} ({}x{})", "settings/resolution_native"_i18n, width, height);
-    return fmt::format("{}x{}", width, height);
-}
-
 #if ARTEMIS_HAS_BENCHMARK_EXPORT
 artemis::benchmark::ExportProfile exportProfile() {
     const auto [width, height] = configuredDimensions();
@@ -99,16 +88,14 @@ artemis::benchmark::ExportSummary exportSummary(
 PerformanceTab::PerformanceTab() {
     inflateFromXMLRes("xml/views/ingame_overlay/performance_tab.xml");
 
-    const std::array<DetailCell*, 16> compactRows = {
-        streamProfile, network, receiveLatency, decodeLatency, renderLatency,
+    const std::array<DetailCell*, 15> compactRows = {
+        network, receiveLatency, decodeLatency, renderLatency,
         packetLoss, renderedFps, queueDepth, benchmarkSummary,
         benchmarkAction, benchmarkSave, benchmarkReset, autoTuneSummary,
         autoTuneAction, autoTuneAdvanced, refreshButton};
     for (auto* row : compactRows) {
         row->title->setSingleLine(true);
-        row->title->setFontSize(18);
         row->detail->setSingleLine(true);
-        row->detail->setFontSize(18);
     }
 
     // Auto Tune results can still be wider than the Switch overlay. Keep the
@@ -119,7 +106,6 @@ PerformanceTab::PerformanceTab() {
     autoTuneSummary->detail->setAutoAnimate(false);
     autoTuneSummary->detail->setAnimated(true);
 
-    streamProfile->setText("artemis/performance/stream_profile"_i18n);
     network->setText("artemis/performance/configured_bitrate"_i18n);
     receiveLatency->setText("artemis/performance/receive_latency"_i18n);
     decodeLatency->setText("artemis/performance/decode_latency"_i18n);
@@ -357,7 +343,7 @@ void PerformanceTab::updateAutoTuneStatus() {
     } else if (runtime.available()) {
         autoTuneSummary->setDetailText("artemis/performance/auto_tune_ready"_i18n);
     } else {
-        autoTuneSummary->setDetailText("artemis/performance/auto_tune_requires_stream"_i18n);
+        autoTuneSummary->setDetailText("artemis/performance/auto_tune_unavailable"_i18n);
     }
 #endif
 }
@@ -365,7 +351,6 @@ void PerformanceTab::updateAutoTuneStatus() {
 void PerformanceTab::refresh() {
     auto* session = MoonlightSession::activeSession();
     if (!session || !session->is_active()) {
-        streamProfile->setDetailText("artemis/performance/no_active_stream"_i18n);
         network->setDetailText("-");
         receiveLatency->setDetailText("-");
         decodeLatency->setDetailText("-");
@@ -378,21 +363,22 @@ void PerformanceTab::refresh() {
         benchmarkReset->setFocusable(false);
 #if ARTEMIS_HAS_AUTO_TUNE
         if (artemis::benchmark::AutoTuneRuntime::instance().running()) {
+            autoTuneSummary->setVisibility(Visibility::VISIBLE);
             updateAutoTuneStatus();
         } else {
-            autoTuneSummary->setDetailText(
-                "artemis/performance/auto_tune_requires_stream"_i18n);
+            autoTuneSummary->setVisibility(Visibility::GONE);
             autoTuneAction->setFocusable(false);
             autoTuneAdvanced->setFocusable(false);
         }
 #else
-        autoTuneSummary->setDetailText(
-            "artemis/performance/auto_tune_requires_stream"_i18n);
+        autoTuneSummary->setVisibility(Visibility::GONE);
         autoTuneAction->setFocusable(false);
         autoTuneAdvanced->setFocusable(false);
 #endif
         return;
     }
+
+    autoTuneSummary->setVisibility(Visibility::VISIBLE);
 
 #if ARTEMIS_HAS_BENCHMARK_RUNTIME
     benchmarkAction->setFocusable(true);
@@ -435,9 +421,6 @@ void PerformanceTab::refresh() {
     snapshot.renderedFps = render.rendered_fps;
     const auto lite = artemis::performance::buildLiteStatus(snapshot);
 
-    streamProfile->setDetailText(fmt::format("{} @ {} FPS, {}",
-        configuredResolutionText(), Settings::instance().fps(),
-        getVideoCodecName(Settings::instance().video_codec())));
     network->setDetailText(lite.networkText);
     receiveLatency->setDetailText(lite.latencyText);
     decodeLatency->setDetailText(lite.decodeText);

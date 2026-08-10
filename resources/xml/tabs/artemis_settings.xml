@@ -7,7 +7,6 @@
         title="@i18n/artemis/settings/title"
         paddingTop="60"
         lineTop="1px"/>
-    <brls:DetailCell id="active_profile"/>
     <brls:BooleanCell id="custom_resolution"/>
     <brls:DetailCell id="custom_width"/>
     <brls:DetailCell id="custom_height"/>

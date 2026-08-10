@@ -78,14 +78,13 @@ int frameRateSelection(const std::vector<int>& values, int current) {
 ArtemisSettingsTab::ArtemisSettingsTab() {
     inflateFromXMLRes("xml/tabs/artemis_settings.xml");
 
-    const std::array<DetailCell*, 14> compactRows = {
-        activeProfile, customResolution, width, height, exactBitrate,
+    const std::array<DetailCell*, 13> compactRows = {
+        customResolution, width, height, exactBitrate,
         frameRate, unlockHighFps, forceFullRange, preventPacketLoss,
         scaleMode, rememberZoomPan, resetZoomPan, forwardMotion,
         consoleMotionFallback};
     for (auto* row : compactRows) {
         row->title->setSingleLine(true);
-        row->title->setFontSize(18);
         row->detail->setSingleLine(true);
     }
 
@@ -102,8 +101,6 @@ ArtemisSettingsTab::ArtemisSettingsTab() {
     width->setText("artemis/settings/custom_width"_i18n);
     height->setText("artemis/settings/custom_height"_i18n);
     exactBitrate->setText("artemis/settings/exact_bitrate"_i18n);
-    activeProfile->setText("artemis/settings/active_profile"_i18n);
-
     width->registerClickAction([this](View*) {
         editWidth();
         return true;
@@ -276,20 +273,6 @@ void ArtemisSettingsTab::refreshValues() {
     height->setDetailText(std::to_string(stored.height));
     exactBitrate->setDetailText(fmt::format("{:.1f} Mbps",
         static_cast<double>(Settings::instance().bitrate()) / 1000.0));
-
-    const int configuredResolution = Settings::instance().resolution();
-    const std::string resolutionText = stored.customResolutionEnabled
-        ? fmt::format("{}x{}", stored.width, stored.height)
-        : (configuredResolution == -1
-               ? "settings/resolution_native"_i18n
-               : fmt::format("{}x{}", configuredResolution * 16 / 9,
-                             configuredResolution));
-
-    activeProfile->setDetailText(fmt::format(
-        "{} · {} FPS · {}",
-        resolutionText,
-        Settings::instance().fps(),
-        getVideoCodecName(Settings::instance().video_codec())));
 
     width->setFocusable(stored.customResolutionEnabled);
     height->setFocusable(stored.customResolutionEnabled);

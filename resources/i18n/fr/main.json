@@ -42,7 +42,6 @@
         "tab": "Artemis",
         "settings": {
             "title": "Réglages de diffusion Artemis",
-            "active_profile": "Diffusion configurée",
             "use_custom_resolution": "Utiliser une résolution personnalisée",
             "custom_width": "Largeur personnalisée",
             "custom_height": "Hauteur personnalisée",
@@ -81,7 +80,8 @@
             "disconnect": "Déconnecter",
             "quick_actions": "Rapide",
             "show_keyboard": "Clavier",
-            "toggle_performance": "Statistiques",
+            "mouse_controls": "Souris",
+            "touch_controls": "Tactile",
             "benchmark": "Test de performance",
             "disconnect_stream": "Déconnecter",
             "quit_host_app": "Fermer sur le PC",
@@ -91,7 +91,6 @@
         },
         "performance": {
             "title": "Performances",
-            "stream_profile": "Profil de diffusion",
             "configured_bitrate": "Débit",
             "receive_latency": "Réception",
             "decode_latency": "Décodage",
@@ -129,8 +128,7 @@
             "no_stable_profile": "Aucun profil stable · réglages restaurés",
             "stop_collect_first": "Arrêtez d'abord le test",
             "save_failed": "Échec de l'enregistrement du test",
-            "auto_tune_ready": "Prêt · 1 à 2 min",
-            "auto_tune_requires_stream": "Lancez une diffusion"
+            "auto_tune_ready": "Prêt · 1 à 2 min"
         }
     },
     "common": {
