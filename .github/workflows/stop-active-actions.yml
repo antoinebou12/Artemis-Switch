@@ -1,5 +1,6 @@
 name: Stop active Actions
 
+# One-shot trigger: merged to master to guarantee a normal push event.
 on:
   push:
     branches:
