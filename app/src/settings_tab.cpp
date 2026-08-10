@@ -222,6 +222,29 @@ SettingsTab::SettingsTab() {
                 Settings::instance().set_upscaling_mode((UpscalingMode)
                     artemis::video::upscaling_mode_from_selector(value, true));
             });
+#elif defined(PLATFORM_SWITCH)
+        int selectedMode = static_cast<int>(Settings::instance().upscaling_mode());
+        // UI order: Off, FSR1, SGSR1, NIS (MetalFX index unused on Switch)
+        int uiIndex = 0;
+        if (selectedMode == UPSCALING_FSR1)
+            uiIndex = 1;
+        else if (selectedMode == UPSCALING_SGSR1)
+            uiIndex = 2;
+        else if (selectedMode == UPSCALING_NIS)
+            uiIndex = 3;
+        upscalingMode->init(
+            "settings/upscaling"_i18n,
+            {"hints/off"_i18n, "FSR1", "SGSR1", "NIS"}, uiIndex,
+            [](int value) {
+                UpscalingMode mode = UPSCALING_OFF;
+                if (value == 1)
+                    mode = UPSCALING_FSR1;
+                else if (value == 2)
+                    mode = UPSCALING_SGSR1;
+                else if (value == 3)
+                    mode = UPSCALING_NIS;
+                Settings::instance().set_upscaling_mode(mode);
+            });
 #else
         constexpr bool kMetalFxChoices = false;
         upscalingMode->init(

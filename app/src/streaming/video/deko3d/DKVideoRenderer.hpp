@@ -74,6 +74,8 @@ class DKVideoRenderer : public IVideoRenderer {
     CShader fragmentShader;
 #ifdef SUPPORT_UPSCALING
     CShader upscalingFragmentShader;
+    CShader sgsr1FragmentShader;
+    CShader nisFragmentShader;
     CShader rcasFragmentShader;
     CShader upscalingPassFragmentShader;
 #endif

@@ -292,12 +292,15 @@ public:
 
         // The custom presentation path is deliberately direct for the first
         // integration milestone. Default Fill continues to use the untouched
-        // legacy FSR/RCAS/dithering path. We can move the same geometry into
-        // the post-processing pass after real Switch validation.
-        legacy.m_dithering_enabled = false;
-        legacy.m_upscaling_enabled = false;
+        // legacy FSR/RCAS/dithering path. When upscaling is enabled, prefer the
+        // legacy post-process path so FSR/SGSR/NIS still run.
+        const bool keepPostProcess = Settings::instance().upscaling() ||
+                                     Settings::instance().dithering() ||
+                                     Settings::instance().rcas();
+        legacy.m_dithering_enabled = keepPostProcess && Settings::instance().dithering();
+        legacy.m_upscaling_enabled = keepPostProcess && Settings::instance().upscaling();
 #ifdef SUPPORT_UPSCALING
-        legacy.m_rcas_enabled = false;
+        legacy.m_rcas_enabled = keepPostProcess && Settings::instance().rcas();
 #endif
 
         cachedFrameWidth = frame->width;
