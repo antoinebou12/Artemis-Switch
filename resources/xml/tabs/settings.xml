@@ -203,6 +203,9 @@
                 
             <brls:BooleanCell
                 id="swap_mouse_scroll"/>
+
+            <brls:BooleanCell
+                id="swap_mouse_sticks"/>
         
             <brls:Header
                 id="mouse_speed_header"

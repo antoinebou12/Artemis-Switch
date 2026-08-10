@@ -834,6 +834,12 @@ SettingsTab::SettingsTab() {
                               Settings::instance().set_swap_mouse_scroll(value);
                           });
 
+    swapMouseSticks->init("settings/swap_mouse_sticks"_i18n,
+                          Settings::instance().swap_mouse_sticks(),
+                          [](bool value) {
+                              Settings::instance().set_swap_mouse_sticks(value);
+                          });
+
     float mouseProgress =
         (Settings::instance().get_mouse_speed_multiplier() / 100.0f);
     mouseSpeedSlider->getProgressEvent()->subscribe([this](float value) {
