@@ -32,12 +32,15 @@ void QrCodeView::draw(NVGcontext* vg, float x, float y, float width, float heigh
         return;
 
     const float side = std::min(width, height);
-    const float module = side / static_cast<float>(size_ + 2);
-    const float originX = x + (width - side) * 0.5f + module;
-    const float originY = y + (height - side) * 0.5f + module;
+    const float quiet = side / static_cast<float>(size_ + 4);
+    const float module = quiet;
+    const float card = quiet * static_cast<float>(size_ + 4);
+    const float originX = x + (width - card) * 0.5f + quiet * 2.0f;
+    const float originY = y + (height - card) * 0.5f + quiet * 2.0f;
 
     nvgBeginPath(vg);
-    nvgRect(vg, x + (width - side) * 0.5f, y + (height - side) * 0.5f, side, side);
+    nvgRoundedRect(vg, x + (width - card) * 0.5f, y + (height - card) * 0.5f,
+                   card, card, 8.0f);
     nvgFillColor(vg, nvgRGB(255, 255, 255));
     nvgFill(vg);
 
@@ -58,27 +61,55 @@ void showUrlQrDialog(const std::string& title, const std::string& url) {
     auto* holder = new brls::Box(brls::Axis::COLUMN);
     holder->setAlignItems(brls::AlignItems::CENTER);
     holder->setJustifyContent(brls::JustifyContent::CENTER);
-    holder->setPadding(20);
+    holder->setPadding(24);
 
     auto* heading = new brls::Label();
-    heading->setText(title);
+    heading->setText(title.empty() ? "host/web_config"_i18n : title);
     heading->setHorizontalAlign(brls::HorizontalAlign::CENTER);
-    heading->setMarginBottom(12);
+    heading->setFontSize(22);
+    heading->setMarginBottom(8);
     holder->addView(heading);
 
+    auto* hint = new brls::Label();
+    hint->setText("host/web_config_scan_hint"_i18n);
+    hint->setHorizontalAlign(brls::HorizontalAlign::CENTER);
+    hint->setFontSize(16);
+    hint->setMarginBottom(16);
+    holder->addView(hint);
+
     auto* qr = new QrCodeView(url);
-    qr->setWidth(280);
-    qr->setHeight(280);
+    constexpr float kQrSize = 340.0f;
+    qr->setWidth(kQrSize);
+    qr->setHeight(kQrSize);
     qr->setMarginBottom(12);
     holder->addView(qr);
 
+    if (!qr->valid()) {
+        auto* fallback = new brls::Label();
+        fallback->setText("host/web_config_qr_unavailable"_i18n);
+        fallback->setHorizontalAlign(brls::HorizontalAlign::CENTER);
+        fallback->setFontSize(16);
+        fallback->setMarginBottom(12);
+        holder->addView(fallback);
+    }
+
     auto* urlLabel = new brls::Label();
     urlLabel->setText(url);
-    urlLabel->setFontSize(18);
+    urlLabel->setFontSize(16);
     urlLabel->setHorizontalAlign(brls::HorizontalAlign::CENTER);
+    urlLabel->setMarginBottom(4);
     holder->addView(urlLabel);
 
     auto* dialog = new brls::Dialog(holder);
+    auto* platform = brls::Application::getPlatform();
+    if (platform) {
+        dialog->addButton("host/web_config_copy"_i18n, [url, platform] {
+            try {
+                platform->pasteToClipboard(url);
+            } catch (...) {
+            }
+        });
+    }
     dialog->addButton("common/close"_i18n, [] {});
     dialog->open();
 }

@@ -29,4 +29,9 @@ class HostTab : public brls::Box {
     HostState state = HostState::FETCHING;
     uint64_t wakeRequestGeneration = 0;
     uint64_t canceledWakeRequestGeneration = 0;
+
+    void refreshStreamProfileLabel();
+    void openProfilePicker();
+    void createProfileForHost();
+    void openProfileManage();
 };

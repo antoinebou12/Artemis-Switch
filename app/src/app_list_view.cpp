@@ -42,7 +42,11 @@ AppListView::AppListView(const Host& host) : host(host) {
             return true;
         }
         const std::string url = "https://" + address + ":47990/";
-        Application::getPlatform()->openBrowser(url);
+        try {
+            if (auto* platform = Application::getPlatform())
+                platform->openBrowser(url);
+        } catch (...) {
+        }
         artemis::ui::showUrlQrDialog("host/web_config"_i18n, url);
         return true;
     });

@@ -20,6 +20,7 @@
 #include "features/input/InputSettingsStore.hpp"
 #include "features/apollo/ApolloHostOptionsStore.hpp"
 #include "features/ui/StatsOverlayLayout.hpp"
+#include "streaming/StreamConfigProfileStore.hpp"
 #include "streaming/StreamProfileStore.hpp"
 #include "utils/ArtemisPlatformFeatures.hpp"
 #include "utils/UsableMac.hpp"
@@ -121,17 +122,29 @@ StreamingView::StreamingView(const Host& host, const AppInfo& app) : host(host),
             const auto hostKey = is_usable_mac(result.value().mac)
                                      ? result.value().mac
                                      : this->host.preferred_address();
+            auto& profileStore =
+                artemis::streaming::StreamConfigProfileStore::instance();
+            const auto selectedProfileId =
+                profileStore.selectedForHost(hostKey);
+            if (!selectedProfileId.empty())
+                profileStore.applyToSettings(selectedProfileId);
+
             const auto stored = artemis::apollo::ApolloHostOptionsStore::instance().get(hostKey);
             int profileWidth = Application::windowWidth;
             int profileHeight = Application::windowHeight;
-            const auto customProfile =
-                artemis::streaming::StreamProfileStore::instance().get(hostKey);
-            if (customProfile.customResolutionEnabled) {
-                profileWidth = customProfile.width;
-                profileHeight = customProfile.height;
-            } else if (Settings::instance().resolution() > 0) {
-                profileHeight = Settings::instance().resolution();
-                profileWidth = profileHeight * 16 / 9;
+            if (auto named = profileStore.get(selectedProfileId)) {
+                profileWidth = named->resolutionWidth();
+                profileHeight = named->resolutionHeight;
+            } else {
+                const auto customProfile =
+                    artemis::streaming::StreamProfileStore::instance().get();
+                if (customProfile.customResolutionEnabled) {
+                    profileWidth = customProfile.width;
+                    profileHeight = customProfile.height;
+                } else if (Settings::instance().resolution() > 0) {
+                    profileHeight = Settings::instance().resolution();
+                    profileWidth = profileHeight * 16 / 9;
+                }
             }
             const auto profile = artemis::apollo::resolveVirtualDisplay(
                 stored, profileWidth, profileHeight);
@@ -560,14 +573,22 @@ void StreamingView::applyVirtualDisplay(
 
     int profileWidth = Application::windowWidth;
     int profileHeight = Application::windowHeight;
-    const auto custom =
-        artemis::streaming::StreamProfileStore::instance().get(hostKey);
-    if (custom.customResolutionEnabled) {
-        profileWidth = custom.width;
-        profileHeight = custom.height;
-    } else if (Settings::instance().resolution() > 0) {
-        profileHeight = Settings::instance().resolution();
-        profileWidth = profileHeight * 16 / 9;
+    auto& profileStore =
+        artemis::streaming::StreamConfigProfileStore::instance();
+    const auto selectedProfileId = profileStore.selectedForHost(hostKey);
+    if (auto named = profileStore.get(selectedProfileId)) {
+        profileWidth = named->resolutionWidth();
+        profileHeight = named->resolutionHeight;
+    } else {
+        const auto custom =
+            artemis::streaming::StreamProfileStore::instance().get();
+        if (custom.customResolutionEnabled) {
+            profileWidth = custom.width;
+            profileHeight = custom.height;
+        } else if (Settings::instance().resolution() > 0) {
+            profileHeight = Settings::instance().resolution();
+            profileWidth = profileHeight * 16 / 9;
+        }
     }
 
     const auto makeLaunch = [this, profileWidth, profileHeight](
