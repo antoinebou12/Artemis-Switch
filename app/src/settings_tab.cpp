@@ -17,6 +17,7 @@
 #include "UpscalingSupport.hpp"
 #include "features/i18n/AppLocalePreference.hpp"
 #include "features/input/InputSettingsStore.hpp"
+#include "features/video/UpscalingModeSelect.hpp"
 #include "keyboard_view.hpp"
 #include <cmath>
 #include <iomanip>
@@ -206,17 +207,32 @@ SettingsTab::SettingsTab() {
             ditheringStrengthToSliderProgress(ditheringStrength));
         updateDitheringControls(Settings::instance().dithering());
 
-#if defined(PLATFORM_APPLE) && !defined(PLATFORM_TVOS)
+        // Prefer an explicit Off/FSR1 (and MetalFX on Apple) selector so the
+        // ENABLE_UPSCALING path is discoverable as FSR1/RCAS rather than a
+        // vague boolean. BooleanCell is removed wherever the selector is shown.
         upscaling->removeFromSuperView(true);
+#if defined(PLATFORM_APPLE) && !defined(PLATFORM_TVOS)
+        constexpr bool kMetalFxChoices = true;
         upscalingMode->init(
             "settings/upscaling"_i18n,
             {"hints/off"_i18n, "MetalFX", "FSR1"},
-            (int)Settings::instance().upscaling_mode(),
-            [](int value) { Settings::instance().set_upscaling_mode((UpscalingMode)value); });
+            artemis::video::upscaling_selector_index(
+                (int)Settings::instance().upscaling_mode(), kMetalFxChoices),
+            [](int value) {
+                Settings::instance().set_upscaling_mode((UpscalingMode)
+                    artemis::video::upscaling_mode_from_selector(value, true));
+            });
 #else
-        upscalingMode->removeFromSuperView(true);
-        upscaling->init("settings/upscaling"_i18n, Settings::instance().upscaling(),
-                        [](bool value) { Settings::instance().set_upscaling(value); });
+        constexpr bool kMetalFxChoices = false;
+        upscalingMode->init(
+            "settings/upscaling"_i18n,
+            {"hints/off"_i18n, "FSR1"},
+            artemis::video::upscaling_selector_index(
+                (int)Settings::instance().upscaling_mode(), kMetalFxChoices),
+            [](int value) {
+                Settings::instance().set_upscaling_mode((UpscalingMode)
+                    artemis::video::upscaling_mode_from_selector(value, false));
+            });
 #endif
         rcas->init("settings/rcas_sharpening"_i18n, Settings::instance().rcas(),
                    [updateRcasControls](bool value) {
