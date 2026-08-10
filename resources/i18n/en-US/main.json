@@ -246,6 +246,8 @@
         "submit": "Done"
     },
     "host": {
+        "add_endpoint": "Add address",
+        "add_endpoint_title": "Host address (LAN, Tailscale, public IP)",
         "connect": "Connect",
         "fetching": "Fetching...",
         "ready": "Ready",

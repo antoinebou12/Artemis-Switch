@@ -3,6 +3,7 @@
 #include "Singleton.hpp"
 #include "UsableMac.hpp"
 #include <borealis.hpp>
+#include "../host/HostEndpoints.hpp"
 #include <map>
 #include <cstdio>
 #include <string>
@@ -54,23 +55,39 @@ struct Host {
     std::string hostname;
     std::string mac;
     std::vector<App> favorites;
+    std::vector<HostEndpoint> endpoints;
 
     [[nodiscard]] std::vector<std::string> connection_addresses() const {
-        std::vector<std::string> addresses;
-        if (!address.empty())
-            addresses.push_back(address);
-        if (!remoteAddress.empty() && remoteAddress != address)
-            addresses.push_back(remoteAddress);
-        return addresses;
+        return ordered_connection_addresses(endpoints, address, remoteAddress);
     }
 
     [[nodiscard]] std::string preferred_address() const {
-        return !address.empty() ? address : remoteAddress;
+        const auto addresses = connection_addresses();
+        return addresses.empty() ? "" : addresses.front();
     }
 
     [[nodiscard]] bool has_address(const std::string& value) const {
-        return !value.empty() &&
-               (address == value || remoteAddress == value);
+        if (value.empty()) {
+            return false;
+        }
+        for (const auto& candidate : connection_addresses()) {
+            if (candidate == value) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    void ensure_endpoints() {
+        if (endpoints.empty()) {
+            endpoints = endpoints_or_legacy(endpoints, address, remoteAddress);
+        }
+        sync_legacy_fields_from_endpoints(endpoints, address, remoteAddress);
+    }
+
+    void add_endpoint(const std::string& label, const std::string& endpointAddress) {
+        add_host_endpoint(endpoints, address, remoteAddress, label,
+                          endpointAddress);
     }
 };
 

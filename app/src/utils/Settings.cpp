@@ -36,6 +36,13 @@ void merge_host(Host& target, const Host& source) {
         target.hostname = source.hostname;
     if (is_usable_mac(source.mac))
         target.mac = source.mac;
+    if (!source.endpoints.empty()) {
+        for (const auto& endpoint : source.endpoints) {
+            target.add_endpoint(endpoint.label, endpoint.address);
+        }
+    } else {
+        target.ensure_endpoints();
+    }
 }
 
 std::string make_preferred_path(const fs::path& path) {
@@ -81,10 +88,14 @@ void Settings::set_working_dir(const std::string& working_dir) {
 }
 
 void Settings::add_host(const Host& host) {
-    if (Host* existing = find_host(m_hosts, host)) {
-        merge_host(*existing, host);
-    } else if (!host.preferred_address().empty() && is_usable_mac(host.mac)) {
-        m_hosts.push_back(host);
+    Host incoming = host;
+    incoming.ensure_endpoints();
+
+    if (Host* existing = find_host(m_hosts, incoming)) {
+        merge_host(*existing, incoming);
+        existing->ensure_endpoints();
+    } else if (!incoming.preferred_address().empty() && is_usable_mac(incoming.mac)) {
+        m_hosts.push_back(incoming);
     }
 
     save();
@@ -224,6 +235,37 @@ void Settings::load() {
                                 host.mac = json_string_value(mac);
                             }
                         }
+
+                        if (json_t* endpoints = json_object_get(json, "endpoints")) {
+                            size_t endpointCount = json_array_size(endpoints);
+                            for (size_t ei = 0; ei < endpointCount; ei++) {
+                                json_t* endpointJson = json_array_get(endpoints, ei);
+                                if (!endpointJson || json_typeof(endpointJson) != JSON_OBJECT) {
+                                    continue;
+                                }
+                                HostEndpoint endpoint;
+                                if (json_t* label = json_object_get(endpointJson, "label")) {
+                                    if (json_typeof(label) == JSON_STRING) {
+                                        endpoint.label = json_string_value(label);
+                                    }
+                                }
+                                if (json_t* endpointAddress = json_object_get(endpointJson, "address")) {
+                                    if (json_typeof(endpointAddress) == JSON_STRING) {
+                                        endpoint.address = json_string_value(endpointAddress);
+                                    }
+                                }
+                                if (json_t* priority = json_object_get(endpointJson, "priority")) {
+                                    if (json_typeof(priority) == JSON_INTEGER) {
+                                        endpoint.priority = (int)json_integer_value(priority);
+                                    }
+                                }
+                                if (!endpoint.address.empty()) {
+                                    host.endpoints.push_back(endpoint);
+                                }
+                            }
+                        }
+
+                        host.ensure_endpoints();
 
                         if (json_t* favorites = json_object_get(json, "favorites")) {
                             size_t size = json_array_size(favorites);
@@ -592,6 +634,20 @@ void Settings::save() {
                     json_object_set_new(json, "remote_address", json_string(host.remoteAddress.c_str()));
                     json_object_set_new(json, "hostname", json_string(host.hostname.c_str()));
                     json_object_set_new(json, "mac", json_string(host.mac.c_str()));
+                    if (json_t* endpoints = json_array()) {
+                        for (const auto& endpoint : host.endpoints) {
+                            if (json_t* endpointJson = json_object()) {
+                                json_object_set_new(endpointJson, "label",
+                                                    json_string(endpoint.label.c_str()));
+                                json_object_set_new(endpointJson, "address",
+                                                    json_string(endpoint.address.c_str()));
+                                json_object_set_new(endpointJson, "priority",
+                                                    json_integer(endpoint.priority));
+                                json_array_append_new(endpoints, endpointJson);
+                            }
+                        }
+                        json_object_set_new(json, "endpoints", endpoints);
+                    }
                     if (json_t* apps = json_array()) {
                         for (auto app: host.favorites) {
                             if (json_t* jsonApp = json_object()) {
