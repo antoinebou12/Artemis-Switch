@@ -1,6 +1,6 @@
 {
     "about": {
-        "about": "Artemis Switch streams games from an Apollo or Sunshine PC. It is based on Moonlight-Switch and Moonlight-Common-C.",
+        "about": "Artemis Switch streams games from an Apollo or Sunshine PC. It is based on the original Moonlight-Switch codebase by XITRIX and Moonlight-Common-C. Apollo and Artemis (Moonlight Noir) by ClassicOldSong inspired host and client UX. Upstream licenses still apply — see LICENSE.",
         "link_gbatemp": "GbaTemp Page",
         "link_github": "Artemis Switch repository",
         "link_moonlight_switch": "Moonlight-Switch (XITRIX)",
@@ -18,6 +18,8 @@
         "thanks_5": " ClassicOldSong for Apollo and Artemis (Moonlight Noir)",
         "thanks_6": " Everyone involved into app development",
         "thanks_7": " You, for using my homebrew!",
+        "thanks_community": "Moonlight-Switch community ideas",
+        "thanks_community_body": "Feature ideas credited to Moonlight-Switch issue reporters (implementations in this fork):\n #110 benwa — Swap X/Y for starring\n #195 orcavia — Disable swipe-to-open overlay\n #163 antegorov — Swap mouse-mode sticks\n #70 xyourmomx — Profiles / multi-endpoint hosts\n #112 xenophobentx — 5.1 surround audio\n #295 linckosz — FSR-like upscaling\n #254 JoJuStudio / #250 bengrahamreview / #144 MetalGooseSolid — WireGuard / remote VPN\n #24 windraver / #165 Msv777 — Terminate host app on disconnect\n #252 Befeeter — Experimental AV1\n #58 gcseed — Debug overlay corner\n #239 HackZy01 / #283 AquaSteam — Language and keyboard\n #266 Moby812 — Virtual display (Apollo)\nFull links are in the repository README Credits section.",
         "title": "About",
         "version": "Artemis Switch v{} by antoinebou12"
     },

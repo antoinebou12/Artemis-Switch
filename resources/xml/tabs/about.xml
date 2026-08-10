@@ -137,6 +137,19 @@
                 text="@i18n/about/thanks_7"
                 marginTop="8"/>
 
+            <brls:Header
+                title="@i18n/about/thanks_community"
+                paddingTop="60"/>
+
+            <brls:Label
+                width="100%"
+                height="auto"
+                fontSize="14"
+                lineHeight="1.25"
+                textColor="@theme/brls/header/subtitle"
+                text="@i18n/about/thanks_community_body"
+                marginTop="8"/>
+
         </brls:Box>
         
     </brls:ScrollingFrame>
