@@ -44,7 +44,7 @@ std::vector<int> activeFrameRates() {
     return artemis::stream::availableFrameRates(
         artemis::stream::AdvancedStreamOptionsStore::instance().get());
 #else
-    return {30, 40, 60, 120};
+    return {30, 40, 60, 90, 120};
 #endif
 }
 
@@ -72,10 +72,16 @@ int frameRateSelection(const std::vector<int>& values, int current) {
     }
     return best;
 }
+
+std::string onOff(bool enabled) {
+    return enabled ? "On" : "Off";
+}
 }
 
 ArtemisSettingsTab::ArtemisSettingsTab() {
     inflateFromXMLRes("xml/tabs/artemis_settings.xml");
+
+    activeProfile->setText("artemis/settings/active_profile"_i18n);
 
     const auto stored = artemis::streaming::StreamProfileStore::instance().get();
     customResolution->init("artemis/settings/use_custom_resolution"_i18n,
@@ -90,7 +96,6 @@ ArtemisSettingsTab::ArtemisSettingsTab() {
     width->setText("artemis/settings/custom_width"_i18n);
     height->setText("artemis/settings/custom_height"_i18n);
     exactBitrate->setText("artemis/settings/exact_bitrate"_i18n);
-    activeProfile->setText("artemis/settings/active_profile"_i18n);
 
     width->registerClickAction([this](View*) {
         editWidth();
@@ -110,29 +115,16 @@ ArtemisSettingsTab::ArtemisSettingsTab() {
 
 #if ARTEMIS_HAS_ADVANCED_STREAM
     const auto advanced = artemis::stream::AdvancedStreamOptionsStore::instance().get();
-    unlockHighFps->init("artemis/settings/unlock_high_fps"_i18n,
-                        advanced.unlockAllFrameRates,
-                        [this](bool enabled) {
-        auto options = artemis::stream::AdvancedStreamOptionsStore::instance().get();
-        options.unlockAllFrameRates = enabled;
-        artemis::stream::AdvancedStreamOptionsStore::instance().set(options);
-        if (!enabled) {
-            const int normalized = artemis::stream::normalizeFrameRate(
-                Settings::instance().fps(), options);
-            Settings::instance().set_fps(normalized);
-            Settings::instance().save();
-        }
-        refreshFrameRateSelector();
-        refreshValues();
-    });
     forceFullRange->init("artemis/settings/force_full_range"_i18n,
-                         advanced.forceFullRangeVideo, [](bool enabled) {
+                         advanced.forceFullRangeVideo, [this](bool enabled) {
         auto options = artemis::stream::AdvancedStreamOptionsStore::instance().get();
         options.forceFullRangeVideo = enabled;
         artemis::stream::AdvancedStreamOptionsStore::instance().set(options);
+        refreshValues();
     });
     forceFullRange->setDetailText(
-        "Requests full range from the host on the next stream start/restart");
+        "Applied on the next stream start/restart; video filtering stays enabled");
+
     preventPacketLoss->init("artemis/settings/prevent_packet_loss"_i18n,
                             advanced.preventPacketLoss, [](bool enabled) {
         auto options = artemis::stream::AdvancedStreamOptionsStore::instance().get();
@@ -141,10 +133,8 @@ ArtemisSettingsTab::ArtemisSettingsTab() {
     });
     preventPacketLoss->setDetailText("artemis/settings/packet_loss_unverified"_i18n);
 #else
-    unlockHighFps->init("artemis/settings/unlock_high_fps"_i18n, false, [](bool) {});
     forceFullRange->init("artemis/settings/force_full_range"_i18n, false, [](bool) {});
     preventPacketLoss->init("artemis/settings/prevent_packet_loss"_i18n, false, [](bool) {});
-    unlockHighFps->setEnabled(false);
     forceFullRange->setEnabled(false);
     preventPacketLoss->setEnabled(false);
 #endif
@@ -158,16 +148,40 @@ ArtemisSettingsTab::ArtemisSettingsTab() {
                      "artemis/settings/fill"_i18n,
                      "artemis/settings/stretch"_i18n},
                     scaleSelection,
-                    [](int selected) {
+                    [this](int selected) {
         const auto mode = selected == 0 ? artemis::video::ScaleMode::Fit
                         : selected == 2 ? artemis::video::ScaleMode::Stretch
                                         : artemis::video::ScaleMode::Fill;
         artemis::video::VideoScaleStore::instance().set(mode);
+        refreshValues();
     });
 #else
     scaleMode->init("artemis/settings/video_scale_mode"_i18n,
                     {"artemis/settings/fill"_i18n}, 0, [](int) {});
     scaleMode->setEnabled(false);
+#endif
+
+    filterStatus->setText("settings/image_adjustments"_i18n);
+
+#if ARTEMIS_HAS_ZOOM_PAN
+    const auto zoom = artemis::video::ZoomPanStore::instance().get();
+    rememberZoomPan->init("artemis/settings/remember_zoom_pan"_i18n,
+                          zoom.rememberBetweenSessions,
+                          [](bool enabled) {
+        artemis::video::ZoomPanStore::instance().setRemember(enabled);
+    });
+    resetZoomPan->setText("artemis/settings/reset_zoom_pan"_i18n);
+    resetZoomPan->registerClickAction([this](View*) {
+        artemis::video::ZoomPanStore::instance().reset();
+        resetZoomPan->setDetailText("artemis/settings/reset_zoom_pan_done"_i18n);
+        return true;
+    });
+#else
+    rememberZoomPan->init("artemis/settings/remember_zoom_pan"_i18n,
+                          false, [](bool) {});
+    rememberZoomPan->setEnabled(false);
+    resetZoomPan->setText("artemis/settings/reset_zoom_pan"_i18n);
+    resetZoomPan->setEnabled(false);
 #endif
 
 #if ARTEMIS_HAS_MOTION_POLICY
@@ -183,9 +197,6 @@ ArtemisSettingsTab::ArtemisSettingsTab() {
     const bool consoleFallbackSupported =
         artemis::input::canEnableConsoleMotionFallback(capabilities);
 
-    // Always force an unsupported saved value back to OFF. This makes console
-    // fallback disabled by default and prevents stale/manual settings from
-    // enabling a path for which libnx does not yet expose mapped motion vectors.
     if (!consoleFallbackSupported && motion.allowConsoleMotionFallback) {
         motion.allowConsoleMotionFallback = false;
         artemis::input::SwitchMotionPolicyStore::instance().set(motion);
@@ -214,27 +225,6 @@ ArtemisSettingsTab::ArtemisSettingsTab() {
                                 false, [](bool) {});
     forwardMotion->setEnabled(false);
     consoleMotionFallback->setEnabled(false);
-#endif
-
-#if ARTEMIS_HAS_ZOOM_PAN
-    const auto zoom = artemis::video::ZoomPanStore::instance().get();
-    rememberZoomPan->init("artemis/settings/remember_zoom_pan"_i18n,
-                          zoom.rememberBetweenSessions,
-                          [](bool enabled) {
-        artemis::video::ZoomPanStore::instance().setRemember(enabled);
-    });
-    resetZoomPan->setText("artemis/settings/reset_zoom_pan"_i18n);
-    resetZoomPan->registerClickAction([this](View*) {
-        artemis::video::ZoomPanStore::instance().reset();
-        resetZoomPan->setDetailText("artemis/settings/reset_zoom_pan_done"_i18n);
-        return true;
-    });
-#else
-    rememberZoomPan->init("artemis/settings/remember_zoom_pan"_i18n,
-                          false, [](bool) {});
-    rememberZoomPan->setEnabled(false);
-    resetZoomPan->setText("artemis/settings/reset_zoom_pan"_i18n);
-    resetZoomPan->setEnabled(false);
 #endif
 
     refreshValues();
@@ -283,12 +273,26 @@ void ArtemisSettingsTab::refreshValues() {
                              configuredResolution));
 
     activeProfile->setDetailText(fmt::format(
-        "{} @ {} FPS, {}, {:.1f} Mbps, {} decoder threads",
+        "{} @ {} FPS, {}, {:.1f} Mbps, {} threads",
         resolutionText,
         Settings::instance().fps(),
         getVideoCodecName(Settings::instance().video_codec()),
         static_cast<double>(Settings::instance().bitrate()) / 1000.0,
         Settings::instance().decoder_threads()));
+
+    std::string rangeText = "Limited";
+#if ARTEMIS_HAS_ADVANCED_STREAM
+    if (artemis::stream::AdvancedStreamOptionsStore::instance()
+            .get()
+            .forceFullRangeVideo)
+        rangeText = "Full";
+#endif
+    filterStatus->setDetailText(fmt::format(
+        "FSR {} | RCAS {} | Dither {} | {} range",
+        onOff(Settings::instance().upscaling()),
+        onOff(Settings::instance().rcas()),
+        onOff(Settings::instance().dithering()),
+        rangeText));
 
     width->setEnabled(stored.customResolutionEnabled);
     height->setEnabled(stored.customResolutionEnabled);
