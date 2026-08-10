@@ -340,7 +340,7 @@ void StreamingView::draw(NVGcontext* vg, float x, float y, float width,
     if (pendingSuspendTerminate) {
         // Focus callback only records intent; tear down here on the main loop.
         pendingSuspendTerminate = false;
-        terminate(false);
+        terminate(Settings::instance().terminate_app_on_disconnect());
         return;
     }
 #endif
@@ -775,6 +775,6 @@ StreamingView::~StreamingView() {
     Application::getWindowFocusChangedEvent()->unsubscribe(
         windowFocusSubscription);
 #endif
-    session->stop(false);
+    session->stop(Settings::instance().terminate_app_on_disconnect());
     delete session;
 }
