@@ -179,3 +179,9 @@ target_include_directories(display_coordinate_mapper_test PRIVATE
 target_compile_features(display_coordinate_mapper_test PRIVATE cxx_std_20)
 add_test(NAME display_coordinate_mapper_test
          COMMAND display_coordinate_mapper_test)
+
+add_executable(host_endpoints_test
+    "${REPO_ROOT}/tests/host_endpoints_test.cpp"
+)
+target_compile_features(host_endpoints_test PRIVATE cxx_std_20)
+add_test(NAME host_endpoints_test COMMAND host_endpoints_test)
