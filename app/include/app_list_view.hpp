@@ -25,6 +25,8 @@ class AppListView : public Box {
 
     void onLayout() override;
     void willAppear(bool resetState) override;
+    void draw(NVGcontext* vg, float x, float y, float width, float height,
+              Style style, FrameContext* ctx) override;
 
   private:
     enum class Pane { Applications, Host };
@@ -47,6 +49,8 @@ class AppListView : public Box {
     int cachedCurrentGame = 0;
     bool loading = false;
     bool inputBlocked = false;
+    bool streamWasActive = false;
+    bool pendingPostStreamRefresh = false;
     LoadingOverlay* loader = nullptr;
     void blockInput(bool block);
 

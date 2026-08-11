@@ -8,6 +8,7 @@
 #include "app_list_view.hpp"
 #include "helper.hpp"
 #include "main_tabs_view.hpp"
+#include "MoonlightSession.hpp"
 #include "features/apollo/ApolloHostOptions.hpp"
 #include "features/apollo/ApolloHostOptionsStore.hpp"
 #include "features/ui/QrCodeView.hpp"
@@ -47,6 +48,10 @@ std::string lowercaseCopy(std::string value) {
         ch = static_cast<char>(
             std::tolower(static_cast<unsigned char>(ch)));
     return value;
+}
+
+bool hostActionsBlockedByActiveSession() {
+    return MoonlightSession::activeSession() != nullptr;
 }
 } // namespace
 
@@ -141,12 +146,16 @@ AppListView::AppListView(const Host& host) : Box(Axis::ROW), host(host) {
     streamProfile->detail->setSingleLine(true);
     refreshStreamProfileLabel();
     streamProfile->registerClickAction([this](View*) {
+        if (hostActionsBlockedByActiveSession())
+            return true;
         artemis::streaming::open_host_profile_picker(
             hostProfileKey, [this] { refreshStreamProfileLabel(); });
         return true;
     });
     streamProfile->registerAction(
         "host/edit_profile"_i18n, BUTTON_Y, [this](View*) {
+            if (hostActionsBlockedByActiveSession())
+                return true;
             const auto selected =
                 artemis::streaming::StreamConfigProfileStore::instance()
                     .selectedForHost(hostProfileKey);
@@ -210,6 +219,8 @@ AppListView::AppListView(const Host& host) : Box(Axis::ROW), host(host) {
     virtualDisplay->title->setSingleLine(true);
     virtualDisplay->detail->setSingleLine(true);
     virtualDisplay->registerClickAction([this](View*) {
+        if (hostActionsBlockedByActiveSession())
+            return true;
         const auto server =
             GameStreamClient::instance().server_data(this->host);
         if (!server.isApollo() || !server.virtualDisplayCapable) {
@@ -637,6 +648,32 @@ void AppListView::setCurrentApp(const AppInfo& app) {
 void AppListView::willAppear(bool resetState) {
     Box::willAppear(resetState);
     updateAppList();
+}
+
+void AppListView::draw(NVGcontext* vg, float x, float y, float width,
+                       float height, Style style, FrameContext* ctx) {
+    const bool sessionActive = MoonlightSession::activeSession() != nullptr;
+    if (sessionActive) {
+        streamWasActive = true;
+    } else if (streamWasActive) {
+        streamWasActive = false;
+        pendingPostStreamRefresh = true;
+    }
+
+    if (pendingPostStreamRefresh && !loading &&
+        MoonlightSession::activeSession() == nullptr) {
+        pendingPostStreamRefresh = false;
+        // Defer one frame so StreamingView/MoonlightSession teardown finishes
+        // before Host/Applications UI reconnects and pushes activities.
+        ASYNC_RETAIN
+        delay(1, [ASYNC_TOKEN] {
+            ASYNC_RELEASE
+            if (!loading)
+                updateAppList();
+        });
+    }
+
+    Box::draw(vg, x, y, width, height, style, ctx);
 }
 
 void AppListView::onLayout() {
