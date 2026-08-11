@@ -24,6 +24,7 @@
 #include "features/apollo/ApolloHostOptionsStore.hpp"
 #include "features/apollo/ServerCommandShortcuts.hpp"
 #include "features/video/DisplayTransformStore.hpp"
+#include "features/video/ZoomPanStore.hpp"
 #include "streaming/InputManager.hpp"
 #include "Limelight.h"
 #include "libgamestream/client.h"
@@ -33,6 +34,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstdint>
+#include <fmt/format.h>
 #include <iomanip>
 #include <optional>
 #include <sstream>
@@ -389,23 +391,21 @@ QuickTab::QuickTab(StreamingView* streamView) : streamView(streamView) {
     auto refreshTouchLabel = [this] {
         const auto mode =
             artemis::input::InputSettingsStore::instance().pointer().mode;
+        const bool on = mode != artemis::input::PointerMode::Disabled;
         quickTouch->setText("artemis/overlay/touch_controls"_i18n);
-        quickTouch->setDetailText(pointerModeFeatureLabel(mode));
+        quickTouch->setDetailText(on ? "artemis/overlay/touch_on"_i18n
+                                     : "artemis/overlay/touch_off"_i18n);
     };
     refreshTouchLabel();
     quickTouch->registerClickAction([this, refreshTouchLabel](View*) {
         auto& store = artemis::input::InputSettingsStore::instance();
         auto settings = store.pointer();
-        constexpr std::array modes = {
-            artemis::input::PointerMode::TrackpadNatural,
-            artemis::input::PointerMode::MultiTouch,
-            artemis::input::PointerMode::Disabled,
-        };
-        const auto current =
-            std::find(modes.begin(), modes.end(), settings.mode);
-        settings.mode = current == modes.end() || std::next(current) == modes.end()
-                            ? modes.front()
-                            : *std::next(current);
+        if (settings.mode == artemis::input::PointerMode::Disabled) {
+            // Prefer multi-touch when enabling from Quick Actions.
+            settings.mode = artemis::input::PointerMode::MultiTouch;
+        } else {
+            settings.mode = artemis::input::PointerMode::Disabled;
+        }
         MoonlightInputManager::instance().dropInput();
         store.setPointer(settings);
         syncLegacyTouchscreenFlag(settings.mode);
@@ -665,6 +665,71 @@ OptionsTab::OptionsTab(StreamingView* streamView) : streamView(streamView) {
         optionsRotation->setDetailText(rotationText(rotation));
         return true;
     });
+
+    auto refreshScaleLabel = [this] {
+        optionsScaleMode->setText("artemis/overlay/scale_mode"_i18n);
+        optionsScaleMode->setDetailText(
+            scaleModeText(artemis::video::VideoScaleStore::instance().get()));
+    };
+    refreshScaleLabel();
+    optionsScaleMode->registerClickAction([this, refreshScaleLabel](View*) {
+        auto& store = artemis::video::VideoScaleStore::instance();
+        store.set(artemis::video::nextScaleMode(store.get()));
+        refreshScaleLabel();
+        return true;
+    });
+
+    auto refreshZoomPanLabels = [this] {
+        const auto state = artemis::video::normalizeZoomPan(
+            artemis::video::ZoomPanStore::instance().get().state);
+        optionsZoom->setText("artemis/overlay/zoom"_i18n);
+        optionsZoom->setDetailText(fmt::format("{:.1f}x", state.zoom));
+        optionsPanX->setText("artemis/overlay/pan_x"_i18n);
+        optionsPanX->setDetailText(fmt::format("{:.2f}", state.panX));
+        optionsPanY->setText("artemis/overlay/pan_y"_i18n);
+        optionsPanY->setDetailText(fmt::format("{:.2f}", state.panY));
+        optionsResetZoomPan->setText("artemis/settings/reset_zoom_pan"_i18n);
+        optionsResetZoomPan->setDetailText(
+            "artemis/settings/reset_zoom_pan_done"_i18n);
+    };
+    refreshZoomPanLabels();
+
+    optionsZoom->registerClickAction([this, refreshZoomPanLabels](View*) {
+        auto& store = artemis::video::ZoomPanStore::instance();
+        auto state = store.get().state;
+        state.zoom += 0.25f;
+        if (state.zoom > 4.0f + 0.001f)
+            state.zoom = 1.0f;
+        store.setState(state);
+        refreshZoomPanLabels();
+        return true;
+    });
+    optionsPanX->registerClickAction([this, refreshZoomPanLabels](View*) {
+        auto& store = artemis::video::ZoomPanStore::instance();
+        auto state = store.get().state;
+        state.panX += 0.1f;
+        if (state.panX > 1.0f)
+            state.panX = -1.0f;
+        store.setState(state);
+        refreshZoomPanLabels();
+        return true;
+    });
+    optionsPanY->registerClickAction([this, refreshZoomPanLabels](View*) {
+        auto& store = artemis::video::ZoomPanStore::instance();
+        auto state = store.get().state;
+        state.panY += 0.1f;
+        if (state.panY > 1.0f)
+            state.panY = -1.0f;
+        store.setState(state);
+        refreshZoomPanLabels();
+        return true;
+    });
+    optionsResetZoomPan->registerClickAction(
+        [this, refreshZoomPanLabels](View*) {
+            artemis::video::ZoomPanStore::instance().reset();
+            refreshZoomPanLabels();
+            return true;
+        });
 
     guideKeyButtons->setText("settings/guide_key_buttons"_i18n);
     setupButtonsSelectorCell(guideKeyButtons,
