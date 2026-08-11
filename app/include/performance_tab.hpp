@@ -29,10 +29,11 @@ private:
     BRLS_BIND(brls::DetailCell, packetLoss, "packet_loss");
     BRLS_BIND(brls::DetailCell, hostFps, "host_fps");
     BRLS_BIND(brls::DetailCell, receivedFps, "received_fps");
+    BRLS_BIND(WifiPerformanceGraph, receivedFpsGraph, "received_fps_graph");
     BRLS_BIND(brls::DetailCell, decodedFps, "decoded_fps");
+    BRLS_BIND(WifiPerformanceGraph, decodedFpsGraph, "decoded_fps_graph");
     BRLS_BIND(brls::DetailCell, renderedFps, "rendered_fps");
     BRLS_BIND(brls::DetailCell, frameQueue, "frame_queue");
-    BRLS_BIND(brls::DetailCell, gpuRender, "gpu_render");
     BRLS_BIND(brls::DetailCell, presentation, "presentation");
     BRLS_BIND(brls::DetailCell, operationMode, "operation_mode");
     BRLS_BIND(brls::DetailCell, cpuClock, "cpu_clock");

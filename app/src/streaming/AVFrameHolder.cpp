@@ -1,22 +1,53 @@
 //
-//  DiscoverManager.cpp
-//  Moonlight
+//  AVFrameHolder.cpp
+//  Artemis-Switch
 //
-// Created by XITRIX on 31.03.2025.
+// Dual-path frame queue:
+//   Legacy path  – occupancy/frameCredit pacing (original Artemis behavior).
+//   Low-latency path – alpha-beta filtered arrival estimation with a present-gate
+//                      (ported from nyanpasu64/Moonlight-Switch frame-rate-sync).
 //
 
 #include "AVFrameHolder.hpp"
 
 #include <algorithm>
+#include <cmath>
 
 namespace {
 
+// ---- Shared ----------------------------------------------------------------
+
 constexpr size_t kBurstHeadroomFrames = 5;
-constexpr auto kArrivalRateWindow = std::chrono::milliseconds(250);
-constexpr auto kArrivalRateResetGap = std::chrono::milliseconds(500);
-constexpr double kArrivalRateSmoothing = 0.35;
-constexpr double kOccupancyCorrectionPerFrame = 0.01;
-constexpr double kMaximumOccupancyCorrection = 0.08;
+
+// ---- Legacy pacing constants -----------------------------------------------
+
+constexpr auto   kArrivalRateWindow        = std::chrono::milliseconds(250);
+constexpr auto   kArrivalRateResetGap      = std::chrono::milliseconds(500);
+constexpr double kArrivalRateSmoothing     = 0.35;
+constexpr double kOccupancyCorrectionPerFrame  = 0.01;
+constexpr double kMaximumOccupancyCorrection   = 0.08;
+
+// ---- Low-latency alpha-beta constants --------------------------------------
+
+// Slow-path smoothing factor (used when measured interval is close to predicted).
+constexpr double kLL_Alpha = 1.0 / 8.0;
+// Fast convergence factor (used when the deviation is large, e.g. after a gap).
+constexpr double kLL_FastAlpha = 1.0 / 4.0;
+// Fixed lead time before estimated next-frame arrival at which a frame is released.
+constexpr double kLL_GateLeadMs = 6.0;
+// Jitter multiplier added to the gate lead time.
+constexpr double kLL_JitterGateMultiplier = 1.5;
+
+// ---- Helpers ---------------------------------------------------------------
+
+void freeTimedFrameDeque(std::deque<TimedFrame>& frames) {
+    for (auto& tf : frames) {
+        if (tf.frame) {
+            av_frame_free(&tf.frame);
+        }
+    }
+    frames.clear();
+}
 
 void freeFrameQueue(std::queue<AVFrame*>& frames) {
     for (; !frames.empty(); frames.pop()) {
@@ -29,13 +60,16 @@ void recycleFrame(std::queue<AVFrame*>& freeQueue, AVFrame*& frame) {
     if (!frame) {
         return;
     }
-
     av_frame_unref(frame);
     freeQueue.push(frame);
     frame = nullptr;
 }
 
 } // namespace
+
+// ===========================================================================
+// AVFrameQueue
+// ===========================================================================
 
 AVFrameQueue::AVFrameQueue() {}
 
@@ -47,6 +81,48 @@ AVFrameQueue::~AVFrameQueue() {
 size_t AVFrameQueue::capacityFor(size_t configuredQueueSize) {
     return std::max<size_t>(configuredQueueSize, 1) + kBurstHeadroomFrames;
 }
+
+// ---------------------------------------------------------------------------
+// configure
+// ---------------------------------------------------------------------------
+
+void AVFrameQueue::configure(size_t queueLimit, int configuredStreamFps,
+                             bool transferOwnershipEnabled,
+                             bool lowLatencyEnabled) {
+    std::lock_guard<std::mutex> lock(m_mutex);
+
+    const size_t configuredDepth = std::max<size_t>(queueLimit, 1);
+    limit         = capacityFor(configuredDepth);
+    lowLatency    = lowLatencyEnabled;
+
+    if (lowLatency) {
+        // Cap buffering at 1 to minimise presentation latency.
+        targetBufferedFrames = configuredDepth > 1
+            ? std::min<size_t>(configuredDepth - 1, 1) : 0;
+    } else {
+        targetBufferedFrames = configuredDepth > 1
+            ? std::min<size_t>(configuredDepth - 1, 2) : 0;
+    }
+
+    transferOwnership        = transferOwnershipEnabled;
+    streamFps                = configuredStreamFps;
+    adaptiveFrameInterval    = std::chrono::nanoseconds::zero();
+    drawClockStarted         = false;
+    averageDrawInterval      = std::chrono::nanoseconds::zero();
+    arrivalClockStarted      = false;
+    arrivalWindowFrames      = 0;
+    arrivalRateSamples       = 0;
+    estimatedSourceFps       = 0.0;
+    frameCredit              = 0.0;
+    startupBuffering         = true;
+    playoutResyncNeeded      = true;
+
+    resetLLFilterLocked();
+}
+
+// ---------------------------------------------------------------------------
+// push  (copy-ref variant)
+// ---------------------------------------------------------------------------
 
 bool AVFrameQueue::push(AVFrame* item) {
     std::lock_guard<std::mutex> lock(m_mutex);
@@ -69,31 +145,50 @@ bool AVFrameQueue::push(AVFrame* item) {
         return false;
     }
 
-    queue.push(queuedFrame);
-    recordArrivalLocked(std::chrono::steady_clock::now());
+    const auto now = std::chrono::steady_clock::now();
+    std::chrono::steady_clock::time_point timeEstimate{};
+    if (lowLatency) {
+        updateLLFilterLocked(now, timeEstimate);
+    } else {
+        recordArrivalLocked(now);
+    }
+
+    queue.push_back({timeEstimate, queuedFrame});
     pushesSincePop++;
     maxPushBurstStat = std::max(maxPushBurstStat, pushesSincePop);
 
     if (queue.size() > limit) {
         const size_t keepFrames = targetBufferedFrames + 1;
         while (queue.size() > keepFrames) {
-            AVFrame* droppedFrame = queue.front();
-            queue.pop();
-            recycleFrame(freeQueue, droppedFrame);
+            AVFrame* dropped = queue.front().frame;
+            queue.pop_front();
+            recycleFrame(freeQueue, dropped);
             framesDroppedStat++;
             overflowDropStat++;
         }
-        resetArrivalRateEstimatorLocked();
-        playoutResyncNeeded = true;
+        if (lowLatency) {
+            resetLLFilterLocked();
+        } else {
+            resetArrivalRateEstimatorLocked();
+            playoutResyncNeeded = true;
+        }
     }
 
     return true;
 }
 
+// ---------------------------------------------------------------------------
+// pushTransferred  (public lock wrapper)
+// ---------------------------------------------------------------------------
+
 bool AVFrameQueue::pushTransferred(AVFrame* item) {
     std::lock_guard<std::mutex> lock(m_mutex);
     return pushTransferredLocked(item);
 }
+
+// ---------------------------------------------------------------------------
+// pop
+// ---------------------------------------------------------------------------
 
 AVFrame* AVFrameQueue::pop(bool* consumed) {
     std::lock_guard<std::mutex> lock(m_mutex);
@@ -105,20 +200,76 @@ AVFrame* AVFrameQueue::pop(bool* consumed) {
     }
 
     const auto now = std::chrono::steady_clock::now();
+
+    // ========================================================================
+    // LOW-LATENCY PATH
+    // ========================================================================
+    if (lowLatency) {
+        // Drop frames that are more than one estimated interval stale,
+        // but always keep at least one frame for display continuity.
+        if (ll_smoothedIntervalNs > 0.0) {
+            const auto staleThreshold = std::chrono::nanoseconds(
+                static_cast<int64_t>(ll_smoothedIntervalNs));
+            while (queue.size() > 1) {
+                if (now >= queue.front().timeEstimate + staleThreshold) {
+                    AVFrame* dropped = queue.front().frame;
+                    queue.pop_front();
+                    recycleFrame(freeQueue, dropped);
+                    framesDroppedStat++;
+                    pacingSkipStat++;
+                } else {
+                    break;
+                }
+            }
+        }
+
+        if (queue.empty()) {
+            if (bufferFrame) {
+                fakeFrameUsedStat++;
+                emptyQueueStat++;
+            }
+            return bufferFrame;
+        }
+
+        // Present gate: release frame (6 ms + 1.5 × jitter) before its
+        // estimated next-frame time to give the renderer a head-start.
+        const double gateNsVal =
+            kLL_GateLeadMs * 1.0e6 + kLL_JitterGateMultiplier * ll_jitterNs;
+        const auto gateNs = std::chrono::nanoseconds(
+            static_cast<int64_t>(std::max(0.0, gateNsVal)));
+
+        if (now < queue.front().timeEstimate - gateNs) {
+            scheduledHoldStat++;
+            return bufferFrame;
+        }
+
+        recycleFrame(freeQueue, bufferFrame);
+        bufferFrame = queue.front().frame;
+        queue.pop_front();
+        localClockPacedFrameStat++;
+        if (consumed) {
+            *consumed = true;
+        }
+        return bufferFrame;
+    }
+
+    // ========================================================================
+    // LEGACY OCCUPANCY / FRAME-CREDIT PATH
+    // ========================================================================
+
     if (!drawClockStarted) {
-        lastDraw = now;
+        lastDraw       = now;
         drawClockStarted = true;
     } else {
         const auto drawInterval =
             std::chrono::duration_cast<std::chrono::nanoseconds>(now - lastDraw);
         lastDraw = now;
 
-        // App suspension and debugger pauses must not turn into a large burst
-        // of overdue video frames when drawing resumes.
+        // Ignore pathological intervals (app suspension, debugger pauses).
         if (drawInterval <= std::chrono::nanoseconds::zero() ||
             drawInterval > std::chrono::milliseconds(250)) {
             averageDrawInterval = std::chrono::nanoseconds::zero();
-            frameCredit = 0.0;
+            frameCredit         = 0.0;
             playoutResyncNeeded = true;
         } else if (averageDrawInterval == std::chrono::nanoseconds::zero()) {
             averageDrawInterval = drawInterval;
@@ -137,59 +288,47 @@ AVFrame* AVFrameQueue::pop(bool* consumed) {
     }
 
     if (startupBuffering) {
-        // Establish a small jitter reserve once at startup. Rebuilding the
-        // whole reserve after every ordinary miss batches a variable-rate
-        // source into visible freeze-and-catch-up cycles.
-        startupBuffering = false;
-        frameCredit = 0.0;
+        startupBuffering    = false;
+        frameCredit         = 0.0;
         playoutResyncNeeded = true;
     }
 
     size_t dueFrames = 0;
     const bool backlogResync = limit > 0 && queue.size() >= limit;
+
     if ((playoutResyncNeeded || backlogResync) && !queue.empty()) {
-        // Resume immediately after a real miss. If latency has reached the
-        // hard limit, discard the stale backlog once instead of repeatedly
-        // overflowing the oldest frame while playback remains frozen.
         trimToPlayoutWindowLocked();
         if (backlogResync) {
             resetArrivalRateEstimatorLocked();
         }
         playoutResyncNeeded = false;
-        frameCredit = 0.0;
+        frameCredit         = 0.0;
         playoutResyncStat++;
-        dueFrames = 1;
+        dueFrames           = 1;
     } else if (arrivalRateSamples == 0 ||
                adaptiveFrameInterval <= std::chrono::nanoseconds::zero() ||
-               averageDrawInterval <= std::chrono::nanoseconds::zero()) {
-        // During the short measurement warm-up, consume only above the jitter
-        // reserve. This follows arrivals without assuming configured FPS is
-        // the FPS the host is actually producing.
+               averageDrawInterval   <= std::chrono::nanoseconds::zero()) {
         dueFrames = queue.size() > targetBufferedFrames ? 1 : 0;
-    } else if (adaptiveFrameInterval > std::chrono::nanoseconds::zero() &&
-               averageDrawInterval > std::chrono::nanoseconds::zero()) {
+    } else {
         const double baseFramesPerDraw =
             static_cast<double>(averageDrawInterval.count()) /
             static_cast<double>(adaptiveFrameInterval.count());
-        const double desiredDepth =
-            static_cast<double>(targetBufferedFrames + 1);
-        const double depthError =
-            static_cast<double>(queue.size()) - desiredDepth;
-        const double occupancyCorrection = std::clamp(
+        const double desiredDepth  = static_cast<double>(targetBufferedFrames + 1);
+        const double depthError    = static_cast<double>(queue.size()) - desiredDepth;
+        const double occupancyCorr = std::clamp(
             depthError * kOccupancyCorrectionPerFrame,
             -kMaximumOccupancyCorrection, kMaximumOccupancyCorrection);
-        const double framesPerDraw =
-            std::max(0.0, baseFramesPerDraw + occupancyCorrection);
+        const double framesPerDraw = std::max(0.0, baseFramesPerDraw + occupancyCorr);
 
         if (baseFramesPerDraw >= 0.98 && baseFramesPerDraw <= 1.02 &&
             depthError == 0.0) {
             frameCredit = 0.0;
-            dueFrames = 1;
+            dueFrames   = 1;
         } else {
             frameCredit += framesPerDraw;
             const size_t wholeFrames = static_cast<size_t>(frameCredit);
             frameCredit -= static_cast<double>(wholeFrames);
-            dueFrames = std::min(wholeFrames, limit);
+            dueFrames    = std::min(wholeFrames, limit);
         }
     }
 
@@ -203,11 +342,8 @@ AVFrame* AVFrameQueue::pop(bool* consumed) {
             fakeFrameUsedStat++;
             emptyQueueStat++;
         }
-        frameCredit = 0.0;
+        frameCredit         = 0.0;
         playoutResyncNeeded = true;
-        // The measured cadence may now be too high because the host FPS fell.
-        // Relearn it from fresh arrivals while occupancy pacing protects the
-        // jitter reserve, rather than causing repeated underflow/resume cycles.
         resetArrivalRateEstimatorLocked();
         return bufferFrame;
     }
@@ -216,8 +352,8 @@ AVFrame* AVFrameQueue::pop(bool* consumed) {
 
     recycleFrame(freeQueue, bufferFrame);
     for (size_t i = 0; i < consumeCount; i++) {
-        AVFrame* item = queue.front();
-        queue.pop();
+        AVFrame* item = queue.front().frame;
+        queue.pop_front();
 
         if (i + 1 < consumeCount) {
             recycleFrame(freeQueue, item);
@@ -232,9 +368,12 @@ AVFrame* AVFrameQueue::pop(bool* consumed) {
         *consumed = true;
     }
     localClockPacedFrameStat++;
-
     return bufferFrame;
 }
+
+// ---------------------------------------------------------------------------
+// acquireWriteFrame / recycleWriteFrame
+// ---------------------------------------------------------------------------
 
 AVFrame* AVFrameQueue::acquireWriteFrame() {
     std::lock_guard<std::mutex> lock(m_mutex);
@@ -246,26 +385,9 @@ void AVFrameQueue::recycleWriteFrame(AVFrame*& frame) {
     recycleFrame(freeQueue, frame);
 }
 
-void AVFrameQueue::configure(size_t queueLimit, int configuredStreamFps,
-                             bool transferOwnershipEnabled) {
-    std::lock_guard<std::mutex> lock(m_mutex);
-    const size_t configuredDepth = std::max<size_t>(queueLimit, 1);
-    limit = capacityFor(configuredDepth);
-    targetBufferedFrames =
-        configuredDepth > 1 ? std::min<size_t>(configuredDepth - 1, 2) : 0;
-    transferOwnership = transferOwnershipEnabled;
-    streamFps = configuredStreamFps;
-    adaptiveFrameInterval = std::chrono::nanoseconds::zero();
-    drawClockStarted = false;
-    averageDrawInterval = std::chrono::nanoseconds::zero();
-    arrivalClockStarted = false;
-    arrivalWindowFrames = 0;
-    arrivalRateSamples = 0;
-    estimatedSourceFps = 0.0;
-    frameCredit = 0.0;
-    startupBuffering = true;
-    playoutResyncNeeded = true;
-}
+// ---------------------------------------------------------------------------
+// Stats getters
+// ---------------------------------------------------------------------------
 
 size_t AVFrameQueue::size() const {
     std::lock_guard<std::mutex> lock(m_mutex);
@@ -334,63 +456,129 @@ size_t AVFrameQueue::getPlayoutResyncStat() const {
 
 double AVFrameQueue::getEstimatedSourceFps() const {
     std::lock_guard<std::mutex> lock(m_mutex);
+    if (lowLatency && ll_smoothedIntervalNs > 0.0) {
+        return 1.0e9 / ll_smoothedIntervalNs;
+    }
     return estimatedSourceFps;
 }
 
+double AVFrameQueue::getJitterMs() const {
+    std::lock_guard<std::mutex> lock(m_mutex);
+    return ll_jitterNs / 1.0e6;
+}
+
+// ---------------------------------------------------------------------------
+// cleanup
+// ---------------------------------------------------------------------------
+
+void AVFrameQueue::cleanup() {
+    std::lock_guard<std::mutex> lock(m_mutex);
+
+    fakeFrameUsedStat        = 0;
+    framesDroppedStat        = 0;
+    emptyQueueStat           = 0;
+    rebufferHoldStat         = 0;
+    overflowDropStat         = 0;
+    pacingSkipStat           = 0;
+    scheduledHoldStat        = 0;
+    pushesSincePop           = 0;
+    maxPushBurstStat         = 0;
+    localClockPacedFrameStat = 0;
+    playoutResyncStat        = 0;
+
+    drawClockStarted         = false;
+    averageDrawInterval      = std::chrono::nanoseconds::zero();
+    arrivalClockStarted      = false;
+    arrivalWindowFrames      = 0;
+    arrivalRateSamples       = 0;
+    estimatedSourceFps       = 0.0;
+    adaptiveFrameInterval    = std::chrono::nanoseconds::zero();
+    frameCredit              = 0.0;
+    startupBuffering         = true;
+    playoutResyncNeeded      = true;
+
+    resetLLFilterLocked();
+
+    if (bufferFrame) {
+        av_frame_free(&bufferFrame);
+    }
+
+    freeTimedFrameDeque(queue);
+    freeFrameQueue(freeQueue);
+    freeQueue = {};
+}
+
+// ---------------------------------------------------------------------------
+// Private helpers – frame pool
+// ---------------------------------------------------------------------------
+
 AVFrame* AVFrameQueue::acquireFrameLocked() {
-    AVFrame* frame = nullptr;
     if (!freeQueue.empty()) {
-        frame = freeQueue.front();
+        AVFrame* frame = freeQueue.front();
         freeQueue.pop();
         av_frame_unref(frame);
         return frame;
     }
-
-    frame = av_frame_alloc();
-    return frame;
+    return av_frame_alloc();
 }
+
+// ---------------------------------------------------------------------------
+// pushTransferredLocked  (caller already holds m_mutex, item ownership transferred)
+// ---------------------------------------------------------------------------
 
 bool AVFrameQueue::pushTransferredLocked(AVFrame* item) {
     if (!item) {
         return false;
     }
 
-    queue.push(item);
-    recordArrivalLocked(std::chrono::steady_clock::now());
+    const auto now = std::chrono::steady_clock::now();
+    std::chrono::steady_clock::time_point timeEstimate{};
+    if (lowLatency) {
+        updateLLFilterLocked(now, timeEstimate);
+    } else {
+        recordArrivalLocked(now);
+    }
+
+    queue.push_back({timeEstimate, item});
     pushesSincePop++;
     maxPushBurstStat = std::max(maxPushBurstStat, pushesSincePop);
 
     if (queue.size() > limit) {
         const size_t keepFrames = targetBufferedFrames + 1;
         while (queue.size() > keepFrames) {
-            AVFrame* droppedFrame = queue.front();
-            queue.pop();
-            recycleFrame(freeQueue, droppedFrame);
+            AVFrame* dropped = queue.front().frame;
+            queue.pop_front();
+            recycleFrame(freeQueue, dropped);
             framesDroppedStat++;
             overflowDropStat++;
         }
-        resetArrivalRateEstimatorLocked();
-        playoutResyncNeeded = true;
+        if (lowLatency) {
+            resetLLFilterLocked();
+        } else {
+            resetArrivalRateEstimatorLocked();
+            playoutResyncNeeded = true;
+        }
     }
 
     return true;
 }
 
-void AVFrameQueue::recordArrivalLocked(
-    std::chrono::steady_clock::time_point now) {
+// ---------------------------------------------------------------------------
+// Private helpers – legacy arrival-rate estimator
+// ---------------------------------------------------------------------------
+
+void AVFrameQueue::recordArrivalLocked(std::chrono::steady_clock::time_point now) {
     if (!arrivalClockStarted) {
-        arrivalClockStarted = true;
-        arrivalWindowStart = now;
-        lastArrival = now;
-        arrivalWindowFrames = 1;
+        arrivalClockStarted  = true;
+        arrivalWindowStart   = now;
+        lastArrival          = now;
+        arrivalWindowFrames  = 1;
         return;
     }
 
     if (now - lastArrival > kArrivalRateResetGap) {
-        // Do not interpret a network pause or app suspension as a permanent
-        // low source rate. Start a fresh window when frames resume.
-        arrivalWindowStart = now;
-        lastArrival = now;
+        arrivalWindowStart  = now;
+        lastArrival         = now;
         arrivalWindowFrames = 1;
         return;
     }
@@ -414,9 +602,6 @@ void AVFrameQueue::recordArrivalLocked(
         if (arrivalRateSamples == 0) {
             estimatedSourceFps = sampleFps;
         } else {
-            // The quarter-second sample ignores short decoder bursts. The EMA
-            // follows sustained FPS changes without making network jitter a
-            // new presentation cadence every window.
             estimatedSourceFps =
                 estimatedSourceFps * (1.0 - kArrivalRateSmoothing) +
                 sampleFps * kArrivalRateSmoothing;
@@ -426,59 +611,95 @@ void AVFrameQueue::recordArrivalLocked(
             static_cast<int64_t>(1000000000.0 / estimatedSourceFps));
     }
 
-    arrivalWindowStart = now;
+    arrivalWindowStart  = now;
     arrivalWindowFrames = 1;
 }
 
 void AVFrameQueue::resetArrivalRateEstimatorLocked() {
     arrivalClockStarted = false;
     arrivalWindowFrames = 0;
-    arrivalRateSamples = 0;
-    estimatedSourceFps = 0.0;
+    arrivalRateSamples  = 0;
+    estimatedSourceFps  = 0.0;
     adaptiveFrameInterval = std::chrono::nanoseconds::zero();
 }
 
 void AVFrameQueue::trimToPlayoutWindowLocked() {
     const size_t keepFrames = targetBufferedFrames + 1;
     while (queue.size() > keepFrames) {
-        AVFrame* droppedFrame = queue.front();
-        queue.pop();
-        recycleFrame(freeQueue, droppedFrame);
+        AVFrame* dropped = queue.front().frame;
+        queue.pop_front();
+        recycleFrame(freeQueue, dropped);
         framesDroppedStat++;
         pacingSkipStat++;
     }
 }
 
-void AVFrameQueue::cleanup() {
-    std::lock_guard<std::mutex> lock(m_mutex);
-    fakeFrameUsedStat = 0;
-    framesDroppedStat = 0;
-    emptyQueueStat = 0;
-    rebufferHoldStat = 0;
-    overflowDropStat = 0;
-    pacingSkipStat = 0;
-    scheduledHoldStat = 0;
-    pushesSincePop = 0;
-    maxPushBurstStat = 0;
-    localClockPacedFrameStat = 0;
-    playoutResyncStat = 0;
-    drawClockStarted = false;
-    averageDrawInterval = std::chrono::nanoseconds::zero();
-    arrivalClockStarted = false;
-    arrivalWindowFrames = 0;
-    arrivalRateSamples = 0;
-    estimatedSourceFps = 0.0;
-    adaptiveFrameInterval = std::chrono::nanoseconds::zero();
-    frameCredit = 0.0;
-    startupBuffering = true;
-    playoutResyncNeeded = true;
+// ---------------------------------------------------------------------------
+// Private helpers – low-latency alpha-beta filter
+// ---------------------------------------------------------------------------
 
-    if (bufferFrame) {
-        av_frame_free(&bufferFrame);
+void AVFrameQueue::updateLLFilterLocked(
+    std::chrono::steady_clock::time_point now,
+    std::chrono::steady_clock::time_point& outNextEstimate) {
+
+    if (ll_firstArrival) {
+        ll_firstArrival      = false;
+        ll_lastArrival       = now;
+        ll_smoothedIntervalNs = streamFps > 0
+            ? 1.0e9 / static_cast<double>(streamFps)
+            : 1.0e9 / 60.0;
+        ll_intervalVelocityNs = 0.0;
+        // Seed jitter at 10 % of nominal interval.
+        ll_jitterNs = ll_smoothedIntervalNs * 0.1;
+        outNextEstimate = now + std::chrono::nanoseconds(
+            static_cast<int64_t>(ll_smoothedIntervalNs));
+        return;
     }
 
-    freeFrameQueue(queue);
-    freeFrameQueue(freeQueue);
-    queue = {};
-    freeQueue = {};
+    const double measuredNs = static_cast<double>(
+        std::chrono::duration_cast<std::chrono::nanoseconds>(now - ll_lastArrival).count());
+    ll_lastArrival = now;
+
+    // Predict where we expected the interval to be.
+    const double predictedInterval = ll_smoothedIntervalNs + ll_intervalVelocityNs;
+    const double predError         = measuredNs - predictedInterval;
+
+    // Choose alpha: converge quickly when the measured interval jumps far from
+    // the prediction (e.g. after a network pause), settle slowly otherwise.
+    const double alpha = (std::abs(predError) > predictedInterval * 0.5)
+        ? kLL_FastAlpha : kLL_Alpha;
+    // Derive beta from alpha (standard alpha-beta relationship).
+    const double beta = (alpha * alpha) / (2.0 - alpha);
+
+    ll_smoothedIntervalNs  = predictedInterval + alpha * predError;
+    ll_intervalVelocityNs += beta * predError;
+
+    // Clamp interval to a sane range: no faster than 120 % of configured FPS,
+    // no slower than one second.
+    if (streamFps > 0) {
+        const double minInterval =
+            1.0e9 / (static_cast<double>(streamFps) * 1.2);
+        ll_smoothedIntervalNs = std::max(ll_smoothedIntervalNs, minInterval);
+    }
+    ll_smoothedIntervalNs = std::min(ll_smoothedIntervalNs, 1.0e9);
+
+    // Clamp velocity drift to ±20 % of the smoothed interval.
+    const double velLimit = ll_smoothedIntervalNs * 0.2;
+    ll_intervalVelocityNs =
+        std::clamp(ll_intervalVelocityNs, -velLimit, velLimit);
+
+    // Update jitter: EMA of the absolute prediction error.
+    ll_jitterNs = ll_jitterNs * (1.0 - kLL_Alpha) +
+                  std::abs(predError) * kLL_Alpha;
+
+    outNextEstimate = now + std::chrono::nanoseconds(
+        static_cast<int64_t>(ll_smoothedIntervalNs));
+}
+
+void AVFrameQueue::resetLLFilterLocked() {
+    ll_firstArrival       = true;
+    ll_smoothedIntervalNs = 0.0;
+    ll_intervalVelocityNs = 0.0;
+    ll_jitterNs           = 0.0;
+    ll_lastArrival        = {};
 }

@@ -4,8 +4,6 @@
 #include "streaming_view.hpp"
 
 #include "MoonlightSession.hpp"
-#include "Settings.hpp"
-#include "streaming_view.hpp"
 #include "features/performance/PerformanceLite.hpp"
 #include "utils/ArtemisPlatformFeatures.hpp"
 
@@ -67,6 +65,7 @@
 #include <array>
 #include <atomic>
 #include <chrono>
+#include <cmath>
 #include <filesystem>
 #include <fmt/format.h>
 #include <utility>
@@ -206,10 +205,10 @@ PerformanceTab::PerformanceTab(StreamingView* streamView)
     : streamView(streamView) {
     inflateFromXMLRes("xml/views/ingame_overlay/performance_tab.xml");
 
-    const std::array<DetailCell*, 22> compactRows = {
+    const std::array<DetailCell*, 21> compactRows = {
         network, wifiSignal, receiveLatency, decodeLatency, renderLatency,
         packetLoss, hostFps, receivedFps, decodedFps, renderedFps, frameQueue,
-        gpuRender, presentation, operationMode, cpuClock, gpuClock, memoryClock,
+        presentation, operationMode, cpuClock, gpuClock, memoryClock,
         battery, benchmarkSummary, benchmarkAction, benchmarkSave, benchmarkReset};
     for (auto* row : compactRows) {
         row->title->setSingleLine(true);
@@ -228,7 +227,6 @@ PerformanceTab::PerformanceTab(StreamingView* streamView)
     decodedFps->setText("artemis/performance/decoded_fps"_i18n);
     renderedFps->setText("artemis/performance/rendered_fps"_i18n);
     frameQueue->setText("artemis/performance/frame_queue"_i18n);
-    gpuRender->setText("artemis/performance/gpu_render"_i18n);
     presentation->setText("artemis/performance/presentation"_i18n);
     operationMode->setText("artemis/performance/operation_mode"_i18n);
     cpuClock->setText("artemis/performance/cpu_clock"_i18n);
@@ -425,8 +423,9 @@ void PerformanceTab::refresh() {
         setDetailTextIfChanged(decodedFps, "-");
         setDetailTextIfChanged(renderedFps, "-");
         setDetailTextIfChanged(frameQueue, "-");
-        setDetailTextIfChanged(gpuRender, "-");
         setDetailTextIfChanged(presentation, "-");
+        receivedFpsGraph->clear();
+        decodedFpsGraph->clear();
         benchmarkAction->setFocusable(false);
         benchmarkSave->setFocusable(false);
         benchmarkReset->setFocusable(false);
@@ -470,7 +469,6 @@ void PerformanceTab::refresh() {
     snapshot.receivedFps = decode.current_received_fps;
     snapshot.decodedFps = decode.current_decoded_fps;
     snapshot.renderedFps = render.rendered_fps;
-    snapshot.gpuRenderMs = render.gpu_rendering_time;
 #if ARTEMIS_HAS_FRAME_QUEUE
     snapshot.queueDepth = AVFrameHolder::instance().getFrameQueueSize();
     snapshot.queueTarget = AVFrameHolder::instance().getFrameQueueTargetDepth();
@@ -489,8 +487,18 @@ void PerformanceTab::refresh() {
     setDetailTextIfChanged(decodedFps, lite.decodedFpsText);
     setDetailTextIfChanged(renderedFps, lite.fpsText);
     setDetailTextIfChanged(frameQueue, lite.frameQueueText);
-    setDetailTextIfChanged(gpuRender, lite.gpuText);
     setDetailTextIfChanged(presentation, lite.presentationText);
+
+    const float targetFps = static_cast<float>(
+        std::max(1, Settings::instance().fps()));
+    receivedFpsGraph->pushSample(
+        std::clamp(static_cast<float>(decode.current_received_fps) / targetFps,
+                   0.0f, 1.25f) /
+        1.25f);
+    decodedFpsGraph->pushSample(
+        std::clamp(static_cast<float>(decode.current_decoded_fps) / targetFps,
+                   0.0f, 1.25f) /
+        1.25f);
 
     const auto color = lite.healthy
         ? Application::getTheme()["brls/list/listItem_value_color"]

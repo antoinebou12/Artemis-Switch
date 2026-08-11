@@ -2,7 +2,10 @@
 
 #include "Singleton.hpp"
 #include <chrono>
+#include <cmath>
+#include <deque>
 #include <functional>
+#include <optional>
 #include "Settings.hpp"
 #include <mutex>
 #include <queue>
@@ -10,6 +13,15 @@
 extern "C" {
 #include <libavcodec/avcodec.h>
 }
+
+// Shared frame-storage entry for both pacing paths.
+// The legacy path writes a zero-initialised timeEstimate and never reads it.
+// The low-latency path writes the predicted arrival time of the *next* frame
+// so that pop() can release this frame at the right moment.
+struct TimedFrame {
+    std::chrono::steady_clock::time_point timeEstimate{};
+    AVFrame* frame = nullptr;
+};
 
 class AVFrameQueue {
 public:
@@ -21,10 +33,16 @@ public:
     AVFrame* pop(bool* consumed = nullptr);
     AVFrame* acquireWriteFrame();
     void recycleWriteFrame(AVFrame*& frame);
+
+    // The new lowLatency parameter selects the pacing path at configure time.
+    // Defaults to false so all existing call-sites stay compatible.
     void configure(size_t queueLimit, int streamFps,
-                   bool transferOwnershipEnabled);
+                   bool transferOwnershipEnabled,
+                   bool lowLatency = false);
+
     static size_t capacityFor(size_t configuredQueueSize);
 
+    // --- Stats getters (all existing names preserved) ---
     [[nodiscard]] size_t size() const;
     [[nodiscard]] size_t targetDepth() const;
     [[nodiscard]] size_t capacity() const;
@@ -39,48 +57,78 @@ public:
     [[nodiscard]] size_t getLocalClockPacedFrameStat() const;
     [[nodiscard]] size_t getPlayoutResyncStat() const;
     [[nodiscard]] double getEstimatedSourceFps() const;
+    // Low-latency jitter estimate in milliseconds (0 when legacy path is active).
+    [[nodiscard]] double getJitterMs() const;
 
     void cleanup();
 
 private:
     friend class AVFrameHolder;
+
+    // Frame pool helpers
     AVFrame* acquireFrameLocked();
+
+    // Shared push helper (no copy, caller transfers ownership of item)
     bool pushTransferredLocked(AVFrame* item);
+
+    // Legacy arrival-rate estimator
     void recordArrivalLocked(std::chrono::steady_clock::time_point now);
     void resetArrivalRateEstimatorLocked();
     void trimToPlayoutWindowLocked();
-    size_t limit = 0;
-    std::queue<AVFrame*> queue;
-    std::queue<AVFrame*> freeQueue;
-    AVFrame* bufferFrame = nullptr;
-    bool transferOwnership = false;
+
+    // Low-latency alpha-beta filter
+    void updateLLFilterLocked(std::chrono::steady_clock::time_point now,
+                               std::chrono::steady_clock::time_point& outNextEstimate);
+    void resetLLFilterLocked();
+
+    // ---- Queue storage (both paths share this deque) ----
+    std::deque<TimedFrame> queue;
+    std::queue<AVFrame*>   freeQueue;
+    AVFrame*               bufferFrame = nullptr;
+
+    // ---- Configuration ----
+    size_t limit               = 0;
     size_t targetBufferedFrames = 0;
-    int streamFps = 0;
-    std::chrono::nanoseconds adaptiveFrameInterval{0};
+    int    streamFps           = 0;
+    bool   transferOwnership   = false;
+    bool   lowLatency          = false;
+
+    // ---- Legacy pacing state ----
+    std::chrono::nanoseconds              adaptiveFrameInterval{0};
     std::chrono::steady_clock::time_point lastDraw{};
-    std::chrono::nanoseconds averageDrawInterval{0};
+    std::chrono::nanoseconds              averageDrawInterval{0};
     std::chrono::steady_clock::time_point arrivalWindowStart{};
     std::chrono::steady_clock::time_point lastArrival{};
-    size_t arrivalWindowFrames = 0;
-    size_t arrivalRateSamples = 0;
-    double estimatedSourceFps = 0.0;
-    double frameCredit = 0.0;
-    bool drawClockStarted = false;
-    bool arrivalClockStarted = false;
-    bool startupBuffering = true;
-    bool playoutResyncNeeded = true;
+    size_t arrivalWindowFrames  = 0;
+    size_t arrivalRateSamples   = 0;
+    double estimatedSourceFps   = 0.0;
+    double frameCredit          = 0.0;
+    bool   drawClockStarted     = false;
+    bool   arrivalClockStarted  = false;
+    bool   startupBuffering     = true;
+    bool   playoutResyncNeeded  = true;
+
+    // ---- Low-latency alpha-beta filter state ----
+    bool   ll_firstArrival       = true;
+    double ll_smoothedIntervalNs = 0.0;   // filtered inter-frame interval (ns)
+    double ll_intervalVelocityNs = 0.0;   // rate-of-change term
+    double ll_jitterNs           = 0.0;   // EMA of absolute prediction error (ns)
+    std::chrono::steady_clock::time_point ll_lastArrival{};
+
     mutable std::mutex m_mutex;
-    size_t fakeFrameUsedStat = 0;
-    size_t framesDroppedStat = 0;
-    size_t emptyQueueStat = 0;
-    size_t rebufferHoldStat = 0;
-    size_t overflowDropStat = 0;
-    size_t pacingSkipStat = 0;
-    size_t scheduledHoldStat = 0;
-    size_t pushesSincePop = 0;
-    size_t maxPushBurstStat = 0;
+
+    // ---- Statistics ----
+    size_t fakeFrameUsedStat       = 0;
+    size_t framesDroppedStat       = 0;
+    size_t emptyQueueStat          = 0;
+    size_t rebufferHoldStat        = 0;
+    size_t overflowDropStat        = 0;
+    size_t pacingSkipStat          = 0;
+    size_t scheduledHoldStat       = 0;
+    size_t pushesSincePop          = 0;
+    size_t maxPushBurstStat        = 0;
     size_t localClockPacedFrameStat = 0;
-    size_t playoutResyncStat = 0;
+    size_t playoutResyncStat       = 0;
 };
 
 class AVFrameHolder : public Singleton<AVFrameHolder> {
@@ -95,7 +143,6 @@ class AVFrameHolder : public Singleton<AVFrameHolder> {
 
     void get(const std::function<void(AVFrame*)>& fn) {
         auto frame = m_frame_queue.pop();
-
         if (frame) {
             fn(frame);
         }
@@ -111,7 +158,8 @@ class AVFrameHolder : public Singleton<AVFrameHolder> {
 
     void prepare(int streamFps, bool transferOwnership = false) {
         m_frame_queue.configure(Settings::instance().frames_queue_size(),
-                                streamFps, transferOwnership);
+                                streamFps, transferOwnership,
+                                Settings::instance().low_latency_pacing());
     }
 
     void cleanup() {
@@ -132,6 +180,7 @@ class AVFrameHolder : public Singleton<AVFrameHolder> {
     [[nodiscard]] size_t getFrameQueueLocalClockPacedFrameStat() const { return m_frame_queue.getLocalClockPacedFrameStat(); }
     [[nodiscard]] size_t getFrameQueuePlayoutResyncStat() const { return m_frame_queue.getPlayoutResyncStat(); }
     [[nodiscard]] double getFrameQueueEstimatedSourceFps() const { return m_frame_queue.getEstimatedSourceFps(); }
+    [[nodiscard]] double getFrameQueueJitterMs() const { return m_frame_queue.getJitterMs(); }
 
   private:
     AVFrameQueue m_frame_queue;

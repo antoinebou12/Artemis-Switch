@@ -233,6 +233,12 @@ ArtemisSettingsTab::ArtemisSettingsTab() {
         options.preventPacketLoss = enabled;
         artemis::stream::AdvancedStreamOptionsStore::instance().set(options);
     });
+    lowLatencyPacing->init("artemis/settings/low_latency_pacing"_i18n,
+                           Settings::instance().low_latency_pacing(),
+                           [](bool enabled) {
+                               Settings::instance().set_low_latency_pacing(enabled);
+                               Settings::instance().save();
+                           });
 
     const auto packetPresets = std::vector<int>{
         artemis::stream::kPacketSizeAuto, 1024, 1346,
@@ -283,6 +289,12 @@ ArtemisSettingsTab::ArtemisSettingsTab() {
 #else
     forceFullRange->init("artemis/settings/force_full_range"_i18n, false, [](bool) {});
     preventPacketLoss->init("artemis/settings/prevent_packet_loss"_i18n, false, [](bool) {});
+    lowLatencyPacing->init("artemis/settings/low_latency_pacing"_i18n,
+                           Settings::instance().low_latency_pacing(),
+                           [](bool enabled) {
+                               Settings::instance().set_low_latency_pacing(enabled);
+                               Settings::instance().save();
+                           });
     packetSize->init("artemis/settings/packet_size"_i18n,
                      {"artemis/settings/packet_size_auto"_i18n}, 0, [](int) {});
     forceFullRange->setEnabled(false);

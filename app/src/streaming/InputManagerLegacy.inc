@@ -628,12 +628,17 @@ void MoonlightInputManager::handleInput(bool ignoreTouch) {
             panStatus.reset();
         }
     } else if (pointer.mode == artemis::input::PointerMode::MultiTouch) {
+        if (ignoreTouch) {
+            // Keep keyboard/controller path above; skip touch while OSK is open.
+        } else {
         uint8_t eventType;
 
         auto touches = brls::Application::currentTouchState;
         for (int i = 0; i < touches.size(); i++) {
             auto touch = touches[i];
-            if (touch.view && touch.view->hasParent() && dynamic_cast<StreamingView*>(touch.view->getParent()) == nullptr) return;
+            if (touch.view && touch.view->hasParent() &&
+                dynamic_cast<StreamingView*>(touch.view->getParent()) == nullptr)
+                continue;
 
             switch (touch.phase) {
                 case TouchPhase::START:
@@ -679,6 +684,7 @@ void MoonlightInputManager::handleInput(bool ignoreTouch) {
                     LiSendMouseButtonEvent(BUTTON_ACTION_RELEASE, BUTTON_MOUSE_LEFT);
                 }
             }
+        }
         }
     } else if (artemis::input::isAbsoluteMode(pointer.mode) && !ignoreTouch) {
         auto touches = brls::Application::currentTouchState;

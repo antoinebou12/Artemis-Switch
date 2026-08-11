@@ -411,6 +411,7 @@ Several Artemis Switch features were implemented from ideas raised on [XITRIX/Mo
 | [#58](https://github.com/XITRIX/Moonlight-Switch/issues/58) | [@gcseed](https://github.com/gcseed) | Debug / FPS overlay corner placement |
 | [#239](https://github.com/XITRIX/Moonlight-Switch/issues/239) / [#283](https://github.com/XITRIX/Moonlight-Switch/issues/283) | [@HackZy01](https://github.com/HackZy01) / [@AquaSteam](https://github.com/AquaSteam) | UI language selection and keyboard layout |
 | [#266](https://github.com/XITRIX/Moonlight-Switch/issues/266) | [@Moby812](https://github.com/Moby812) | Virtual display (Apollo-gated path) |
+| [#323](https://github.com/XITRIX/Moonlight-Switch/issues/323) | [@nyanpasu64](https://github.com/nyanpasu64) | Low-latency frame pacing (algorithm inspiration; opt-in) |
 
 Related discussion on Moonlight Qt: [moonlight-qt#1557](https://github.com/moonlight-stream/moonlight-qt/issues/1557) (upscaling).
 

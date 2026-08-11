@@ -29,10 +29,21 @@
             <brls:DetailCell id="packet_loss"/>
             <brls:DetailCell id="host_fps"/>
             <brls:DetailCell id="received_fps"/>
+            <WifiPerformanceGraph
+                id="received_fps_graph"
+                width="auto"
+                height="96"
+                marginTop="8"
+                marginBottom="8"/>
             <brls:DetailCell id="decoded_fps"/>
+            <WifiPerformanceGraph
+                id="decoded_fps_graph"
+                width="auto"
+                height="96"
+                marginTop="8"
+                marginBottom="16"/>
             <brls:DetailCell id="rendered_fps"/>
             <brls:DetailCell id="frame_queue"/>
-            <brls:DetailCell id="gpu_render"/>
             <brls:DetailCell id="presentation"/>
             <brls:Header title="@i18n/artemis/performance/switch_runtime" paddingTop="60" lineTop="1px"/>
             <brls:DetailCell id="operation_mode"/>

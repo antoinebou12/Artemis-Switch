@@ -70,6 +70,8 @@
             "preset_docked_4_3": "Sur dock 1440×1080 (4:3)",
             "force_full_range": "Vidéo pleine plage",
             "prevent_packet_loss": "Protection des paquets",
+            "low_latency_pacing": "Cadence faible latence",
+            "low_latency_pacing_hint": "Moins de latence d'entrée ; peut saccader sur Wi-Fi instable",
             "packet_loss_unverified": "Avec taille Auto/1392, utilise 1024 octets pour les liens MTU bas / VPN. Sunshine peut encore limiter packetsize côté hôte.",
             "packet_size": "Taille des paquets",
             "packet_size_auto": "Auto",

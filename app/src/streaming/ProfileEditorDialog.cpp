@@ -5,6 +5,8 @@
 #include "ProfileEditorDialog.hpp"
 
 #include "StreamConfigProfileNormalize.hpp"
+#include "features/apollo/ApolloHostOptions.hpp"
+#include "features/apollo/ApolloHostOptionsStore.hpp"
 #include "features/stream/AdvancedStreamOptions.hpp"
 #include "features/stream/FrameRateOptions.hpp"
 #include "keyboard_view.hpp"
@@ -658,6 +660,9 @@ void openProfileEditor(const std::string& profileId,
     addBool(content, "artemis/settings/prevent_packet_loss"_i18n,
             draft->preventPacketLoss,
             [draft](bool v) { draft->preventPacketLoss = v; });
+    addBool(content, "artemis/settings/low_latency_pacing"_i18n,
+            draft->lowLatencyPacing,
+            [draft](bool v) { draft->lowLatencyPacing = v; });
 
     auto packetSizeLabel = [](int size) -> std::string {
         if (size <= 0)
@@ -960,7 +965,109 @@ void openProfileEditor(const std::string& profileId,
             [draft](bool v) { draft->swapMouseSticks = v; });
     addMouseSpeedSlider(content, draft);
 
-    auto persistDraft = [draft, profileId, assignHostKey, onChanged]() {
+    // Apollo host options (write-through to ApolloHostOptionsStore on save).
+    auto* apolloDraft = new artemis::apollo::ApolloHostOptions(
+        assignHostKey.empty()
+            ? artemis::apollo::ApolloHostOptions{}
+            : artemis::apollo::ApolloHostOptionsStore::instance().get(
+                  assignHostKey));
+
+    auto vdLabel = [](artemis::apollo::VirtualDisplayTarget target) {
+        using Target = artemis::apollo::VirtualDisplayTarget;
+        switch (target) {
+        case Target::Off:
+            return "artemis/overlay/vd_off"_i18n;
+        case Target::CurrentProfile:
+            return "artemis/overlay/vd_current"_i18n;
+        case Target::Handheld:
+            return "artemis/overlay/vd_handheld"_i18n;
+        case Target::Docked:
+            return "artemis/overlay/vd_docked"_i18n;
+        case Target::PortraitHandheld:
+            return "artemis/overlay/vd_portrait_handheld"_i18n;
+        case Target::PortraitDocked:
+            return "artemis/overlay/vd_portrait_docked"_i18n;
+        case Target::Custom:
+            return "artemis/overlay/vd_custom"_i18n;
+        }
+        return "artemis/overlay/vd_off"_i18n;
+    };
+
+    addHeader(content, "artemis/overlay/apollo_options"_i18n);
+    auto* vdCell = addDetail(content, "artemis/overlay/virtual_display"_i18n,
+                             vdLabel(apolloDraft->target));
+    vdCell->registerClickAction([apolloDraft, vdCell, vdLabel](brls::View*) {
+        using Target = artemis::apollo::VirtualDisplayTarget;
+        const std::vector<Target> values = {
+            Target::Off,        Target::CurrentProfile, Target::Handheld,
+            Target::Docked,     Target::PortraitHandheld,
+            Target::PortraitDocked, Target::Custom};
+        std::vector<std::string> labels;
+        int selected = 0;
+        for (size_t i = 0; i < values.size(); ++i) {
+            labels.push_back(vdLabel(values[i]));
+            if (values[i] == apolloDraft->target)
+                selected = static_cast<int>(i);
+        }
+        auto* dropdown = new brls::Dropdown(
+            "artemis/overlay/virtual_display"_i18n, labels,
+            [apolloDraft, vdCell, vdLabel, values](int index) {
+                if (index < 0 || index >= static_cast<int>(values.size()))
+                    return;
+                apolloDraft->target = values[static_cast<size_t>(index)];
+                if (apolloDraft->target == Target::Custom) {
+                    brls::Application::getImeManager()->openForText(
+                        [apolloDraft, vdCell, vdLabel](const std::string& text) {
+                            if (!artemis::apollo::parseVirtualDisplaySpec(
+                                    text, *apolloDraft, nullptr))
+                                return;
+                            apolloDraft->target = Target::Custom;
+                            vdCell->setDetailText(vdLabel(apolloDraft->target));
+                        },
+                        "artemis/overlay/vd_custom"_i18n,
+                        "artemis/overlay/vd_custom_prompt"_i18n, 32,
+                        fmt::format("{}x{}@{}", apolloDraft->customWidth,
+                                    apolloDraft->customHeight,
+                                    apolloDraft->refreshRate),
+                        0);
+                    return;
+                }
+                vdCell->setDetailText(vdLabel(apolloDraft->target));
+            },
+            selected);
+        brls::Application::pushActivity(new brls::Activity(dropdown));
+        return true;
+    });
+
+    auto* apolloScaleCell = addDetail(
+        content, "artemis/overlay/apollo_scale_factor"_i18n,
+        fmt::format("{}%", apolloDraft->scaleFactor > 0 ? apolloDraft->scaleFactor
+                                                         : 100));
+    apolloScaleCell->registerClickAction([apolloDraft, apolloScaleCell](brls::View*) {
+        const std::vector<int> values = {50, 75, 100, 125, 150};
+        std::vector<std::string> labels;
+        int selected = 2;
+        for (size_t i = 0; i < values.size(); ++i) {
+            labels.push_back(fmt::format("{}%", values[i]));
+            if (values[i] == apolloDraft->scaleFactor)
+                selected = static_cast<int>(i);
+        }
+        auto* dropdown = new brls::Dropdown(
+            "artemis/overlay/apollo_scale_factor"_i18n, labels,
+            [apolloDraft, apolloScaleCell, values](int index) {
+                if (index < 0 || index >= static_cast<int>(values.size()))
+                    return;
+                apolloDraft->scaleFactor = values[static_cast<size_t>(index)];
+                apolloScaleCell->setDetailText(
+                    fmt::format("{}%", apolloDraft->scaleFactor));
+            },
+            selected);
+        brls::Application::pushActivity(new brls::Activity(dropdown));
+        return true;
+    });
+
+    auto persistDraft = [draft, apolloDraft, profileId, assignHostKey,
+                         onChanged]() {
         if (draft->name.empty())
             draft->name = "Profile";
         auto& store = StreamConfigProfileStore::instance();
@@ -972,11 +1079,15 @@ void openProfileEditor(const std::string& profileId,
         }
         draft->id = id;
         store.update(*draft);
-        if (!assignHostKey.empty())
+        if (!assignHostKey.empty()) {
             store.setSelectedForHost(assignHostKey, id);
+            artemis::apollo::ApolloHostOptionsStore::instance().set(
+                assignHostKey, *apolloDraft);
+        }
         // Keep live Settings in sync for every field the editor exposes.
         store.applyProfile(*draft);
         delete draft;
+        delete apolloDraft;
         // Pop first so list refresh callbacks see the correct stack.
         brls::Application::popActivity(brls::TransitionAnimation::FADE,
                                        [onChanged] {
@@ -991,8 +1102,9 @@ void openProfileEditor(const std::string& profileId,
         return true;
     });
     auto* cancelCell = addDetail(content, "common/cancel"_i18n, "");
-    cancelCell->registerClickAction([draft](brls::View*) {
+    cancelCell->registerClickAction([draft, apolloDraft](brls::View*) {
         delete draft;
+        delete apolloDraft;
         brls::Application::popActivity();
         return true;
     });

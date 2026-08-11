@@ -145,6 +145,8 @@ json_t* profileToJson(const StreamConfigProfile& profile) {
                                                     : json_false());
     json_object_set_new(item, "prevent_packet_loss",
                         profile.preventPacketLoss ? json_true() : json_false());
+    json_object_set_new(item, "low_latency_pacing",
+                        profile.lowLatencyPacing ? json_true() : json_false());
     json_object_set_new(item, "packet_size",
                         json_integer(artemis::stream::clampPacketSize(
                             profile.packetSize)));
@@ -276,6 +278,8 @@ StreamConfigProfile profileFromJson(json_t* object) {
         profile.forceFullRangeVideo = jsonToBool(full);
     if (json_t* loss = json_object_get(object, "prevent_packet_loss"))
         profile.preventPacketLoss = jsonToBool(loss);
+    if (json_t* lowLatency = json_object_get(object, "low_latency_pacing"))
+        profile.lowLatencyPacing = jsonToBool(lowLatency);
     if (json_t* packetSize = json_object_get(object, "packet_size");
         json_is_integer(packetSize))
         profile.packetSize = artemis::stream::clampPacketSize(
@@ -436,6 +440,7 @@ void applyProfileToSettings(const StreamConfigProfile& profile) {
     settings.set_deadzone_stick_right(profile.deadzoneRight);
     settings.set_rumble_force(profile.rumbleForce);
     settings.set_swap_joycon_stick_to_dpad(profile.swapStickToDpad);
+    settings.set_low_latency_pacing(profile.lowLatencyPacing);
     if (!profile.mappingLayoutTitle.empty()) {
         auto* layouts = settings.get_mapping_laouts();
         for (size_t i = 0; layouts && i < layouts->size(); ++i) {
@@ -598,6 +603,7 @@ StreamConfigProfileStore::snapshotFromSettings(const std::string& name) {
         artemis::stream::AdvancedStreamOptionsStore::instance().get();
     profile.forceFullRangeVideo = advanced.forceFullRangeVideo;
     profile.preventPacketLoss = advanced.preventPacketLoss;
+    profile.lowLatencyPacing = settings.low_latency_pacing();
     profile.packetSize =
         artemis::stream::clampPacketSize(advanced.packetSize);
     profile.scaleMode = artemis::video::VideoScaleStore::instance().get();

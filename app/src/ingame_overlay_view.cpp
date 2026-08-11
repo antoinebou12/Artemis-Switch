@@ -15,6 +15,7 @@
 #include "streaming_input_overlay.hpp"
 #include "button_selecting_dialog.hpp"
 #include "UpscalingSupport.hpp"
+#include "Settings.hpp"
 #include "features/video/UpscalingModeSelect.hpp"
 #include "video/VideoScaleStore.hpp"
 #include "features/input/ControllerTopology.hpp"
@@ -260,6 +261,105 @@ private:
     int selectedSlot = 0;
 };
 
+class ControllersOptionsPanel final : public brls::Box {
+public:
+    ControllersOptionsPanel() : brls::Box(brls::Axis::COLUMN) {
+        setWidth(720);
+        setPadding(24, 28, 24, 28);
+        setAlignItems(brls::AlignItems::STRETCH);
+
+        const auto connectedControllerCount = [] {
+            const int reported = brls::Application::getPlatform()
+                                     ->getInputManager()
+                                     ->getControllersConnectedCount();
+            return artemis::input::clampControllerCount(reported);
+        };
+        const auto controllerCountText = [connectedControllerCount] {
+            return std::to_string(connectedControllerCount()) + " / " +
+                   std::to_string(artemis::input::MaxSupportedControllers);
+        };
+
+        auto* title = new brls::Header();
+        title->setTitle("artemis/overlay/controllers"_i18n);
+        addView(title);
+
+        auto* connected = new brls::DetailCell();
+        connected->setText("artemis/overlay/connected_controllers"_i18n);
+        connected->setDetailText(controllerCountText());
+        connected->registerClickAction(
+            [connected, connectedControllerCount, controllerCountText](
+                brls::View*) {
+                connected->setDetailText(controllerCountText());
+                const auto players = artemis::input::connectedControllerPlayers(
+                    connectedControllerCount());
+                std::string message = "artemis/overlay/connected_controllers"_i18n;
+                message += "\n\n";
+                if (players.empty()) {
+                    message += "artemis/overlay/no_controllers"_i18n;
+                } else {
+                    for (std::size_t i = 0; i < players.size(); ++i) {
+                        if (i != 0)
+                            message += "\n";
+                        message +=
+                            "P" + std::to_string(players[i]) + " → " +
+                            "artemis/overlay/pc_slot"_i18n + " " +
+                            std::to_string(players[i]) + " · " +
+                            "artemis/overlay/rumble_motion"_i18n;
+                    }
+                }
+                auto* dialog = new brls::Dialog(message);
+                dialog->addButton("common/close"_i18n, [] {});
+                dialog->open();
+                return true;
+            });
+        addView(connected);
+
+        auto* diagnostics = new brls::DetailCell();
+        diagnostics->setText("artemis/overlay/controller_diagnostics"_i18n);
+        diagnostics->setDetailText("");
+        diagnostics->registerClickAction([](brls::View*) {
+            auto* dialog = new brls::Dialog(new ControllerDiagnosticsPanel());
+            dialog->addButton("common/close"_i18n, [] {});
+            dialog->open();
+            return true;
+        });
+        addView(diagnostics);
+
+        auto* rumbleHeader = new brls::Header();
+        rumbleHeader->setTitle("settings/rumble_force"_i18n);
+        rumbleHeader->setSubtitle(
+            std::to_string(
+                static_cast<int>(Settings::instance().get_rumble_force() *
+                                 100)) +
+            "%");
+        rumbleHeader->setMarginTop(24);
+        addView(rumbleHeader);
+
+        auto* rumbleSlider = new brls::Slider();
+        rumbleSlider->setHeight(84);
+        rumbleSlider->setGrow(1.0f);
+        const float rumbleForceProgress = Settings::instance().get_rumble_force();
+        rumbleSlider->getProgressEvent()->subscribe(
+            [rumbleHeader](float value) {
+                rumbleHeader->setSubtitle(
+                    std::to_string(static_cast<int>(value * 100)) + "%");
+                Settings::instance().set_rumble_force(value);
+            });
+        rumbleSlider->setProgress(rumbleForceProgress);
+        addView(rumbleSlider);
+
+        auto* swapStick = new brls::BooleanCell();
+        swapStick->init(
+            "settings/swap_stick_to_dpad"_i18n,
+            Settings::instance().swap_joycon_stick_to_dpad(),
+            [](bool value) {
+                Settings::instance().set_swap_joycon_stick_to_dpad(value);
+            });
+        swapStick->setMarginTop(16);
+        addView(swapStick);
+    }
+};
+
 }
 
 bool debug = false;
@@ -400,15 +500,15 @@ QuickTab::QuickTab(StreamingView* streamView) : streamView(streamView) {
     quickTouch->registerClickAction([this, refreshTouchLabel](View*) {
         auto& store = artemis::input::InputSettingsStore::instance();
         auto settings = store.pointer();
-        if (settings.mode == artemis::input::PointerMode::Disabled) {
-            // Prefer multi-touch when enabling from Quick Actions.
+        // Quick Actions: On/Off only. Full modes stay under Options.
+        if (settings.mode == artemis::input::PointerMode::Disabled)
             settings.mode = artemis::input::PointerMode::MultiTouch;
-        } else {
+        else
             settings.mode = artemis::input::PointerMode::Disabled;
-        }
         MoonlightInputManager::instance().dropInput();
         store.setPointer(settings);
         syncLegacyTouchscreenFlag(settings.mode);
+        Settings::instance().save();
         refreshTouchLabel();
         return true;
     });
@@ -601,6 +701,7 @@ OptionsTab::OptionsTab(StreamingView* streamView) : streamView(streamView) {
         MoonlightInputManager::instance().dropInput();
         store.setPointer(settings);
         syncLegacyTouchscreenFlag(settings.mode);
+        Settings::instance().save();
         optionsPointerMode->setDetailText(
             pointerModeFeatureLabel(settings.mode));
         return true;
@@ -609,40 +710,16 @@ OptionsTab::OptionsTab(StreamingView* streamView) : streamView(streamView) {
     optionsControllers->setText("artemis/overlay/controllers"_i18n);
     optionsControllers->setDetailText(controllerCountText());
     optionsControllers->registerClickAction(
-        [this, connectedControllerCount, controllerCountText](View*) {
-            const auto players = artemis::input::connectedControllerPlayers(
-                connectedControllerCount());
-            std::string message =
-                "artemis/overlay/connected_controllers"_i18n;
-            message += "\n\n";
-            if (players.empty()) {
-                message += "artemis/overlay/no_controllers"_i18n;
-            } else {
-                for (std::size_t i = 0; i < players.size(); ++i) {
-                    if (i != 0)
-                        message += "\n";
-                    message += "P" + std::to_string(players[i]) + " → " +
-                               "artemis/overlay/pc_slot"_i18n + " " +
-                               std::to_string(players[i]) + " · " +
-                               "artemis/overlay/rumble_motion"_i18n;
-                }
-            }
-
+        [this, controllerCountText](View*) {
             optionsControllers->setDetailText(controllerCountText());
-            auto* dialog = new Dialog(message);
-            dialog->addButton("common/close"_i18n, [] {});
-            dialog->open();
+            auto* panel = new ControllersOptionsPanel();
+            auto* scroll = new ScrollingFrame();
+            scroll->setContentView(panel);
+            auto* frame = new AppletFrame(scroll);
+            frame->setTitle("artemis/overlay/controllers"_i18n);
+            Application::pushActivity(new Activity(frame));
             return true;
         });
-
-    optionsDiagnostics->setText("artemis/overlay/controller_diagnostics"_i18n);
-    optionsDiagnostics->setDetailText("artemis/overlay/live_input_debug"_i18n);
-    optionsDiagnostics->registerClickAction([](View*) {
-        auto* dialog = new Dialog(new ControllerDiagnosticsPanel());
-        dialog->addButton("common/close"_i18n, [] {});
-        dialog->open();
-        return true;
-    });
 
     const auto server = GameStreamClient::instance().server_data(streamView->getHost());
     optionsClipboard->setText("artemis/overlay/clipboard"_i18n);
@@ -678,6 +755,13 @@ OptionsTab::OptionsTab(StreamingView* streamView) : streamView(streamView) {
         refreshScaleLabel();
         return true;
     });
+
+    optionsLowLatencyPacing->init(
+        "artemis/settings/low_latency_pacing"_i18n,
+        Settings::instance().low_latency_pacing(), [](bool value) {
+            Settings::instance().set_low_latency_pacing(value);
+            Settings::instance().save();
+        });
 
     auto refreshZoomPanLabels = [this] {
         const auto state = artemis::video::normalizeZoomPan(
@@ -773,15 +857,6 @@ OptionsTab::OptionsTab(StreamingView* streamView) : streamView(streamView) {
     guideBySystemButton->setDetailTextColor(color);
 #endif
 
-    float rumbleForceProgress = Settings::instance().get_rumble_force();
-    rumbleForceSlider->getProgressEvent()->subscribe([this](float value) {
-        std::stringstream stream;
-        stream << std::fixed << std::setprecision(1) << int(value * 100);
-        rumbleForceHeader->setSubtitle(stream.str() + "%");
-        Settings::instance().set_rumble_force(value);
-    });
-    rumbleForceSlider->setProgress(rumbleForceProgress);
-
     float mouseProgress =
         ((float) Settings::instance().get_mouse_speed_multiplier() / 100.0f);
     mouseSlider->getProgressEvent()->subscribe([this](float value) {
@@ -850,17 +925,8 @@ OptionsTab::OptionsTab(StreamingView* streamView) : streamView(streamView) {
         }
     });
 
-    touchscreenMouseMode->init("settings/touchscreen_mouse_mode"_i18n,
-                               Settings::instance().touchscreen_mouse_mode(),
-                               [](bool value) {
-                                   Settings::instance().set_touchscreen_mouse_mode(value);
-                                   auto pointer = artemis::input::InputSettingsStore::instance().pointer();
-                                   pointer.mode = artemis::input::pointerModeFromLegacyTouchscreen(value);
-                                   artemis::input::InputSettingsStore::instance().setPointer(pointer);
-                               });
-
-    swapStickToDpad->init("settings/swap_stick_to_dpad"_i18n, Settings::instance().swap_joycon_stick_to_dpad(),
-                          [](bool value) { Settings::instance().set_swap_joycon_stick_to_dpad(value); });
+    // Legacy touchscreen mouse toggle removed from Options XML; pointer mode
+    // row is the single source of truth for MultiTouch / Absolute / Trackpad.
 
 #ifdef SUPPORT_UPSCALING
     if (!isVideoUpscalingSupported()) {

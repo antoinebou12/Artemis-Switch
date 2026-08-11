@@ -20,15 +20,14 @@
             <brls:DetailCell id="input_overlay"/>
             <brls:SelectorCell id="keyboard_type"/>
             <brls:SelectorCell id="keyboard_fingers"/>
-            <brls:BooleanCell id="touchscreen_mouse_mode"/>
             <brls:DetailCell id="options_pointer_mode"/>
             <brls:DetailCell id="options_controllers"/>
-            <brls:DetailCell id="options_diagnostics"/>
 
             <brls:Header title="@i18n/artemis/overlay/apollo_options" paddingTop="60"/>
             <brls:DetailCell id="options_clipboard"/>
             <brls:DetailCell id="options_rotation"/>
             <brls:DetailCell id="options_scale_mode"/>
+            <brls:BooleanCell id="options_low_latency_pacing"/>
             <brls:DetailCell id="options_zoom"/>
             <brls:DetailCell id="options_pan_x"/>
             <brls:DetailCell id="options_pan_y"/>
@@ -37,12 +36,6 @@
             <brls:Header title="@i18n/settings/guide_key" paddingTop="60"/>
             <brls:DetailCell id="guide_key_buttons"/>
             <brls:SelectorCell id="guide_by_system_button"/>
-
-            <brls:Header id="rumble_slider_header" title="@i18n/settings/rumble_force" subtitle="" paddingTop="60" lineTop="1px"/>
-            <brls:Slider id="rumble_slider" width="auto" height="84" grow="1"/>
-
-            <brls:Header title="@i18n/settings/single_joycon" paddingTop="60" lineTop="1px"/>
-            <brls:BooleanCell id="swap_stick_to_dpad"/>
 
             <brls:Header id="mouse_speed_header" title="@i18n/streaming/mouse_speed" subtitle="" paddingTop="60"/>
             <brls:Slider id="mouse_speed_slider" width="auto" height="84" grow="1"/>

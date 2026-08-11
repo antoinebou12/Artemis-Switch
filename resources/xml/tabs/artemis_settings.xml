@@ -16,6 +16,7 @@
     <brls:SelectorCell id="frame_rate"/>
     <brls:BooleanCell id="force_full_range"/>
     <brls:BooleanCell id="prevent_packet_loss"/>
+    <brls:BooleanCell id="low_latency_pacing"/>
     <brls:SelectorCell id="packet_size"/>
 
     <brls:Header title="@i18n/artemis/settings/resolution_presets" paddingTop="60" lineTop="1px"/>

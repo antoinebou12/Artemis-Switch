@@ -70,6 +70,8 @@
             "preset_docked_4_3": "Docked 1440×1080 (4:3)",
             "force_full_range": "Full-range video",
             "prevent_packet_loss": "Packet-loss guard",
+            "low_latency_pacing": "Low latency pacing",
+            "low_latency_pacing_hint": "Lower input lag; may stutter more on unstable Wi-Fi",
             "packet_loss_unverified": "When on with Auto/1392 packet size, uses 1024 bytes for low-MTU / VPN links. Sunshine can still clamp packetsize on the host.",
             "packet_size": "Packet size",
             "packet_size_auto": "Auto",

@@ -428,6 +428,8 @@ AppListView::AppListView(const Host& host) : Box(Axis::ROW), host(host) {
         return true;
     });
     registerAction("host/new_profile"_i18n, BUTTON_RB, [this](View*) {
+        if (activePane != Pane::Host)
+            return false;
         showPane(Pane::Host, true);
         if (sidebar && sidebar->getItem(1))
             Application::giveFocus(sidebar->getItem(1));
@@ -435,6 +437,8 @@ AppListView::AppListView(const Host& host) : Box(Axis::ROW), host(host) {
             hostProfileKey, [this] { refreshStreamProfileLabel(); });
         return true;
     });
+    // Applications is the default pane; hide Host-only RB "New profile" hint.
+    showPane(Pane::Applications, false);
     blockInput(true);
 }
 
@@ -447,11 +451,12 @@ void AppListView::showPane(Pane pane, bool focusContent) {
     setActionAvailable(BUTTON_Y, true);
     setActionAvailable(BUTTON_X, !apps);
     setActionAvailable(BUTTON_LB, apps);
-    setActionAvailable(BUTTON_RB, true);
+    setActionAvailable(BUTTON_RB, !apps);
     updateActionHint(BUTTON_Y, apps ? "app_list/reload_app_list"_i18n
                                     : "host/edit_profile"_i18n);
     updateActionHint(BUTTON_X, "host/delete_profile"_i18n);
     updateActionHint(BUTTON_LB, "app_list/search"_i18n);
+    updateActionHint(BUTTON_RB, "host/new_profile"_i18n);
 
     if (!focusContent)
         return;
@@ -668,9 +673,27 @@ void AppListView::refreshAppSearchLabel() {
 void AppListView::promptAppSearch() {
     Application::getImeManager()->openForText(
         [this](const std::string& text) {
-            appSearchQuery = text;
+            // Trim edges so accidental spaces do not empty the filtered list.
+            std::string trimmed = text;
+            while (!trimmed.empty() &&
+                   std::isspace(static_cast<unsigned char>(trimmed.front())))
+                trimmed.erase(trimmed.begin());
+            while (!trimmed.empty() &&
+                   std::isspace(static_cast<unsigned char>(trimmed.back())))
+                trimmed.pop_back();
+            appSearchQuery = std::move(trimmed);
             refreshAppSearchLabel();
-            rebuildAppGrid();
+            // Prefer an in-memory filter when apps are already cached so the
+            // grid updates immediately after the IME closes.
+            if (!cachedApps.empty() && !loading) {
+                rebuildAppGrid();
+                if (gridView && !gridView->getChildren().empty())
+                    Application::giveFocus(gridView);
+                else if (appSearch)
+                    Application::giveFocus(appSearch);
+            } else {
+                updateAppList();
+            }
         },
         "app_list/search"_i18n, "app_list/search_hint"_i18n, 40,
         appSearchQuery, 0);
@@ -699,6 +722,9 @@ void AppListView::rebuildAppGrid() {
         gridView->addView(cell);
         updateFavoriteAction(cell, host, app);
     }
+    gridView->invalidate();
+    if (appsContainer)
+        appsContainer->invalidate();
 }
 
 void AppListView::setCurrentApp(const AppInfo& app) {
@@ -711,6 +737,13 @@ void AppListView::setCurrentApp(const AppInfo& app) {
 
 void AppListView::willAppear(bool resetState) {
     Box::willAppear(resetState);
+    // Avoid a full network reload when the IME dismisses after search — that
+    // was wiping the filtered grid before the async applist returned.
+    if (!cachedApps.empty()) {
+        refreshAppSearchLabel();
+        rebuildAppGrid();
+        return;
+    }
     updateAppList();
 }
 
