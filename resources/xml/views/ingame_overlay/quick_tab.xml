@@ -20,6 +20,8 @@
             <brls:DetailCell id="quick_move_right"/>
             <brls:DetailCell id="quick_touch"/>
             <brls:DetailCell id="quick_host_shortcuts"/>
+            <brls:DetailCell id="quick_restart_server"/>
+            <brls:DetailCell id="quick_reset_display"/>
             <brls:DetailCell id="quick_server_commands"/>
             <brls:DetailCell id="quick_mouse"/>
             <brls:Header id="volume_header" paddingTop="60" title="@i18n/streaming/volume"/>

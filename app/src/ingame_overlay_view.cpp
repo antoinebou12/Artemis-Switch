@@ -22,6 +22,7 @@
 #include "features/input/InputSettingsStore.hpp"
 #include "features/input/HostKeyboardShortcuts.hpp"
 #include "features/apollo/ApolloHostOptionsStore.hpp"
+#include "features/apollo/ServerCommandShortcuts.hpp"
 #include "features/video/DisplayTransformStore.hpp"
 #include "streaming/InputManager.hpp"
 #include "Limelight.h"
@@ -355,9 +356,10 @@ void syncLegacyTouchscreenFlag(artemis::input::PointerMode mode) {
 QuickTab::QuickTab(StreamingView* streamView) : streamView(streamView) {
     this->inflateFromXMLRes("xml/views/ingame_overlay/quick_tab.xml");
 
-    const std::array<DetailCell*, 7> quickRows = {
+    const std::array<DetailCell*, 9> quickRows = {
         quickKeyboard,      quickMoveLeft,       quickMoveRight, quickTouch,
-        quickHostShortcuts, quickServerCommands, quickMouse};
+        quickHostShortcuts, quickRestartServer,  quickResetDisplay,
+        quickServerCommands, quickMouse};
     for (auto* row : quickRows) {
         row->title->setSingleLine(true);
         row->detail->setSingleLine(true);
@@ -456,6 +458,47 @@ QuickTab::QuickTab(StreamingView* streamView) : streamView(streamView) {
         (!server.hasApolloPermissionField ||
          (server.permission & serverCommandPermission) != 0) &&
         !server.serverCommands.empty();
+
+    auto wireMatchedCommand = [this, commandsAllowed](
+                                  DetailCell* cell,
+                                  artemis::apollo::ServerCommandShortcutKind kind,
+                                  const std::string& titleKey,
+                                  const std::string& hintKey) {
+        cell->setText(titleKey);
+        if (!commandsAllowed) {
+            cell->setVisibility(Visibility::GONE);
+            return;
+        }
+        const auto match = artemis::apollo::findAdvertisedServerCommand(
+            GameStreamClient::instance()
+                .server_data(this->streamView->getHost())
+                .serverCommands,
+            kind);
+        if (!match) {
+            cell->setVisibility(Visibility::GONE);
+            return;
+        }
+        cell->setVisibility(Visibility::VISIBLE);
+        cell->setDetailText(hintKey);
+        const auto index = match->index;
+        cell->registerClickAction([this, cell, index](View*) {
+            if (index > UINT8_MAX)
+                return true;
+            const bool sent =
+                LiSendExecServerCmd(static_cast<uint8_t>(index)) == 0;
+            cell->setDetailText(sent ? "artemis/overlay/sent"_i18n
+                                     : "artemis/overlay/send_failed"_i18n);
+            return true;
+        });
+    };
+    wireMatchedCommand(quickRestartServer,
+                       artemis::apollo::ServerCommandShortcutKind::Restart,
+                       "artemis/overlay/restart_server"_i18n,
+                       "artemis/overlay/restart_server_hint"_i18n);
+    wireMatchedCommand(quickResetDisplay,
+                       artemis::apollo::ServerCommandShortcutKind::ResetDisplay,
+                       "artemis/overlay/reset_display"_i18n,
+                       "artemis/overlay/reset_display_hint"_i18n);
 
     quickServerCommands->setText("artemis/overlay/server_commands"_i18n);
     quickServerCommands->setDetailText(

@@ -140,7 +140,7 @@ The Performance page exposes live streaming and renderer information:
 | Benchmark runtime | ✅ Integrated | Live sampling, P50/P95/P99, frame-queue faults, stability score |
 | Benchmark JSON / CSV | ✅ Integrated | Includes Switch runtime metadata when services are available |
 | Apollo capability detection | 🟡 Partial | Conservative detection with Sunshine-safe fallback |
-| Apollo virtual display / commands / clipboard | ⏳ Planned | Only verified Apollo protocol operations will be added |
+| Apollo virtual display / commands / clipboard | ✅ Gated | Available when the host advertises capability / permissions |
 | French Artemis UI | ✅ Integrated | Settings, overlay tabs, and Performance UI use Borealis i18n |
 | CI / Release CD | ✅ Integrated | Unit, sanitizer, i18n, release-contract, Switch NRO publish |
 
@@ -356,7 +356,7 @@ Sunshine and standard Moonlight/GameStream behavior remain the compatibility bas
 - Multiple simultaneous controllers need multiplayer confirmation against each supported host.
 - Full-range output still benefits from visual verification across host resolutions.
 - Console-motion fallback remains disabled until libnx console sensor vectors are mapped safely.
-- Apollo virtual-display, server-command, and clipboard operations stay gated until verified.
+- Apollo virtual-display, server-command, and clipboard operations are capability-gated (shown when the host advertises them).
 - Benchmark scoring still needs tuning from real Switch measurements.
 
 See [`docs/ARTEMIS_SWITCH_INTEGRATION_PLAN.md`](docs/ARTEMIS_SWITCH_INTEGRATION_PLAN.md) for release acceptance criteria.
