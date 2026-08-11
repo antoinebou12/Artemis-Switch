@@ -21,6 +21,8 @@ struct StreamConfigProfile {
     int resolutionHeight = 720; // 360, 480, 720, or 1080
     StreamAspectRatio aspectRatio = StreamAspectRatio::Ratio16x9;
     int fps = 60;
+    // 0 = fps * 100. NTSC presets store 5994 / 11988 / etc.
+    int clientRefreshRateX100 = 0;
     int bitrateKbps = 10000;
     VideoCodec videoCodec = H264;
     bool requestHdr = false;
@@ -86,7 +88,7 @@ struct StreamConfigProfile {
 
 class StreamConfigProfileStore {
 public:
-    static constexpr int SchemaVersion = 6;
+    static constexpr int SchemaVersion = 7;
     static StreamConfigProfileStore& instance();
 
     const std::vector<StreamConfigProfile>& list();

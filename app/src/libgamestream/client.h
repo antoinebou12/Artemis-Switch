@@ -65,6 +65,8 @@ struct APOLLO_LAUNCH_OPTIONS {
     int width = 0;
     int height = 0;
     int refreshRate = 0;
+    // Apollo scaled resolution percent (50/75/100/125/150). 100 = native.
+    int scaleFactor = 100;
 };
 
 int gs_start_app(PSERVER_DATA server, PSTREAM_CONFIGURATION config, int appId,

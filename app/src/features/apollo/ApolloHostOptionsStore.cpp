@@ -81,6 +81,8 @@ void ApolloHostOptionsStore::reload() {
             options.customHeight = json_integer_value(value);
         if (json_t* value = json_object_get(item, "refresh_rate"); json_is_integer(value))
             options.refreshRate = json_integer_value(value);
+        if (json_t* value = json_object_get(item, "scale_factor"); json_is_integer(value))
+            options.scaleFactor = json_integer_value(value);
         m_hosts[key] = validateApolloHostOptions(options);
     }
     json_decref(root);
@@ -98,6 +100,7 @@ bool ApolloHostOptionsStore::save() const {
         json_object_set_new(item, "width", json_integer(options.customWidth));
         json_object_set_new(item, "height", json_integer(options.customHeight));
         json_object_set_new(item, "refresh_rate", json_integer(options.refreshRate));
+        json_object_set_new(item, "scale_factor", json_integer(options.scaleFactor));
         json_object_set_new(hosts, key.c_str(), item);
     }
     json_object_set_new(root, "hosts", hosts);

@@ -39,4 +39,13 @@ int main() {
     assert(!error.empty());
     assert(!parseVirtualDisplaySpec("720x1280@144", custom));
     assert(!parseVirtualDisplaySpec("shell.exe", custom));
+
+    ApolloHostOptions badScale;
+    badScale.scaleFactor = 33;
+    assert(validateApolloHostOptions(badScale).scaleFactor == 100);
+    ApolloHostOptions goodScale;
+    goodScale.scaleFactor = 125;
+    assert(validateApolloHostOptions(goodScale).scaleFactor == 125);
+
+    return 0;
 }

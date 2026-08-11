@@ -126,6 +126,8 @@ json_t* profileToJson(const StreamConfigProfile& profile) {
         item, "aspect_ratio",
         json_string(aspectRatioToString(profile.aspectRatio)));
     json_object_set_new(item, "fps", json_integer(profile.fps));
+    json_object_set_new(item, "client_refresh_rate_x100",
+                        json_integer(profile.clientRefreshRateX100));
     json_object_set_new(item, "bitrate_kbps",
                         json_integer(profile.bitrateKbps));
     json_object_set_new(item, "video_codec",
@@ -248,6 +250,11 @@ StreamConfigProfile profileFromJson(json_t* object) {
     }
     if (json_t* fps = json_object_get(object, "fps"); json_is_integer(fps))
         profile.fps = static_cast<int>(json_integer_value(fps));
+    if (json_t* refreshX100 =
+            json_object_get(object, "client_refresh_rate_x100");
+        json_is_integer(refreshX100))
+        profile.clientRefreshRateX100 =
+            static_cast<int>(json_integer_value(refreshX100));
     if (json_t* bitrate = json_object_get(object, "bitrate_kbps");
         json_is_integer(bitrate))
         profile.bitrateKbps = static_cast<int>(json_integer_value(bitrate));
@@ -395,6 +402,7 @@ void applyProfileToSettings(const StreamConfigProfile& profile) {
     settings.set_resolution(profile.resolutionHeight);
     settings.set_aspect_ratio(profile.aspectRatio);
     settings.set_fps(profile.fps);
+    settings.set_client_refresh_rate_x100(profile.clientRefreshRateX100);
     settings.set_bitrate(profile.bitrateKbps);
     settings.set_video_codec(profile.videoCodec);
     settings.set_request_hdr(profile.requestHdr);
@@ -470,6 +478,8 @@ StreamConfigProfile normalizeProfile(StreamConfigProfile profile) {
     profile.aspectRatio = normalizeAspectRatio(profile.aspectRatio);
     if (profile.fps <= 0)
         profile.fps = 60;
+    if (profile.clientRefreshRateX100 < 0)
+        profile.clientRefreshRateX100 = 0;
     if (profile.bitrateKbps <= 0)
         profile.bitrateKbps = 10000;
     if (profile.decoderThreads < 0)
@@ -539,6 +549,7 @@ StreamConfigProfileStore::snapshotFromSettings(const std::string& name) {
         normalizeHeight(settings.resolution() > 0 ? settings.resolution() : 720);
     profile.aspectRatio = settings.aspect_ratio();
     profile.fps = settings.fps();
+    profile.clientRefreshRateX100 = settings.client_refresh_rate_x100();
     profile.bitrateKbps = settings.bitrate();
     profile.videoCodec = settings.video_codec();
     profile.requestHdr = settings.request_hdr();

@@ -326,6 +326,16 @@ void Settings::load() {
                     m_fps = (int)json_integer_value(fps);
                 }
             }
+
+            if (json_t* refreshX100 =
+                    json_object_get(settings, "client_refresh_rate_x100")) {
+                if (json_typeof(refreshX100) == JSON_INTEGER) {
+                    m_client_refresh_rate_x100 =
+                        (int)json_integer_value(refreshX100);
+                    if (m_client_refresh_rate_x100 < 0)
+                        m_client_refresh_rate_x100 = 0;
+                }
+            }
             
             if (json_t* video_codec = json_object_get(settings, "video_codec")) {
                 if (json_typeof(video_codec) == JSON_INTEGER) {
@@ -735,6 +745,8 @@ void Settings::save() {
                 json_string(artemis::streaming::aspectRatioToString(m_aspect_ratio)));
             json_object_set_new(settings, "native_resolution_scale", json_integer(m_native_resolution_scale));
             json_object_set_new(settings, "fps", json_integer(m_fps));
+            json_object_set_new(settings, "client_refresh_rate_x100",
+                                json_integer(m_client_refresh_rate_x100));
             json_object_set_new(settings, "video_codec", json_integer(m_video_codec));
             json_object_set_new(settings, "audio_backend", json_integer(m_audio_backend));
             json_object_set_new(settings, "bitrate", json_integer(m_bitrate));

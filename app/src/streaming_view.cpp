@@ -155,6 +155,7 @@ StreamingView::StreamingView(const Host& host, const AppInfo& app) : host(host),
             launch.width = profile.width;
             launch.height = profile.height;
             launch.refreshRate = profile.refreshRate;
+            launch.scaleFactor = stored.scaleFactor;
             session->setApolloLaunchOptions(std::move(launch));
 
             ASYNC_RETAIN
@@ -613,6 +614,7 @@ void StreamingView::applyVirtualDisplay(
         launch.width = resolved.width;
         launch.height = resolved.height;
         launch.refreshRate = resolved.refreshRate;
+        launch.scaleFactor = value.scaleFactor;
         return launch;
     };
 

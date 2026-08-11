@@ -188,6 +188,7 @@
             "rumble_test_all": "Vibrer toutes les manettes",
             "rumble_test_all_hint": "Tous les contrôleurs connectés",
             "virtual_display": "Écran virtuel Apollo",
+            "apollo_scale_factor": "Facteur d’échelle Apollo",
             "vd_off": "Écran virtuel désactivé",
             "vd_current": "Profil de diffusion actuel",
             "vd_handheld": "Portable 1280×720",
