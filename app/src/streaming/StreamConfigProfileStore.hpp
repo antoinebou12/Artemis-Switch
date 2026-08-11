@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Settings.hpp"
+#include "StreamAspectRatio.hpp"
 #include "StreamConfigProfileNormalize.hpp"
 #include "features/input/PointerSettings.hpp"
 #include "video/VideoScale.hpp"
@@ -18,6 +19,7 @@ struct StreamConfigProfile {
 
     // Video
     int resolutionHeight = 720; // 360, 480, 720, or 1080
+    StreamAspectRatio aspectRatio = StreamAspectRatio::Ratio16x9;
     int fps = 60;
     int bitrateKbps = 10000;
     VideoCodec videoCodec = H264;
@@ -76,13 +78,13 @@ struct StreamConfigProfile {
     std::string mappingLayoutTitle;
 
     [[nodiscard]] int resolutionWidth() const {
-        return resolutionHeight * 16 / 9;
+        return streamWidthFromHeight(resolutionHeight, aspectRatio);
     }
 };
 
 class StreamConfigProfileStore {
 public:
-    static constexpr int SchemaVersion = 4;
+    static constexpr int SchemaVersion = 5;
     static StreamConfigProfileStore& instance();
 
     const std::vector<StreamConfigProfile>& list();

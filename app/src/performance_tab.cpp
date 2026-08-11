@@ -138,7 +138,9 @@ std::pair<int, int> configuredDimensions() {
     const int resolution = Settings::instance().resolution();
     if (resolution == -1)
         return {Application::windowWidth, Application::windowHeight};
-    return {resolution * 16 / 9, resolution};
+    return {artemis::streaming::streamWidthFromHeight(
+                resolution, Settings::instance().aspect_ratio()),
+            resolution};
 }
 
 std::string scaleModeLabel() {

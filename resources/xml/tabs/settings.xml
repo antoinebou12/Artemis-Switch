@@ -36,6 +36,9 @@
                 id="resolution"/>
 
             <brls:SelectorCell
+                id="aspect_ratio"/>
+
+            <brls:SelectorCell
                 id="resolution_scale"/>
                 
             <brls:SelectorCell

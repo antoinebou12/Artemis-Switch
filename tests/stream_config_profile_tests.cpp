@@ -1,3 +1,4 @@
+#include "StreamAspectRatio.hpp"
 #include "StreamConfigProfileNormalize.hpp"
 
 #include <cassert>
@@ -9,6 +10,15 @@ int main() {
     assert(std::strcmp(profileStoreFilename(), "profile.json") == 0);
     assert(std::strcmp(legacyProfileStoreFilename(),
                        "artemis_profiles.json") == 0);
+
+    assert(streamWidthFromHeight(720, StreamAspectRatio::Ratio16x9) == 1280);
+    assert(streamWidthFromHeight(1080, StreamAspectRatio::Ratio16x9) == 1920);
+    assert(streamWidthFromHeight(720, StreamAspectRatio::Ratio4x3) == 960);
+    assert(streamWidthFromHeight(1080, StreamAspectRatio::Ratio4x3) == 1440);
+    assert(aspectRatioFromString("4:3") == StreamAspectRatio::Ratio4x3);
+    assert(aspectRatioFromString("16:9") == StreamAspectRatio::Ratio16x9);
+    assert(std::strcmp(aspectRatioToString(StreamAspectRatio::Ratio4x3),
+                       "4:3") == 0);
 
     assert(normalizeProfileHeight(360) == 360);
     assert(normalizeProfileHeight(480) == 480);

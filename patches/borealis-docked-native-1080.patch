@@ -1,0 +1,92 @@
+diff --git a/library/lib/platforms/switch/switch_video.cpp b/library/lib/platforms/switch/switch_video.cpp
+index dc874458..805e6681 100644
+--- a/library/lib/platforms/switch/switch_video.cpp
++++ b/library/lib/platforms/switch/switch_video.cpp
+@@ -160,32 +160,51 @@ void SwitchVideoContext::recordStaticCommands()
+ 
+ void SwitchVideoContext::updateWindowSize()
+ {
+-    // First try to get actual resolution with GetDefaultDisplayResolution
+-    int32_t width, height;
+-    Result rc = appletGetDefaultDisplayResolution(&width, &height);
+-    if (R_SUCCEEDED(rc))
++    // Prefer operation mode for Switch UI resolution. Some docks/TVs report
++    // 1280x720 from GetDefaultDisplayResolution even while Console/docked,
++    // which leaves the Borealis menu soft and letterboxed on a 1080p TV.
++    // Handheld stays 1280x720; docked UI is always native 1920x1080 (same as
++    // original Moonlight-Switch / Borealis dock behavior).
++    int32_t reportedWidth = 0;
++    int32_t reportedHeight = 0;
++    const Result rc =
++        appletGetDefaultDisplayResolution(&reportedWidth, &reportedHeight);
++    const AppletOperationMode mode = appletGetOperationMode();
++
++    switch (mode)
+     {
+-        this->framebufferWidth  = (float)width;
+-        this->framebufferHeight = (float)height;
+-    }
+-    // If it failed, use hardcoded resolutions as fallback
+-    else
+-    {
+-        Logger::warning(fmt::runtime("switch: failed to detect display resolution ({:#x}), falling back to hardcoded resolution"));
+-
+-        switch (appletGetOperationMode())
+-        {
+-            case AppletOperationMode_Handheld:
++        case AppletOperationMode_Handheld:
++            this->framebufferWidth  = HANDHELD_WIDTH;
++            this->framebufferHeight = HANDHELD_HEIGHT;
++            break;
++        case AppletOperationMode_Console:
++            this->framebufferWidth  = DOCKED_WIDTH;
++            this->framebufferHeight = DOCKED_HEIGHT;
++            if (R_SUCCEEDED(rc) &&
++                (reportedWidth != static_cast<int32_t>(DOCKED_WIDTH) ||
++                 reportedHeight != static_cast<int32_t>(DOCKED_HEIGHT)))
++            {
++                Logger::info(
++                    "switch: docked UI forced to 1920x1080 (display reported {}x{})",
++                    reportedWidth, reportedHeight);
++            }
++            break;
++        default:
++            if (R_SUCCEEDED(rc) && reportedWidth > 0 && reportedHeight > 0)
++            {
++                this->framebufferWidth  = static_cast<float>(reportedWidth);
++                this->framebufferHeight = static_cast<float>(reportedHeight);
++            }
++            else
++            {
++                Logger::warning(fmt::runtime(
++                    "switch: failed to detect display resolution ({:#x}), "
++                    "falling back to handheld"),
++                    rc);
+                 this->framebufferWidth  = HANDHELD_WIDTH;
+                 this->framebufferHeight = HANDHELD_HEIGHT;
+-                break;
+-            case AppletOperationMode_Console:
+-                this->framebufferWidth  = DOCKED_WIDTH;
+-                this->framebufferHeight = DOCKED_HEIGHT;
+-                break;
+-            default:
+-                return;
+-        }
++            }
++            break;
+     }
+ 
+     Application::onWindowResized(roundf(this->framebufferWidth), roundf(this->framebufferHeight));
+@@ -264,8 +283,10 @@ void SwitchVideoContext::destroyFramebufferResources()
+ 
+ void SwitchVideoContext::appletCallback(AppletHookType hookType)
+ {
+-    // Only reset framebuffer if the display resolution change event isn't ready
+-    if (hookType == AppletHookType_OnOperationMode && !this->displayResolutionChangeEventReady)
++    // Always rebuild on dock/undock. Relying only on the display-resolution
++    // event misses cases where the TV keeps reporting 720p while the console
++    // switches to Console mode (menu stayed soft/letterboxed).
++    if (hookType == AppletHookType_OnOperationMode)
+         resetFramebuffer();
+ }
+ 

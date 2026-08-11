@@ -266,10 +266,11 @@ void MoonlightSession::start(ServerCallback<bool> callback, bool is_sunshine) {
         w = custom.width;
         h = custom.height;
         brls::Logger::info("Artemis custom stream resolution: {}x{}", w, h);
-    } else {
+    }     else {
         const int resolution = Settings::instance().resolution();
         h = resolution;
-        w = h * 16 / 9;
+        w = artemis::streaming::streamWidthFromHeight(
+            h, Settings::instance().aspect_ratio());
         if (resolution == -1) {
 #if defined(PLATFORM_IOS) || defined(PLATFORM_VISIONOS)
             getWindowSize(&w, &h);

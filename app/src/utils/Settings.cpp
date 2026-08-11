@@ -305,6 +305,16 @@ void Settings::load() {
                 }
             }
 
+            if (json_t* aspect = json_object_get(settings, "aspect_ratio")) {
+                if (json_is_string(aspect)) {
+                    set_aspect_ratio(artemis::streaming::aspectRatioFromString(
+                        json_string_value(aspect)));
+                } else if (json_typeof(aspect) == JSON_INTEGER) {
+                    set_aspect_ratio(artemis::streaming::aspectRatioFromInt(
+                        (int)json_integer_value(aspect)));
+                }
+            }
+
             if (json_t* native_resolution_scale = json_object_get(settings, "native_resolution_scale")) {
                 if (json_typeof(native_resolution_scale) == JSON_INTEGER) {
                     set_native_resolution_scale((int)json_integer_value(native_resolution_scale));
@@ -720,6 +730,9 @@ void Settings::save() {
         
         if (json_t* settings = json_object()) {
             json_object_set_new(settings, "resolution", json_integer(m_resolution));
+            json_object_set_new(
+                settings, "aspect_ratio",
+                json_string(artemis::streaming::aspectRatioToString(m_aspect_ratio)));
             json_object_set_new(settings, "native_resolution_scale", json_integer(m_native_resolution_scale));
             json_object_set_new(settings, "fps", json_integer(m_fps));
             json_object_set_new(settings, "video_codec", json_integer(m_video_codec));

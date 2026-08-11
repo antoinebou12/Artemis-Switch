@@ -830,6 +830,32 @@ void DKVideoRenderer::recordStaticCommands(AVFrame* frame) {
     m_present_y = geometry.destination.y;
     m_present_width = geometry.destination.width;
     m_present_height = geometry.destination.height;
+    // One-shot: when stream and screen share 16:9, Fit/Fill/Stretch must all
+    // full-blit. A thin present rect is the docked strip bug (stale size / UVs).
+    if (m_screen_width > 0 && m_screen_height > 0 && logicalWidth > 0 &&
+        logicalHeight > 0 && m_present_width > 0.0f) {
+        const float srcAspect =
+            static_cast<float>(logicalWidth) / static_cast<float>(logicalHeight);
+        const float screenAspect = static_cast<float>(m_screen_width) /
+                                   static_cast<float>(m_screen_height);
+        const bool matchedAspect = std::fabs(srcAspect - screenAspect) < 0.01f;
+        const bool expectFullScreen =
+            matchedAspect || scaleMode == artemis::video::ScaleMode::Stretch ||
+            scaleMode == artemis::video::ScaleMode::Fill;
+        if (expectFullScreen &&
+            m_present_width < static_cast<float>(m_screen_width) * 0.95f) {
+            static bool loggedThinPresent = false;
+            if (!loggedThinPresent) {
+                loggedThinPresent = true;
+                brls::Logger::warning(
+                    "DKVideoRenderer: thin present rect {:.0f}x{:.0f}+{:.0f}+{:.0f} "
+                    "on screen {}x{} (frame {}x{}, scale {}, rot {})",
+                    m_present_width, m_present_height, m_present_x, m_present_y,
+                    m_screen_width, m_screen_height, m_frame_width, m_frame_height,
+                    static_cast<int>(scaleMode), static_cast<int>(rotation));
+            }
+        }
+    }
 #ifdef SUPPORT_UPSCALING
     const bool requestedDithering = shouldUseDithering();
 #else

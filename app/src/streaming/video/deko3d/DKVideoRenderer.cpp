@@ -127,11 +127,22 @@ public:
         ScaleMode scaleMode,
         const artemis::video::ZoomPanState& zoomPan,
         bool forceFullRange, artemis::video::Rotation rotation) const {
-        (void)scaleMode;
-        (void)zoomPan;
         (void)forceFullRange;
         (void)rotation;
-        return false;
+        // Fill keeps the legacy FSR/RCAS/dither path. Fit and Stretch use the
+        // Artemis path (full-FB clear + present rect) so 720p→dock and
+        // handheld letterbox/stretch fill the Switch framebuffer correctly.
+        if (scaleMode == ScaleMode::Fill)
+            return false;
+        if (zoomPan.zoom > 1.0f)
+            return true;
+        const bool keepPostProcess = Settings::instance().upscaling() ||
+                                     Settings::instance().dithering() ||
+                                     Settings::instance().rcas();
+        // Upscaling still needs the legacy filtered path.
+        if (keepPostProcess)
+            return false;
+        return scaleMode == ScaleMode::Fit || scaleMode == ScaleMode::Stretch;
     }
 
     void restoreLegacyCommands(int width, int height, AVFrame* frame) {

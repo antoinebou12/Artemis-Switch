@@ -5,6 +5,7 @@
 #include "UsableMac.hpp"
 #include <borealis.hpp>
 #include "../host/HostEndpoints.hpp"
+#include "../streaming/StreamAspectRatio.hpp"
 #include <map>
 #include <cstdio>
 #include <string>
@@ -144,6 +145,13 @@ class Settings : public Singleton<Settings> {
 
     [[nodiscard]] int resolution() const { return m_resolution; }
     void set_resolution(int resolution) { m_resolution = resolution; }
+
+    [[nodiscard]] artemis::streaming::StreamAspectRatio aspect_ratio() const {
+        return m_aspect_ratio;
+    }
+    void set_aspect_ratio(artemis::streaming::StreamAspectRatio aspect) {
+        m_aspect_ratio = artemis::streaming::normalizeAspectRatio(aspect);
+    }
 
     [[nodiscard]] int native_resolution_scale() const {
         return m_native_resolution_scale;
@@ -446,6 +454,8 @@ class Settings : public Singleton<Settings> {
 
     std::vector<Host> m_hosts;
     int m_resolution = 720;
+    artemis::streaming::StreamAspectRatio m_aspect_ratio =
+        artemis::streaming::StreamAspectRatio::Ratio16x9;
     int m_native_resolution_scale = 100;
     int m_fps = 60;
 #ifdef __PSV__

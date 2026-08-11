@@ -143,5 +143,33 @@ int main() {
         assert(brokenV00 < -0.5f);
     }
 
+    // Matched 16:9 (720p profile → dock 1080 / handheld 720): Fit, Fill, and
+    // Stretch must all full-blit with an uncropped source.
+    const ScaleMode matchedModes[] = {ScaleMode::Fit, ScaleMode::Fill,
+                                      ScaleMode::Stretch};
+    for (ScaleMode mode : matchedModes) {
+        const auto dock = VideoScale::presentationGeometry(
+            1280, 720, 1920, 1080, mode);
+        assert(near(dock.destination.x, 0.0f));
+        assert(near(dock.destination.y, 0.0f));
+        assert(near(dock.destination.width, 1920.0f));
+        assert(near(dock.destination.height, 1080.0f));
+        assert(near(dock.source.x, 0.0f));
+        assert(near(dock.source.y, 0.0f));
+        assert(near(dock.source.width, 1280.0f));
+        assert(near(dock.source.height, 720.0f));
+
+        const auto handheld = VideoScale::presentationGeometry(
+            1280, 720, 1280, 720, mode);
+        assert(near(handheld.destination.x, 0.0f));
+        assert(near(handheld.destination.y, 0.0f));
+        assert(near(handheld.destination.width, 1280.0f));
+        assert(near(handheld.destination.height, 720.0f));
+        assert(near(handheld.source.x, 0.0f));
+        assert(near(handheld.source.y, 0.0f));
+        assert(near(handheld.source.width, 1280.0f));
+        assert(near(handheld.source.height, 720.0f));
+    }
+
     return 0;
 }

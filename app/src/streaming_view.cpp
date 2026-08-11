@@ -143,7 +143,8 @@ StreamingView::StreamingView(const Host& host, const AppInfo& app) : host(host),
                     profileHeight = customProfile.height;
                 } else if (Settings::instance().resolution() > 0) {
                     profileHeight = Settings::instance().resolution();
-                    profileWidth = profileHeight * 16 / 9;
+                    profileWidth = artemis::streaming::streamWidthFromHeight(
+                        profileHeight, Settings::instance().aspect_ratio());
                 }
             }
             const auto profile = artemis::apollo::resolveVirtualDisplay(
@@ -366,7 +367,17 @@ void StreamingView::draw(NVGcontext* vg, float x, float y, float width,
         return;
     }
 
-    session->draw(vg, (int) width, (int) height);
+    // Present against the live Switch framebuffer size so dock↔handheld
+    // changes always full-blit even if the AppletFrame layout briefly lags.
+#if defined(PLATFORM_SWITCH)
+    const int presentW =
+        Application::windowWidth > 0 ? Application::windowWidth : (int)width;
+    const int presentH =
+        Application::windowHeight > 0 ? Application::windowHeight : (int)height;
+    session->draw(vg, presentW, presentH);
+#else
+    session->draw(vg, (int)width, (int)height);
+#endif
 
     if (!tempInputLock && session->is_active())
         handleInput();
@@ -587,7 +598,8 @@ void StreamingView::applyVirtualDisplay(
             profileHeight = custom.height;
         } else if (Settings::instance().resolution() > 0) {
             profileHeight = Settings::instance().resolution();
-            profileWidth = profileHeight * 16 / 9;
+            profileWidth = artemis::streaming::streamWidthFromHeight(
+                profileHeight, Settings::instance().aspect_ratio());
         }
     }
 

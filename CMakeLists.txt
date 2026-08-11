@@ -5,7 +5,9 @@ set(ARTEMIS_BOREALIS_SOURCE ${EXTERN_PATH}/borealis)
 set(ARTEMIS_BOREALIS_PATCHED ${CMAKE_BINARY_DIR}/extern/borealis-patched)
 set(ARTEMIS_BOREALIS_PATCHES
     ${CMAKE_CURRENT_SOURCE_DIR}/patches/borealis-handheld-motion-source.patch
-    ${CMAKE_CURRENT_SOURCE_DIR}/patches/borealis-split-swap-ab-xy.patch)
+    ${CMAKE_CURRENT_SOURCE_DIR}/patches/borealis-split-swap-ab-xy.patch
+    ${CMAKE_CURRENT_SOURCE_DIR}/patches/borealis-clear-vibration-zero.patch
+    ${CMAKE_CURRENT_SOURCE_DIR}/patches/borealis-docked-native-1080.patch)
 
 # The source submodule stays pinned and clean. Apply Artemis Borealis patches to
 # a build-directory copy, just like the common-C protocol patch.

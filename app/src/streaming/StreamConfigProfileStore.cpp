@@ -122,6 +122,9 @@ json_t* profileToJson(const StreamConfigProfile& profile) {
 
     json_object_set_new(item, "resolution_height",
                         json_integer(profile.resolutionHeight));
+    json_object_set_new(
+        item, "aspect_ratio",
+        json_string(aspectRatioToString(profile.aspectRatio)));
     json_object_set_new(item, "fps", json_integer(profile.fps));
     json_object_set_new(item, "bitrate_kbps",
                         json_integer(profile.bitrateKbps));
@@ -232,6 +235,14 @@ StreamConfigProfile profileFromJson(json_t* object) {
         json_is_integer(height))
         profile.resolutionHeight =
             static_cast<int>(json_integer_value(height));
+    if (json_t* aspect = json_object_get(object, "aspect_ratio")) {
+        if (json_is_string(aspect))
+            profile.aspectRatio =
+                aspectRatioFromString(json_string_value(aspect));
+        else if (json_is_integer(aspect))
+            profile.aspectRatio =
+                aspectRatioFromInt(static_cast<int>(json_integer_value(aspect)));
+    }
     if (json_t* fps = json_object_get(object, "fps"); json_is_integer(fps))
         profile.fps = static_cast<int>(json_integer_value(fps));
     if (json_t* bitrate = json_object_get(object, "bitrate_kbps");
@@ -375,6 +386,7 @@ StreamConfigProfile profileFromJson(json_t* object) {
 void applyProfileToSettings(const StreamConfigProfile& profile) {
     auto& settings = Settings::instance();
     settings.set_resolution(profile.resolutionHeight);
+    settings.set_aspect_ratio(profile.aspectRatio);
     settings.set_fps(profile.fps);
     settings.set_bitrate(profile.bitrateKbps);
     settings.set_video_codec(profile.videoCodec);
@@ -446,6 +458,7 @@ void applyProfileToSettings(const StreamConfigProfile& profile) {
 
 StreamConfigProfile normalizeProfile(StreamConfigProfile profile) {
     profile.resolutionHeight = normalizeProfileHeight(profile.resolutionHeight);
+    profile.aspectRatio = normalizeAspectRatio(profile.aspectRatio);
     if (profile.fps <= 0)
         profile.fps = 60;
     if (profile.bitrateKbps <= 0)
@@ -514,6 +527,7 @@ StreamConfigProfileStore::snapshotFromSettings(const std::string& name) {
     const auto& settings = Settings::instance();
     profile.resolutionHeight =
         normalizeHeight(settings.resolution() > 0 ? settings.resolution() : 720);
+    profile.aspectRatio = settings.aspect_ratio();
     profile.fps = settings.fps();
     profile.bitrateKbps = settings.bitrate();
     profile.videoCodec = settings.video_codec();
@@ -577,19 +591,28 @@ void StreamConfigProfileStore::seedDefaultsIfEmpty() {
     if (!m_profiles.empty())
         return;
 
-    auto makeSeed = [](const char* name, int height, int fps, int bitrate) {
+    auto makeSeed = [](const char* name, int height, int fps, int bitrate,
+                       StreamAspectRatio aspect =
+                           StreamAspectRatio::Ratio16x9,
+                       artemis::video::ScaleMode scale =
+                           artemis::video::ScaleMode::Fill) {
         StreamConfigProfile profile;
         profile.id = makeId();
         profile.name = name;
         profile.resolutionHeight = height;
+        profile.aspectRatio = aspect;
         profile.fps = fps;
         profile.bitrateKbps = bitrate;
         profile.videoCodec = H264;
+        profile.scaleMode = scale;
         return profile;
     };
 
     m_profiles.push_back(makeSeed("720p 60", 720, 60, 10000));
     m_profiles.push_back(makeSeed("1080p 60", 1080, 60, 20000));
+    m_profiles.push_back(makeSeed("720p 4:3", 720, 60, 10000,
+                                  StreamAspectRatio::Ratio4x3,
+                                  artemis::video::ScaleMode::Fit));
     m_profiles.push_back(makeSeed("360p remote", 360, 30, 2500));
     m_activeProfileId = m_profiles.front().id;
 }

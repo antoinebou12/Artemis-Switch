@@ -140,6 +140,21 @@ SettingsTab::SettingsTab() {
         DEFAULT;
     }
 
+    aspectRatio->setText("settings/aspect_ratio"_i18n);
+    aspectRatio->setData({"settings/aspect_ratio_16_9"_i18n,
+                          "settings/aspect_ratio_4_3"_i18n});
+    aspectRatio->setSelection(
+        Settings::instance().aspect_ratio() ==
+                artemis::streaming::StreamAspectRatio::Ratio4x3
+            ? 1
+            : 0);
+    aspectRatio->getEvent()->subscribe([](int selected) {
+        Settings::instance().set_aspect_ratio(
+            selected == 1 ? artemis::streaming::StreamAspectRatio::Ratio4x3
+                          : artemis::streaming::StreamAspectRatio::Ratio16x9);
+        Settings::instance().save();
+    });
+
     std::vector<std::string> nativeResolutionScales = {
         "0.5x", "0.75x", "1.0x",
 #if !defined(__PSV__)

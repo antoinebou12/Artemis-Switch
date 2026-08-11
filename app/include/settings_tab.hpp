@@ -17,6 +17,7 @@ class SettingsTab : public brls::Box {
     ~SettingsTab();
 
     BRLS_BIND(brls::SelectorCell, resolution, "resolution");
+    BRLS_BIND(brls::SelectorCell, aspectRatio, "aspect_ratio");
     BRLS_BIND(brls::SelectorCell, resolutionScale, "resolution_scale");
     BRLS_BIND(brls::Header, imageAdjustmentsHeader, "image_adjustments_header");
     BRLS_BIND(BooleanSliderCell, dithering, "dithering");

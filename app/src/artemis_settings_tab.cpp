@@ -89,9 +89,13 @@ int frameRateSelection(const std::vector<int>& values, int current) {
 
 int resolutionPresetIndex(int width, int height) {
     if (width == 1280 && height == 720)
-        return 1; // Handheld
+        return 1; // Handheld 16:9
     if (width == 1920 && height == 1080)
-        return 2; // Docked
+        return 2; // Docked 16:9
+    if (width == 960 && height == 720)
+        return 3; // Handheld 4:3
+    if (width == 1440 && height == 1080)
+        return 4; // Docked 4:3
     return 0; // Custom
 }
 
@@ -105,16 +109,32 @@ void applyResolutionPreset(int selected) {
     } else if (selected == 2) {
         width = 1920;
         height = 1080;
+    } else if (selected == 3) {
+        width = 960;
+        height = 720;
+    } else if (selected == 4) {
+        width = 1440;
+        height = 1080;
     }
     artemis::streaming::StreamProfileStore::instance().setCustomResolution(
         true, width, height);
 
+    if (selected == 1 || selected == 2) {
+        Settings::instance().set_aspect_ratio(
+            artemis::streaming::StreamAspectRatio::Ratio16x9);
+        Settings::instance().save();
+    } else if (selected == 3 || selected == 4) {
+        Settings::instance().set_aspect_ratio(
+            artemis::streaming::StreamAspectRatio::Ratio4x3);
+        Settings::instance().save();
+    }
+
 #if ARTEMIS_HAS_APOLLO_HOST_OPTIONS
     // Persist preferred Apollo virtual-display target for the next connection.
     auto options = artemis::apollo::ApolloHostOptions{};
-    if (selected == 1)
+    if (selected == 1 || selected == 3)
         options.target = artemis::apollo::VirtualDisplayTarget::Handheld;
-    else if (selected == 2)
+    else if (selected == 2 || selected == 4)
         options.target = artemis::apollo::VirtualDisplayTarget::Docked;
     else
         options.target = artemis::apollo::VirtualDisplayTarget::Custom;
@@ -173,7 +193,9 @@ ArtemisSettingsTab::ArtemisSettingsTab() {
         "artemis/settings/resolution_preset"_i18n,
         {"artemis/settings/preset_custom"_i18n,
          "artemis/settings/preset_handheld"_i18n,
-         "artemis/settings/preset_docked"_i18n},
+         "artemis/settings/preset_docked"_i18n,
+         "artemis/settings/preset_handheld_4_3"_i18n,
+         "artemis/settings/preset_docked_4_3"_i18n},
         resolutionPresetIndex(stored.width, stored.height),
         [this](int selected) {
             applyResolutionPreset(selected);

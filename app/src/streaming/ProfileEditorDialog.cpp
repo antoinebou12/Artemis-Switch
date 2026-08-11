@@ -26,6 +26,10 @@ void addHeader(brls::Box* content, const std::string& title,
                float paddingTop = 60.0f) {
     auto* header = new brls::Header();
     header->setTitle(title);
+    // Keep section titles on one line (long locales / docked UI).
+    if (auto* label = dynamic_cast<brls::Label*>(
+            header->getView("brls/header/title")))
+        label->setSingleLine(true);
     header->setMarginTop(paddingTop);
     content->addView(header);
 }
@@ -50,12 +54,27 @@ brls::BooleanCell* addBool(brls::Box* content, const std::string& title,
     return cell;
 }
 
+float mouseSpeedScaleFromMultiplier(int multiplier) {
+    // Match Settings::mouse_speed_scale(): slider 0..100 → 0.1x .. 2.0x.
+    return 0.1f + (std::clamp(multiplier, 0, 100) / 100.0f) * 1.9f;
+}
+
+void styleSliderHeader(brls::Header* header, float marginTop = 20.0f) {
+    header->setMarginTop(marginTop);
+    if (auto* label = dynamic_cast<brls::Label*>(
+            header->getView("brls/header/title")))
+        label->setSingleLine(true);
+    if (auto* label = dynamic_cast<brls::Label*>(
+            header->getView("brls/header/subtitle")))
+        label->setSingleLine(true);
+}
+
 void addBitrateSlider(brls::Box* content, StreamConfigProfile* draft) {
     auto* header = new brls::Header();
     header->setTitle("settings/video_bitrate"_i18n);
     header->setSubtitle(
         fmt::format("{:.1f} Mbps", draft->bitrateKbps / 1000.0));
-    header->setMarginTop(60.0f);
+    styleSliderHeader(header);
     content->addView(header);
 
     auto* slider = new brls::Slider();
@@ -77,7 +96,7 @@ void addRumbleSlider(brls::Box* content, StreamConfigProfile* draft) {
     auto* header = new brls::Header();
     header->setTitle("settings/rumble_force"_i18n);
     header->setSubtitle(fmt::format("{:.0f}%", draft->rumbleForce * 100.0f));
-    header->setMarginTop(60.0f);
+    styleSliderHeader(header);
     content->addView(header);
 
     auto* slider = new brls::Slider();
@@ -93,14 +112,12 @@ void addRumbleSlider(brls::Box* content, StreamConfigProfile* draft) {
 
 void addMouseSpeedSlider(brls::Box* content, StreamConfigProfile* draft) {
     auto* header = new brls::Header();
-    header->setTitle("streaming/mouse_speed"_i18n);
-    {
-        std::stringstream stream;
-        stream << std::fixed << std::setprecision(1)
-               << (0.5f + draft->mouseSpeedMultiplier / 100.0f * 2.5f);
-        header->setSubtitle(stream.str() + "x");
-    }
-    header->setMarginTop(60.0f);
+    header->setTitle("settings/mouse_speed"_i18n);
+    header->setSubtitle(
+        fmt::format("{:.1f}x",
+                    mouseSpeedScaleFromMultiplier(draft->mouseSpeedMultiplier)));
+    // Already under the Mouse section header — avoid a second 60px gap.
+    styleSliderHeader(header, 20.0f);
     content->addView(header);
 
     auto* slider = new brls::Slider();
@@ -110,10 +127,9 @@ void addMouseSpeedSlider(brls::Box* content, StreamConfigProfile* draft) {
     slider->getProgressEvent()->subscribe([draft, header](float p) {
         draft->mouseSpeedMultiplier =
             std::clamp(static_cast<int>(p * 100.0f), 0, 100);
-        std::stringstream stream;
-        stream << std::fixed << std::setprecision(1)
-               << (0.5f + draft->mouseSpeedMultiplier / 100.0f * 2.5f);
-        header->setSubtitle(stream.str() + "x");
+        header->setSubtitle(fmt::format(
+            "{:.1f}x",
+            mouseSpeedScaleFromMultiplier(draft->mouseSpeedMultiplier)));
     });
     content->addView(slider);
 }
@@ -161,6 +177,16 @@ void addRcasCell(brls::Box* content, StreamConfigProfile* draft) {
 
 std::string heightLabel(int height) {
     return fmt::format("{}p", height);
+}
+
+std::string aspectLabel(StreamAspectRatio aspect) {
+    switch (normalizeAspectRatio(aspect)) {
+    case StreamAspectRatio::Ratio4x3:
+        return "settings/aspect_ratio_4_3"_i18n;
+    case StreamAspectRatio::Ratio16x9:
+    default:
+        return "settings/aspect_ratio_16_9"_i18n;
+    }
 }
 
 std::string codecLabel(VideoCodec codec) {
@@ -347,6 +373,31 @@ void openProfileEditor(const std::string& profileId,
                 if (index >= 0 && index < static_cast<int>(heights.size()))
                     draft->resolutionHeight = heights[static_cast<size_t>(index)];
                 resCell->setDetailText(heightLabel(draft->resolutionHeight));
+            },
+            selected);
+        brls::Application::pushActivity(new brls::Activity(dropdown));
+        return true;
+    });
+
+    auto* aspectCell =
+        addDetail(content, "settings/aspect_ratio"_i18n,
+                  aspectLabel(draft->aspectRatio));
+    aspectCell->registerClickAction([draft, aspectCell](brls::View*) {
+        const std::vector<StreamAspectRatio> values = {
+            StreamAspectRatio::Ratio16x9, StreamAspectRatio::Ratio4x3};
+        std::vector<std::string> options;
+        int selected = 0;
+        for (size_t i = 0; i < values.size(); ++i) {
+            options.push_back(aspectLabel(values[i]));
+            if (values[i] == draft->aspectRatio)
+                selected = static_cast<int>(i);
+        }
+        auto* dropdown = new brls::Dropdown(
+            "settings/aspect_ratio"_i18n, options,
+            [draft, aspectCell, values](int index) {
+                if (index >= 0 && index < static_cast<int>(values.size()))
+                    draft->aspectRatio = values[static_cast<size_t>(index)];
+                aspectCell->setDetailText(aspectLabel(draft->aspectRatio));
             },
             selected);
         brls::Application::pushActivity(new brls::Activity(dropdown));
@@ -822,33 +873,36 @@ void openProfileEditor(const std::string& profileId,
             [draft](bool v) { draft->swapMouseSticks = v; });
     addMouseSpeedSlider(content, draft);
 
+    auto persistDraft = [draft, profileId, assignHostKey, onChanged]() {
+        if (draft->name.empty())
+            draft->name = "Profile";
+        auto& store = StreamConfigProfileStore::instance();
+        std::string id = profileId;
+        if (id.empty()) {
+            auto created = store.create(draft->name, false);
+            draft->id = created.id;
+            id = created.id;
+        }
+        draft->id = id;
+        store.update(*draft);
+        if (!assignHostKey.empty())
+            store.setSelectedForHost(assignHostKey, id);
+        // Keep live Settings in sync for every field the editor exposes.
+        store.applyProfile(*draft);
+        delete draft;
+        // Pop first so list refresh callbacks see the correct stack.
+        brls::Application::popActivity(brls::TransitionAnimation::FADE,
+                                       [onChanged] {
+                                           if (onChanged)
+                                               onChanged();
+                                       });
+    };
+
     auto* saveCell = addDetail(content, "common/confirm"_i18n, "");
-    saveCell->registerClickAction(
-        [draft, profileId, assignHostKey, onChanged](brls::View*) {
-            if (draft->name.empty())
-                draft->name = "Profile";
-            auto& store = StreamConfigProfileStore::instance();
-            std::string id = profileId;
-            if (id.empty()) {
-                auto created = store.create(draft->name, false);
-                draft->id = created.id;
-                id = created.id;
-            }
-            draft->id = id;
-            store.update(*draft);
-            if (!assignHostKey.empty())
-                store.setSelectedForHost(assignHostKey, id);
-            // Keep live Settings in sync for every field the editor exposes.
-            store.applyProfile(*draft);
-            delete draft;
-            // Pop first so list refresh callbacks see the correct stack.
-            brls::Application::popActivity(brls::TransitionAnimation::FADE,
-                                           [onChanged] {
-                                               if (onChanged)
-                                                   onChanged();
-                                           });
-            return true;
-        });
+    saveCell->registerClickAction([persistDraft](brls::View*) {
+        persistDraft();
+        return true;
+    });
     auto* cancelCell = addDetail(content, "common/cancel"_i18n, "");
     cancelCell->registerClickAction([draft](brls::View*) {
         delete draft;
@@ -861,10 +915,10 @@ void openProfileEditor(const std::string& profileId,
     auto* frame = new brls::AppletFrame(scroll);
     frame->setTitle(profileId.empty() ? "artemis/settings/create_profile"_i18n
                                       : "host/edit_profile"_i18n);
-    frame->registerAction("common/cancel"_i18n, brls::BUTTON_B,
-                          [draft](brls::View*) {
-                              delete draft;
-                              brls::Application::popActivity();
+    // B / Back auto-saves; Cancel row still discards.
+    frame->registerAction("common/confirm"_i18n, brls::BUTTON_B,
+                          [persistDraft](brls::View*) {
+                              persistDraft();
                               return true;
                           });
     brls::Application::pushActivity(new brls::Activity(frame));
