@@ -108,6 +108,7 @@
             "profile_name_hint": "Tap to name",
             "profile_section_video": "Video",
             "profile_section_presentation": "Presentation",
+            "profile_section_stream": "Stream",
             "profile_section_audio": "Audio",
             "profile_section_keyboard": "Keyboard",
             "profile_section_mouse": "Mouse",

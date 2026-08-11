@@ -183,6 +183,8 @@ namespace
                             const SourceViewport& viewport,
                             int frameWidth,
                             int frameHeight) {
+        // Encoded for texture_fsh.glsl:
+        //   uv = uv_data.xy + vTextureCoord / uv_data.zw
         transform.uv_data[0] = viewport.offsetX / static_cast<float>(frameWidth);
         transform.uv_data[1] = viewport.offsetY / static_cast<float>(frameHeight);
         transform.uv_data[2] = static_cast<float>(frameWidth) / viewport.width;

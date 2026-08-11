@@ -113,5 +113,35 @@ int main() {
     assert(near(invalidViewport.source.width, 0.0f));
     assert(near(invalidViewport.destination.width, 0.0f));
 
+    // 90° rotation uses swapped logical size. Fill then crops that logical
+    // frame. Shader UVs must be origin + vTC / scale so corners stay inside
+    // the crop (the old (vTC - origin) * scale formula left [0,1]).
+    {
+        const float logicalW = 1080.0f;
+        const float logicalH = 1920.0f;
+        const auto rotatedFill = VideoScale::presentationGeometry(
+            logicalW, logicalH, 1280, 720, ScaleMode::Fill);
+        const float uvX = rotatedFill.source.x / logicalW;
+        const float uvY = rotatedFill.source.y / logicalH;
+        const float scaleX = logicalW / rotatedFill.source.width;
+        const float scaleY = logicalH / rotatedFill.source.height;
+        const float u00 = uvX + 0.0f / scaleX;
+        const float v00 = uvY + 0.0f / scaleY;
+        const float u11 = uvX + 1.0f / scaleX;
+        const float v11 = uvY + 1.0f / scaleY;
+        assert(u00 >= -0.001f && u00 <= 1.001f);
+        assert(v00 >= -0.001f && v00 <= 1.001f);
+        assert(u11 >= -0.001f && u11 <= 1.001f);
+        assert(v11 >= -0.001f && v11 <= 1.001f);
+        assert(near(u00, rotatedFill.source.x / logicalW));
+        assert(near(v00, rotatedFill.source.y / logicalH));
+        assert(near(u11, (rotatedFill.source.x + rotatedFill.source.width) /
+                             logicalW));
+        assert(near(v11, (rotatedFill.source.y + rotatedFill.source.height) /
+                             logicalH));
+        const float brokenV00 = (0.0f - uvY) * scaleY;
+        assert(brokenV00 < -0.5f);
+    }
+
     return 0;
 }

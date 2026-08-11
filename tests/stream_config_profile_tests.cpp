@@ -20,6 +20,15 @@ int main() {
     assert(normalizeProfileHeight(0) == 360);
     assert(normalizeProfileHeight(-10) == 360);
 
+    assert(normalizeNativeResolutionScale(50) == 50);
+    assert(normalizeNativeResolutionScale(75) == 75);
+    assert(normalizeNativeResolutionScale(100) == 100);
+    assert(normalizeNativeResolutionScale(200) == 200);
+    assert(normalizeNativeResolutionScale(33) == 100);
+    assert(normalizeCustomDimension(80, 1920) == 1920);
+    assert(normalizeCustomDimension(1280, 1920) == 1280);
+    assert(normalizeCustomDimension(9000, 1920) == 7680);
+
     ProfileNormalizeInput profile;
     profile.resolutionHeight = 999;
     profile.fps = 0;

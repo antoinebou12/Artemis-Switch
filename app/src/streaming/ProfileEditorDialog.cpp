@@ -4,12 +4,14 @@
 
 #include "ProfileEditorDialog.hpp"
 
+#include "StreamConfigProfileNormalize.hpp"
 #include "keyboard_view.hpp"
 #include "views/boolean_slider_cell.hpp"
 
 #include <algorithm>
 #include <borealis.hpp>
 #include <fmt/format.h>
+#include <functional>
 #include <iomanip>
 #include <sstream>
 #include <utility>
@@ -139,7 +141,7 @@ void addDitheringCell(brls::Box* content, StreamConfigProfile* draft) {
 
 void addRcasCell(brls::Box* content, StreamConfigProfile* draft) {
     auto* cell = new BooleanSliderCell();
-    cell->init("settings/rcas"_i18n, draft->rcas, [draft, cell](bool on) {
+    cell->init("settings/rcas_sharpening"_i18n, draft->rcas, [draft, cell](bool on) {
         draft->rcas = on;
         cell->setSliderVisibility(on ? brls::Visibility::VISIBLE
                                      : brls::Visibility::GONE);
@@ -213,6 +215,48 @@ std::string keyboardTypeLabel(KeyboardType type) {
     }
 }
 
+std::string nativeScaleLabel(int scale) {
+    switch (scale) {
+    case 50:
+        return "0.5x";
+    case 75:
+        return "0.75x";
+    case 200:
+        return "2.0x";
+    case 100:
+    default:
+        return "1.0x";
+    }
+}
+
+std::string audioBackendLabel(AudioBackend backend) {
+#ifdef __SWITCH__
+    if (backend == AUDREN)
+        return "Audren";
+#endif
+    (void)backend;
+    return "SDL";
+}
+
+std::string pointerModeLabel(artemis::input::PointerMode mode) {
+    using Mode = artemis::input::PointerMode;
+    switch (mode) {
+    case Mode::MultiTouch:
+        return "artemis/overlay/touch_multitouch"_i18n;
+    case Mode::Absolute:
+        return "artemis/overlay/touch_absolute"_i18n;
+    case Mode::AbsoluteSwapped:
+        return "artemis/overlay/touch_absolute_swapped"_i18n;
+    case Mode::TrackpadGaming:
+        return "artemis/overlay/touch_trackpad_gaming"_i18n;
+    case Mode::Disabled:
+        return "artemis/overlay/touch_disabled"_i18n;
+    case Mode::TrackpadNatural:
+    default:
+        return "artemis/overlay/touch_trackpad"_i18n;
+    }
+}
+
 } // namespace
 
 void openProfileEditor(const std::string& profileId,
@@ -260,7 +304,7 @@ void openProfileEditor(const std::string& profileId,
         return true;
     });
 
-    addHeader(content, "settings/quality"_i18n);
+    addHeader(content, "artemis/settings/profile_section_video"_i18n);
 
     auto* fpsCell =
         addDetail(content, "settings/fps"_i18n, fmt::format("{} FPS", draft->fps));
@@ -308,6 +352,79 @@ void openProfileEditor(const std::string& profileId,
         brls::Application::pushActivity(new brls::Activity(dropdown));
         return true;
     });
+
+    auto* customToggle = new brls::BooleanCell();
+    content->addView(customToggle);
+    auto* customW = addDetail(content, "artemis/settings/custom_width"_i18n,
+                              std::to_string(draft->customWidth));
+    customW->registerClickAction([draft, customW](brls::View*) {
+        brls::Application::getImeManager()->openForNumber(
+            [draft, customW](long number) {
+                draft->customWidth =
+                    normalizeCustomDimension(static_cast<int>(number), 1920);
+                customW->setDetailText(std::to_string(draft->customWidth));
+            },
+            "artemis/settings/custom_width"_i18n, "", 5,
+            std::to_string(draft->customWidth), "", "", 0);
+        return true;
+    });
+    auto* customH = addDetail(content, "artemis/settings/custom_height"_i18n,
+                              std::to_string(draft->customHeight));
+    customH->registerClickAction([draft, customH](brls::View*) {
+        brls::Application::getImeManager()->openForNumber(
+            [draft, customH](long number) {
+                draft->customHeight =
+                    normalizeCustomDimension(static_cast<int>(number), 1080);
+                customH->setDetailText(std::to_string(draft->customHeight));
+            },
+            "artemis/settings/custom_height"_i18n, "", 5,
+            std::to_string(draft->customHeight), "", "", 0);
+        return true;
+    });
+    const auto customResVisibility = draft->customResolutionEnabled
+                                         ? brls::Visibility::VISIBLE
+                                         : brls::Visibility::GONE;
+    customW->setVisibility(customResVisibility);
+    customH->setVisibility(customResVisibility);
+    customToggle->init(
+        "artemis/settings/use_custom_resolution"_i18n,
+        draft->customResolutionEnabled,
+        [draft, customW, customH](bool enabled) {
+            draft->customResolutionEnabled = enabled;
+            const auto visibility = enabled ? brls::Visibility::VISIBLE
+                                            : brls::Visibility::GONE;
+            customW->setVisibility(visibility);
+            customH->setVisibility(visibility);
+        });
+
+    auto* nativeScaleCell =
+        addDetail(content, "settings/resolution_scale"_i18n,
+                  nativeScaleLabel(draft->nativeResolutionScale));
+    nativeScaleCell->registerClickAction([draft, nativeScaleCell](brls::View*) {
+        const std::vector<int> values = {50, 75, 100, 200};
+        std::vector<std::string> labels;
+        int selected = 2;
+        for (size_t i = 0; i < values.size(); ++i) {
+            labels.push_back(nativeScaleLabel(values[i]));
+            if (values[i] == draft->nativeResolutionScale)
+                selected = static_cast<int>(i);
+        }
+        auto* dropdown = new brls::Dropdown(
+            "settings/resolution_scale"_i18n, labels,
+            [draft, nativeScaleCell, values](int index) {
+                if (index >= 0 && index < static_cast<int>(values.size()))
+                    draft->nativeResolutionScale =
+                        values[static_cast<size_t>(index)];
+                nativeScaleCell->setDetailText(
+                    nativeScaleLabel(draft->nativeResolutionScale));
+            },
+            selected);
+        brls::Application::pushActivity(new brls::Activity(dropdown));
+        return true;
+    });
+
+    addBool(content, "settings/use_hw_decoding"_i18n, draft->useHwDecoding,
+            [draft](bool v) { draft->useHwDecoding = v; });
 
     auto* codecCell =
         addDetail(content, "settings/video_codec"_i18n, codecLabel(draft->videoCodec));
@@ -363,7 +480,7 @@ void openProfileEditor(const std::string& profileId,
 
     addBitrateSlider(content, draft);
 
-    addHeader(content, "settings/image_adjustments"_i18n);
+    addHeader(content, "artemis/settings/profile_section_presentation"_i18n);
     addDitheringCell(content, draft);
     auto* upscaleCell =
         addDetail(content, "settings/upscaling"_i18n, upscalingLabel(draft->upscalingMode));
@@ -425,7 +542,7 @@ void openProfileEditor(const std::string& profileId,
         return true;
     });
 
-    addHeader(content, "settings/stream_settings"_i18n);
+    addHeader(content, "artemis/settings/profile_section_stream"_i18n);
     addBool(content, "settings/usops"_i18n, draft->sops,
             [draft](bool v) { draft->sops = v; });
     addBool(content, "settings/paop"_i18n, draft->playAudioOnPc,
@@ -460,13 +577,94 @@ void openProfileEditor(const std::string& profileId,
             draft->preventPacketLoss,
             [draft](bool v) { draft->preventPacketLoss = v; });
 
-    addHeader(content, "settings/keys"_i18n);
+#ifdef __SWITCH__
+    {
+        const std::vector<std::string> backends = {"SDL", "Audren"};
+        auto* audioBackendCell = addDetail(
+            content, "settings/audio_backend"_i18n,
+            audioBackendLabel(draft->audioBackend));
+        audioBackendCell->registerClickAction(
+            [draft, audioBackendCell, backends](brls::View*) {
+                auto* dropdown = new brls::Dropdown(
+                    "settings/audio_backend"_i18n, backends,
+                    [draft, audioBackendCell](int index) {
+                        draft->audioBackend = index == 1 ? AUDREN : SDL;
+                        audioBackendCell->setDetailText(
+                            audioBackendLabel(draft->audioBackend));
+                    },
+                    draft->audioBackend == AUDREN ? 1 : 0);
+                brls::Application::pushActivity(new brls::Activity(dropdown));
+                return true;
+            });
+    }
+#else
+    addDetail(content, "settings/audio_backend"_i18n, "SDL")->setFocusable(false);
+#endif
+
+    addBool(content, "settings/volume_amplification"_i18n,
+            draft->volumeAmplification,
+            [draft](bool v) { draft->volumeAmplification = v; });
+
+    addHeader(content, "artemis/settings/profile_section_controller"_i18n);
+    {
+        auto* layouts = Settings::instance().get_mapping_laouts();
+        std::vector<std::string> layoutTitles;
+        int selected = 0;
+        if (layouts) {
+            layoutTitles.reserve(layouts->size());
+            for (size_t i = 0; i < layouts->size(); ++i) {
+                layoutTitles.push_back((*layouts)[i].title);
+                if (!draft->mappingLayoutTitle.empty() &&
+                    (*layouts)[i].title == draft->mappingLayoutTitle)
+                    selected = static_cast<int>(i);
+            }
+            if (draft->mappingLayoutTitle.empty() && !layoutTitles.empty()) {
+                const int current = Settings::instance().get_current_mapping_layout();
+                if (current >= 0 &&
+                    current < static_cast<int>(layoutTitles.size()))
+                    selected = current;
+                draft->mappingLayoutTitle =
+                    layoutTitles[static_cast<size_t>(selected)];
+            }
+        }
+        const std::string detail = draft->mappingLayoutTitle.empty()
+                                       ? "—"
+                                       : draft->mappingLayoutTitle;
+        auto* layoutCell =
+            addDetail(content, "settings/keys_mapping_title"_i18n, detail);
+        if (!layoutTitles.empty()) {
+            layoutCell->registerClickAction(
+                [draft, layoutCell, layoutTitles](brls::View*) {
+                    int selected = 0;
+                    for (size_t i = 0; i < layoutTitles.size(); ++i) {
+                        if (layoutTitles[i] == draft->mappingLayoutTitle)
+                            selected = static_cast<int>(i);
+                    }
+                    auto* dropdown = new brls::Dropdown(
+                        "settings/keys_mapping_title"_i18n, layoutTitles,
+                        [draft, layoutCell, layoutTitles](int index) {
+                            if (index >= 0 &&
+                                index < static_cast<int>(layoutTitles.size())) {
+                                draft->mappingLayoutTitle =
+                                    layoutTitles[static_cast<size_t>(index)];
+                                layoutCell->setDetailText(
+                                    draft->mappingLayoutTitle);
+                            }
+                        },
+                        selected);
+                    brls::Application::pushActivity(
+                        new brls::Activity(dropdown));
+                    return true;
+                });
+        } else {
+            layoutCell->setFocusable(false);
+        }
+    }
     addBool(content, "settings/swap_ui_ab"_i18n, draft->swapUiAb,
             [draft](bool v) { draft->swapUiAb = v; });
     addBool(content, "settings/swap_ui_xy"_i18n, draft->swapUiXy,
             [draft](bool v) { draft->swapUiXy = v; });
 
-    addHeader(content, "settings/deadzone/title"_i18n);
     auto* dzL = addDetail(
         content, "settings/deadzone/stick_left"_i18n,
         fmt::format("{:.0f}%", draft->deadzoneLeft * 100.0f));
@@ -503,11 +701,10 @@ void openProfileEditor(const std::string& profileId,
     });
 
     addRumbleSlider(content, draft);
-    addHeader(content, "settings/single_joycon"_i18n);
     addBool(content, "settings/swap_stick_to_dpad"_i18n, draft->swapStickToDpad,
             [draft](bool v) { draft->swapStickToDpad = v; });
 
-    addHeader(content, "settings/keyboard"_i18n);
+    addHeader(content, "artemis/settings/profile_section_keyboard"_i18n);
     auto* kbType = addDetail(content, "settings/keyboard_type"_i18n,
                              keyboardTypeLabel(draft->keyboardType));
     kbType->registerClickAction([draft, kbType](brls::View*) {
@@ -587,10 +784,36 @@ void openProfileEditor(const std::string& profileId,
         return true;
     });
 
-    addHeader(content, "settings/mouse"_i18n);
-    addBool(content, "settings/touchscreen_mouse_mode"_i18n,
-            draft->touchscreenMouseMode,
-            [draft](bool v) { draft->touchscreenMouseMode = v; });
+    addHeader(content, "artemis/settings/profile_section_mouse"_i18n);
+    auto* pointerCell =
+        addDetail(content, "artemis/overlay/pointer_mode"_i18n,
+                  pointerModeLabel(draft->pointerMode));
+    pointerCell->registerClickAction([draft, pointerCell](brls::View*) {
+        using Mode = artemis::input::PointerMode;
+        const std::vector<Mode> modes = {
+            Mode::TrackpadNatural, Mode::TrackpadGaming, Mode::MultiTouch,
+            Mode::Absolute,        Mode::AbsoluteSwapped, Mode::Disabled};
+        std::vector<std::string> labels;
+        int selected = 0;
+        for (size_t i = 0; i < modes.size(); ++i) {
+            labels.push_back(pointerModeLabel(modes[i]));
+            if (modes[i] == draft->pointerMode)
+                selected = static_cast<int>(i);
+        }
+        auto* dropdown = new brls::Dropdown(
+            "artemis/overlay/pointer_mode"_i18n, labels,
+            [draft, pointerCell, modes](int index) {
+                if (index >= 0 && index < static_cast<int>(modes.size())) {
+                    draft->pointerMode = modes[static_cast<size_t>(index)];
+                    draft->touchscreenMouseMode =
+                        draft->pointerMode == Mode::MultiTouch;
+                }
+                pointerCell->setDetailText(pointerModeLabel(draft->pointerMode));
+            },
+            selected);
+        brls::Application::pushActivity(new brls::Activity(dropdown));
+        return true;
+    });
     addBool(content, "settings/swap_mouse_keys"_i18n, draft->swapMouseKeys,
             [draft](bool v) { draft->swapMouseKeys = v; });
     addBool(content, "settings/swap_mouse_scroll"_i18n, draft->swapMouseScroll,

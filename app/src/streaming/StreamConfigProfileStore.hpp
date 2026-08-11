@@ -2,6 +2,7 @@
 
 #include "Settings.hpp"
 #include "StreamConfigProfileNormalize.hpp"
+#include "features/input/PointerSettings.hpp"
 #include "video/VideoScale.hpp"
 
 #include <map>
@@ -22,8 +23,13 @@ struct StreamConfigProfile {
     VideoCodec videoCodec = H264;
     bool requestHdr = false;
     int decoderThreads = 4;
+    int nativeResolutionScale = 100;
+    bool useHwDecoding = true;
     bool forceFullRangeVideo = false;
     bool preventPacketLoss = false;
+    bool customResolutionEnabled = false;
+    int customWidth = 1920;
+    int customHeight = 1080;
 
     // Presentation
     artemis::video::ScaleMode scaleMode = artemis::video::ScaleMode::Fill;
@@ -38,14 +44,22 @@ struct StreamConfigProfile {
     bool playAudioOnPc = false;
     bool sops = false;
     bool terminateAppOnDisconnect = false;
+#ifdef __SWITCH__
+    AudioBackend audioBackend = AUDREN;
+#else
+    AudioBackend audioBackend = SDL;
+#endif
+    bool volumeAmplification = false;
 
     // Keyboard
     KeyboardType keyboardType = COMPACT;
     int keyboardLocale = 0;
     int keyboardFingers = 3;
 
-    // Mouse
+    // Mouse / pointer
     bool touchscreenMouseMode = false;
+    artemis::input::PointerMode pointerMode =
+        artemis::input::PointerMode::TrackpadNatural;
     bool swapMouseKeys = false;
     bool swapMouseScroll = false;
     bool swapMouseSticks = false;
@@ -58,6 +72,8 @@ struct StreamConfigProfile {
     float deadzoneRight = 0.0f;
     float rumbleForce = 1.0f;
     bool swapStickToDpad = false;
+    // Empty = leave current Settings layout unchanged on apply.
+    std::string mappingLayoutTitle;
 
     [[nodiscard]] int resolutionWidth() const {
         return resolutionHeight * 16 / 9;
@@ -66,7 +82,7 @@ struct StreamConfigProfile {
 
 class StreamConfigProfileStore {
 public:
-    static constexpr int SchemaVersion = 2;
+    static constexpr int SchemaVersion = 4;
     static StreamConfigProfileStore& instance();
 
     const std::vector<StreamConfigProfile>& list();

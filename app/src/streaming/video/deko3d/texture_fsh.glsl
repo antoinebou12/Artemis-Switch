@@ -16,7 +16,12 @@ layout (std140, binding = 0) uniform Transformation
 
 void main()
 {
-    vec2 uv = (vTextureCoord - u.uv_data.xy) * u.uv_data.zw;
+    // uv_data = (cropOriginXY / frameSize, frameSize / cropSize).
+    // Map the destination quad across the cropped rect in logical UV space,
+    // then rotate into the real NV12 texture when orientation != 0.
+    // (vTC - origin) * scale is wrong for Fill/zoom crops and blows up under
+    // 90/270 rotation when logical aspect no longer matches the screen.
+    vec2 uv = u.uv_data.xy + vTextureCoord / u.uv_data.zw;
     if (u.orientation.x == 90.0)
         uv = vec2(uv.y, 1.0 - uv.x);
     else if (u.orientation.x == 180.0)

@@ -91,6 +91,7 @@ void populateUvTransform(Transformation& transform,
         return;
     }
 
+    // Encoded for shader: uv = uv_data.xy + vTC / uv_data.zw
     transform.uv_data[0] = source.x / static_cast<float>(frameWidth);
     transform.uv_data[1] = source.y / static_cast<float>(frameHeight);
     transform.uv_data[2] = static_cast<float>(frameWidth) / source.width;

@@ -26,6 +26,26 @@ inline int normalizeProfileHeight(int height) {
     return best;
 }
 
+inline int normalizeNativeResolutionScale(int scale) {
+    switch (scale) {
+    case 50:
+    case 75:
+    case 100:
+    case 200:
+        return scale;
+    default:
+        return 100;
+    }
+}
+
+inline int normalizeCustomDimension(int value, int fallback) {
+    if (value < 160)
+        return fallback;
+    if (value > 7680)
+        return 7680;
+    return value;
+}
+
 struct ProfileNormalizeInput {
     std::string name;
     int resolutionHeight = 720;
@@ -37,7 +57,8 @@ struct ProfileNormalizeInput {
     float rumbleForce = 1.0f;
 };
 
-inline ProfileNormalizeInput normalizeProfileFields(ProfileNormalizeInput profile) {
+inline ProfileNormalizeInput
+normalizeProfileFields(ProfileNormalizeInput profile) {
     profile.resolutionHeight = normalizeProfileHeight(profile.resolutionHeight);
     if (profile.fps <= 0)
         profile.fps = 60;
