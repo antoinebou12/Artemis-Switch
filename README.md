@@ -32,11 +32,11 @@ Artemis Switch is based on [Moonlight-Switch](https://github.com/XITRIX/Moonligh
 
 | Area | What you get |
 |---|---|
-| **Stable video presentation** | Fit, Fill, Stretch, Zoom/Pan, and Full Range share one Switch presentation path |
-| **Video filtering** | FSR/EASU upscaling, RCAS sharpening, dithering, Full/Limited range conversion |
-| **Stream profiles** | 30 / 40 / 60 / 90 / 120 FPS always available; custom resolution and exact bitrate |
-| **Cleaner controls** | Quick Actions for frequent in-session tools; Options for live input/audio/filters/diagnostics |
-| **Performance & diagnostics** | Live latency, packet loss, render timing, frame queue, presentation mode, Auto Tune |
+| **Stable video presentation** | Fit, Fill, Stretch, Zoom/Pan, Rotation, and Full Range share one Switch presentation path |
+| **Video filtering** | FSR/EASU upscaling (FSR1 / SGSR1 / NIS), RCAS sharpening, dithering, Full/Limited range |
+| **Stream profiles** | Named full settings profiles (`profile.json`); per-host assign; import/export; 30–120 FPS |
+| **Cleaner controls** | Slim Quick Actions; Options for rotation, filters, pointer, host shortcuts, and more |
+| **Performance & diagnostics** | Live latency, packet loss, render timing, Switch clocks, Benchmark, then Debug / logs |
 | **Switch optimizations** | WLAN priority mode, frame-queue telemetry, motion/controller policy, NVDEC + deko3d |
 
 ---
@@ -45,7 +45,7 @@ Artemis Switch is based on [Moonlight-Switch](https://github.com/XITRIX/Moonligh
 
 ### Stable video presentation
 
-Fit, Fill, Stretch, Zoom/Pan, and Full Range use one Switch presentation path instead of switching between separate filtered and direct renderers.
+Fit, Fill, Stretch, Zoom/Pan, Rotation, and Full Range use one Switch presentation path instead of switching between separate filtered and direct renderers.
 
 | Mode | Behavior |
 |---|---|
@@ -53,6 +53,7 @@ Fit, Fill, Stretch, Zoom/Pan, and Full Range use one Switch presentation path in
 | **Fill** | Crops source UVs to cover the complete output |
 | **Stretch** | Maps the complete source to the full output viewport |
 | **Zoom / Pan** | Bounded GPU-side source crop with persistent state |
+| **Rotation** | 0° / 90° / 180° / 270° stream orientation (overlay Options); correct Fill crop UVs on deko3d |
 | **Full Range** | Requests `COLOR_RANGE_FULL` and keeps the video filtering pipeline available |
 
 The presentation path reuses existing NVDEC/NVTEGRA frame mappings and deko3d rendering infrastructure.
@@ -63,8 +64,8 @@ The existing Switch GPU filtering stack remains available with the presentation 
 
 | Filter | Role |
 |---|---|
-| **FSR / EASU** | Upscaling (enabled only when required GPU resources are valid) |
-| **RCAS** | Sharpening |
+| **FSR / EASU** | Upscaling (FSR1; also SGSR1 / NIS modes when enabled) |
+| **RCAS** | Sharpening (FSR RCAS) |
 | **Dithering** | Temporal / spatial dithering |
 | **Full / Limited** | Color-range conversion |
 
@@ -72,22 +73,28 @@ If filtering resources are unavailable, Artemis Switch keeps the selected Fit/Fi
 
 ### Stream profiles
 
+Named stream profiles store a full settings-style snapshot (video, presentation, stream/audio, controller, keyboard, mouse, pointer, keys mapping layout) in `profile.json`. Assign a profile per host; create/edit/delete from Host (RB / Y / X) or manage import/export from the app list.
+
 | Control | Options |
 |---|---|
 | **FPS** | 30 · 40 · 60 · 90 · 120 (always exposed; no separate high-FPS unlock) |
-| **Resolution** | Custom width / height override from settings |
-| **Bitrate** | Exact 1–100 Mbps configuration for the next stream connection |
-| **Codec** | H.264 and HEVC via the existing decoder path |
+| **Resolution** | Height presets and optional custom width / height (custom W/H hidden when off) |
+| **Scale / HW** | Native resolution scale; hardware decoding |
+| **Bitrate** | Exact kbps for the next stream connection |
+| **Codec** | H.264 · H.265 · AV1 (where supported) |
+| **Presentation** | Fit / Fill / Stretch, upscaling, RCAS, dithering |
+| **Input** | Pointer mode, mouse/keyboard options, deadzones, rumble, mapping layout |
 
 ### Cleaner controls
 
 | Surface | Contents |
 |---|---|
-| **Quick Actions** | Keyboard, performance overlay, pointer/mouse mode, disconnect, quit host app when available |
-| **Options** | Live input, audio, image filtering, benchmark, and diagnostic controls |
-| **Settings groups** | Stream profile · Presentation · Advanced stream/network · Motion |
+| **Quick Actions** | Keyboard; move window left/right; mouse; volume; touch screen; host shortcuts / server commands with short helper text |
+| **Options** | Rotation, scale mode, filters, pointer, live input, audio, and more |
+| **Host tabs** | Applications (default) · Host settings (web-config QR, stream profile) |
+| **Settings groups** | Stream · Presentation · Advanced stream/network · Motion · VPN |
 
-Presentation settings keep Fit/Fill/Stretch, Full Range, Zoom/Pan persistence, and current FSR/RCAS/dithering status together.
+Presentation settings keep Fit/Fill/Stretch, Rotation, Full Range, Zoom/Pan persistence, and current FSR/RCAS/dithering status together.
 
 ### Performance and diagnostics
 
@@ -95,13 +102,13 @@ The Performance page exposes live streaming and renderer information:
 
 | Metric | Description |
 |---|---|
-| Stream config | Resolution, FPS, codec, bitrate |
-| Network | Receive latency, packet loss |
-| Decode / render | Decode latency, rendered FPS, frame render time |
-| Post-process | Post-processing, FSR, RCAS, dithering, GPU render time |
-| Frame queue | Current / target / capacity |
-| Presentation | Active Fit / Fill / Stretch mode and Full / Limited range |
-| Tools | Benchmark controls, Auto Tune |
+| Network | Receive latency, packet loss, Wi‑Fi signal / graph |
+| Decode / render | Decode / render latency, host / received / decoded / rendered FPS |
+| Frame queue | Current queue depth |
+| GPU / presentation | GPU render time and active Fit / Fill / Stretch mode |
+| Switch runtime | Operation mode, CPU / GPU / memory clocks, battery |
+| Benchmark | Start / stop / save / reset |
+| Debug | On-screen debug stats and logs (after Benchmark) |
 
 ### Nintendo Switch optimizations
 
@@ -122,12 +129,14 @@ The Performance page exposes live streaming and renderer information:
 | Standard Moonlight / Sunshine streaming | ✅ Available | GameStream remains the compatibility path |
 | Switch NVDEC + deko3d | ✅ Build tested | Existing renderer preserved; Artemis presentation path integrated |
 | Fit / Fill / Stretch | ✅ Build + unit tested | Fill and Stretch retain filtering; Fit uses a black letterbox viewport |
-| Zoom & Pan | 🟡 Device validation | GPU source crop with persistent state |
+| Zoom & Pan | ✅ Available | GPU source crop with persistent state |
+| Rotation | ✅ Available | Overlay Options; deko3d Fill crop UVs corrected for 90° / 270° |
 | Full-range video | 🟡 Device validation | Host request + deko3d full-range YUV conversion |
+| Named stream profiles | ✅ Integrated | Full settings snapshot, per-host assign, import/export |
 | Joy-Con / Pro Controller motion | ✅ Integrated | Existing Moonlight motion forwarding is policy-gated |
 | Multiple controllers | ✅ Build + unit tested | Five-player active mask, hot-plug, independent player input |
 | Console-motion fallback | ⛔ Disabled by default | API detectable; console motion vectors not mapped safely yet |
-| Live performance view | ✅ Integrated | Existing in-game Borealis overlay |
+| Live performance view | ✅ Integrated | Overlay Performance tab (Benchmark, then Debug / logs) |
 | Benchmark runtime | ✅ Integrated | Live sampling, P50/P95/P99, frame-queue faults, stability score |
 | Benchmark JSON / CSV | ✅ Integrated | Includes Switch runtime metadata when services are available |
 | Apollo capability detection | 🟡 Partial | Conservative detection with Sunshine-safe fallback |
@@ -160,12 +169,14 @@ Sunshine / Apollo host
 │                                                               │
 │ Borealis UI                                                    │
 │   ├── Artemis settings                                        │
-│   ├── Performance                                             │
+│   ├── Host Applications / Host settings                       │
+│   ├── Stream profiles                                         │
+│   ├── Performance (Benchmark → Debug)                         │
 │   └── Quick Actions                                           │
 │                                                               │
 │ Switch runtime                                                 │
 │   ├── FFmpeg / NVDEC                                          │
-│   ├── deko3d (+ FSR / RCAS / dither when available)           │
+│   ├── deko3d (+ Fit/Fill/Stretch/Zoom/Rotation/FSR/RCAS)      │
 │   └── Joy-Con / controller input                              │
 └───────────────────────────────────────────────────────────────┘
 ```
@@ -343,7 +354,7 @@ Sunshine and standard Moonlight/GameStream behavior remain the compatibility bas
 ## Known limitations
 
 - Multiple simultaneous controllers need multiplayer confirmation against each supported host.
-- Fit, Zoom/Pan, and full-range output still benefit from visual verification across host resolutions.
+- Full-range output still benefits from visual verification across host resolutions.
 - Console-motion fallback remains disabled until libnx console sensor vectors are mapped safely.
 - Apollo virtual-display, server-command, and clipboard operations stay gated until verified.
 - Benchmark scoring still needs tuning from real Switch measurements.
