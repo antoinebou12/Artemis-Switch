@@ -7,11 +7,14 @@
 
 #include <borealis.hpp>
 #include <fmt/format.h>
+#include <functional>
 
 using namespace brls::literals;
 
 namespace artemis::streaming {
 namespace {
+
+enum class ProfileListKind { Picker, Manage };
 
 brls::Box* makePageColumn() {
     auto* column = new brls::Box(brls::Axis::COLUMN);
@@ -40,32 +43,86 @@ brls::DetailCell* addRow(brls::Box* column, const std::string& text,
     return cell;
 }
 
+void popTimesThen(int count, const std::function<void()>& then) {
+    if (count <= 0) {
+        if (then)
+            then();
+        return;
+    }
+    brls::Application::popActivity(
+        brls::TransitionAnimation::NONE, [count, then] {
+            popTimesThen(count - 1, then);
+        });
+}
+
+void reopenProfileList(ProfileListKind kind, const std::string& hostKey,
+                       const std::function<void()>& onChanged, int popCount) {
+    // Dialog/editor dismiss animations finish first; rebuild on next tick.
+    brls::sync([kind, hostKey, onChanged, popCount] {
+        if (onChanged)
+            onChanged();
+        popTimesThen(popCount, [kind, hostKey, onChanged] {
+            if (kind == ProfileListKind::Manage)
+                open_manage_host_profile(hostKey, onChanged);
+            else
+                open_host_profile_picker(hostKey, onChanged);
+        });
+    });
+}
+
 void confirmDeleteProfile(const std::string& profileId,
                           const std::string& hostKey,
-                          const std::function<void()>& onChanged,
-                          const std::function<void()>& afterDelete) {
+                          ProfileListKind kind, int popCount,
+                          const std::function<void()>& onChanged) {
     auto* confirm = new brls::Dialog("host/delete_profile_message"_i18n);
     confirm->addButton("common/cancel"_i18n, [] {});
     confirm->addButton("common/remove"_i18n,
-                       [profileId, hostKey, onChanged, afterDelete] {
-                           auto& store = StreamConfigProfileStore::instance();
-                           store.remove(profileId);
-                           if (!hostKey.empty() &&
-                               store.selectedForHost(hostKey) == profileId) {
-                               store.clearSelectedForHost(hostKey);
-                           }
-                           if (onChanged)
-                               onChanged();
-                           if (afterDelete)
-                               afterDelete();
+                       [profileId, hostKey, kind, popCount, onChanged] {
+                           StreamConfigProfileStore::instance().remove(
+                               profileId);
+                           reopenProfileList(kind, hostKey, onChanged,
+                                             popCount);
                        });
     confirm->open();
 }
 
+void open_profile_actions_page(const StreamConfigProfile& profile,
+                               const std::string& hostKey,
+                               const std::function<void()>& onChanged) {
+    auto* column = makePageColumn();
+    const auto profileId = profile.id;
+
+    addRow(column, "common/edit"_i18n)
+        ->registerClickAction([profileId, hostKey, onChanged](brls::View*) {
+            openProfileEditor(profileId, hostKey, onChanged);
+            return true;
+        });
+
+    addRow(column, "artemis/settings/duplicate_profile"_i18n)
+        ->registerClickAction([profileId, hostKey, onChanged](brls::View*) {
+            auto& store = StreamConfigProfileStore::instance();
+            store.duplicate(profileId, {});
+            // Pop actions + manage, then reopen a fresh manage list.
+            reopenProfileList(ProfileListKind::Manage, hostKey, onChanged, 2);
+            return true;
+        });
+
+    addRow(column, "common/remove"_i18n)
+        ->registerClickAction([profileId, hostKey, onChanged](brls::View*) {
+            // Pop dialog (auto) + actions + manage after confirm.
+            confirmDeleteProfile(profileId, hostKey, ProfileListKind::Manage, 2,
+                                 onChanged);
+            return true;
+        });
+
+    pushContentPage(
+        fmt::format("{} — {}", "host/manage_profile"_i18n, profile.name),
+        column);
+}
+
 void wireQuickProfileActions(brls::DetailCell* cell, const std::string& profileId,
-                             const std::string& hostKey,
-                             const std::function<void()>& onChanged,
-                             const std::function<void()>& afterDelete = {}) {
+                             const std::string& hostKey, ProfileListKind kind,
+                             const std::function<void()>& onChanged) {
     cell->registerAction(
         "host/edit_profile"_i18n, brls::BUTTON_Y,
         [profileId, hostKey, onChanged](brls::View*) {
@@ -74,8 +131,9 @@ void wireQuickProfileActions(brls::DetailCell* cell, const std::string& profileI
         });
     cell->registerAction(
         "host/delete_profile"_i18n, brls::BUTTON_X,
-        [profileId, hostKey, onChanged, afterDelete](brls::View*) {
-            confirmDeleteProfile(profileId, hostKey, onChanged, afterDelete);
+        [profileId, hostKey, kind, onChanged](brls::View*) {
+            // Only the list page needs popping; dialog dismisses itself.
+            confirmDeleteProfile(profileId, hostKey, kind, 1, onChanged);
             return true;
         });
 }
@@ -113,10 +171,8 @@ void open_host_profile_picker(const std::string& hostKey,
         const bool selected = !currentId.empty() && profile.id == currentId;
         auto* row =
             addRow(column, profile.name, selected ? "hints/on"_i18n : "");
-        // Y edit / X delete on the focused row; A still selects for this host.
-        wireQuickProfileActions(
-            row, profile.id, hostKey, onChanged,
-            [] { brls::Application::popActivity(); });
+        wireQuickProfileActions(row, profile.id, hostKey,
+                                ProfileListKind::Picker, onChanged);
         row->registerClickAction(
             [hostKey, id = profile.id, onChanged](brls::View*) {
                 StreamConfigProfileStore::instance().setSelectedForHost(
@@ -155,29 +211,29 @@ void open_manage_host_profile(const std::string& hostKey,
     auto& store = StreamConfigProfileStore::instance();
     const auto profiles = store.list();
 
+    if (profiles.empty()) {
+        addRow(column, "host/manage_profile_none"_i18n)->setFocusable(false);
+    }
+
     for (const auto& profile : profiles) {
         auto* row = addRow(
             column, profile.name,
             fmt::format("{}p {}fps", profile.resolutionHeight, profile.fps));
-        wireQuickProfileActions(
-            row, profile.id, hostKey, onChanged,
-            [hostKey, onChanged] {
-                brls::Application::popActivity(
-                    brls::TransitionAnimation::NONE, [hostKey, onChanged] {
-                        open_manage_host_profile(hostKey, onChanged);
-                    });
-            });
-        // A opens the editor immediately.
-        row->registerClickAction(
-            [id = profile.id, hostKey, onChanged](brls::View*) {
-                openProfileEditor(id, hostKey, onChanged);
-                return true;
-            });
+        wireQuickProfileActions(row, profile.id, hostKey,
+                                ProfileListKind::Manage, onChanged);
+        // A opens Edit / Duplicate / Remove.
+        row->registerClickAction([profile, hostKey, onChanged](brls::View*) {
+            open_profile_actions_page(profile, hostKey, onChanged);
+            return true;
+        });
     }
 
     addRow(column, "artemis/settings/create_profile"_i18n)
         ->registerClickAction([hostKey, onChanged](brls::View*) {
-            openProfileEditor({}, hostKey, onChanged);
+            openProfileEditor({}, hostKey, [hostKey, onChanged] {
+                reopenProfileList(ProfileListKind::Manage, hostKey, onChanged,
+                                  1);
+            });
             return true;
         });
     addRow(column, "artemis/settings/export_profiles"_i18n)
@@ -204,12 +260,8 @@ void open_manage_host_profile(const std::string& hostKey,
                     if (StreamConfigProfileStore::instance().importJson(
                             path, true, &error)) {
                         showAlert("artemis/settings/import_profiles_done"_i18n);
-                        if (onChanged)
-                            onChanged();
-                        brls::Application::popActivity(
-                            brls::TransitionAnimation::NONE, [hostKey, onChanged] {
-                                open_manage_host_profile(hostKey, onChanged);
-                            });
+                        reopenProfileList(ProfileListKind::Manage, hostKey,
+                                          onChanged, 1);
                     } else {
                         showError(
                             error.empty()

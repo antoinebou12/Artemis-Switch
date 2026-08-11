@@ -617,10 +617,13 @@ void openProfileEditor(const std::string& profileId,
                 store.setSelectedForHost(assignHostKey, id);
             // Keep live Settings in sync for every field the editor exposes.
             store.applyProfile(*draft);
-            if (onChanged)
-                onChanged();
             delete draft;
-            brls::Application::popActivity();
+            // Pop first so list refresh callbacks see the correct stack.
+            brls::Application::popActivity(brls::TransitionAnimation::FADE,
+                                           [onChanged] {
+                                               if (onChanged)
+                                                   onChanged();
+                                           });
             return true;
         });
     auto* cancelCell = addDetail(content, "common/cancel"_i18n, "");

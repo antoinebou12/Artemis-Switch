@@ -544,7 +544,7 @@ bool StreamConfigProfileStore::remove(const std::string& id) {
         m_activeProfileId =
             m_profiles.empty() ? std::string{} : m_profiles.front().id;
 
-    seedDefaultsIfEmpty();
+    // Do not re-seed here: empty after delete must stay empty so remove works.
     save();
     return true;
 }
