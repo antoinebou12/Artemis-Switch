@@ -129,12 +129,17 @@ StreamingView::StreamingView(const Host& host, const AppInfo& app) : host(host),
             if (!selectedProfileId.empty())
                 profileStore.applyToSettings(selectedProfileId);
 
-            const auto stored = artemis::apollo::ApolloHostOptionsStore::instance().get(hostKey);
+            artemis::apollo::ApolloHostOptions stored =
+                artemis::apollo::ApolloHostOptionsStore::instance().get(hostKey);
             int profileWidth = Application::windowWidth;
             int profileHeight = Application::windowHeight;
             if (auto named = profileStore.get(selectedProfileId)) {
                 profileWidth = named->resolutionWidth();
                 profileHeight = named->resolutionHeight;
+                stored = named->apolloOptions();
+                artemis::apollo::ApolloHostOptionsStore::instance().set(
+                    hostKey,
+                    artemis::apollo::validateApolloHostOptions(stored));
             } else {
                 const auto customProfile =
                     artemis::streaming::StreamProfileStore::instance().get();
@@ -146,7 +151,14 @@ StreamingView::StreamingView(const Host& host, const AppInfo& app) : host(host),
                     profileWidth = artemis::streaming::streamWidthFromHeight(
                         profileHeight, Settings::instance().aspect_ratio());
                 }
+                // Fall back to Artemis Settings Apollo defaults.
+                if (stored.target == artemis::apollo::VirtualDisplayTarget::Off &&
+                    stored.scaleFactor == 100) {
+                    stored = artemis::apollo::ApolloHostOptionsStore::instance()
+                                 .get("default");
+                }
             }
+            stored = artemis::apollo::validateApolloHostOptions(stored);
             const auto profile = artemis::apollo::resolveVirtualDisplay(
                 stored, profileWidth, profileHeight);
             APOLLO_LAUNCH_OPTIONS launch;

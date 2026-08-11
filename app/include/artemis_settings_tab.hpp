@@ -27,6 +27,9 @@ private:
     BRLS_BIND(brls::BooleanCell, lowLatencyPacing, "low_latency_pacing");
     BRLS_BIND(brls::SelectorCell, packetSize, "packet_size");
 
+    BRLS_BIND(brls::DetailCell, apolloVirtualDisplay, "apollo_virtual_display");
+    BRLS_BIND(brls::DetailCell, apolloScaleFactor, "apollo_scale_factor");
+
     BRLS_BIND(brls::SelectorCell, scaleMode, "scale_mode");
 
     BRLS_BIND(brls::BooleanCell, forwardMotion, "forward_motion");

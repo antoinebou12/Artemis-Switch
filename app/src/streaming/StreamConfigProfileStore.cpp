@@ -2,6 +2,7 @@
 
 #include "StreamConfigProfileNormalize.hpp"
 #include "StreamProfileStore.hpp"
+#include "features/apollo/ApolloHostOptionsStore.hpp"
 #include "features/input/InputSettingsStore.hpp"
 #include "features/stream/AdvancedStreamOptionsStore.hpp"
 #include "video/VideoScaleStore.hpp"
@@ -147,6 +148,18 @@ json_t* profileToJson(const StreamConfigProfile& profile) {
                         profile.preventPacketLoss ? json_true() : json_false());
     json_object_set_new(item, "low_latency_pacing",
                         profile.lowLatencyPacing ? json_true() : json_false());
+    json_object_set_new(
+        item, "virtual_display_target",
+        json_string(artemis::apollo::virtualDisplayTargetName(
+            profile.virtualDisplayTarget)));
+    json_object_set_new(item, "virtual_display_custom_width",
+                        json_integer(profile.virtualDisplayCustomWidth));
+    json_object_set_new(item, "virtual_display_custom_height",
+                        json_integer(profile.virtualDisplayCustomHeight));
+    json_object_set_new(item, "virtual_display_refresh_rate",
+                        json_integer(profile.virtualDisplayRefreshRate));
+    json_object_set_new(item, "apollo_scale_factor",
+                        json_integer(profile.apolloScaleFactor));
     json_object_set_new(item, "packet_size",
                         json_integer(artemis::stream::clampPacketSize(
                             profile.packetSize)));
@@ -280,6 +293,29 @@ StreamConfigProfile profileFromJson(json_t* object) {
         profile.preventPacketLoss = jsonToBool(loss);
     if (json_t* lowLatency = json_object_get(object, "low_latency_pacing"))
         profile.lowLatencyPacing = jsonToBool(lowLatency);
+    if (json_t* vdTarget = json_object_get(object, "virtual_display_target");
+        json_is_string(vdTarget)) {
+        artemis::apollo::VirtualDisplayTarget target{};
+        if (artemis::apollo::virtualDisplayTargetFromName(
+                json_string_value(vdTarget), target))
+            profile.virtualDisplayTarget = target;
+    }
+    if (json_t* vdW = json_object_get(object, "virtual_display_custom_width");
+        json_is_integer(vdW))
+        profile.virtualDisplayCustomWidth =
+            static_cast<int>(json_integer_value(vdW));
+    if (json_t* vdH = json_object_get(object, "virtual_display_custom_height");
+        json_is_integer(vdH))
+        profile.virtualDisplayCustomHeight =
+            static_cast<int>(json_integer_value(vdH));
+    if (json_t* vdHz = json_object_get(object, "virtual_display_refresh_rate");
+        json_is_integer(vdHz))
+        profile.virtualDisplayRefreshRate =
+            static_cast<int>(json_integer_value(vdHz));
+    if (json_t* scale = json_object_get(object, "apollo_scale_factor");
+        json_is_integer(scale))
+        profile.apolloScaleFactor =
+            static_cast<int>(json_integer_value(scale));
     if (json_t* packetSize = json_object_get(object, "packet_size");
         json_is_integer(packetSize))
         profile.packetSize = artemis::stream::clampPacketSize(
@@ -474,6 +510,11 @@ void applyProfileToSettings(const StreamConfigProfile& profile) {
     auto pointer = artemis::input::InputSettingsStore::instance().pointer();
     pointer.mode = profile.pointerMode;
     artemis::input::InputSettingsStore::instance().setPointer(pointer);
+
+    // Keep shared Artemis Settings Apollo defaults aligned with the profile.
+    artemis::apollo::ApolloHostOptionsStore::instance().set(
+        "default",
+        artemis::apollo::validateApolloHostOptions(profile.apolloOptions()));
 }
 
 } // namespace
@@ -514,6 +555,17 @@ StreamConfigProfile normalizeProfile(StreamConfigProfile profile) {
 
     profile.touchscreenMouseMode =
         legacyTouchscreenFromPointerMode(profile.pointerMode);
+
+    profile.virtualDisplayCustomWidth =
+        normalizeCustomDimension(profile.virtualDisplayCustomWidth, 1280);
+    profile.virtualDisplayCustomHeight =
+        normalizeCustomDimension(profile.virtualDisplayCustomHeight, 720);
+    if (profile.virtualDisplayRefreshRate <= 0)
+        profile.virtualDisplayRefreshRate = 60;
+    const int scale = profile.apolloScaleFactor;
+    if (scale != 50 && scale != 75 && scale != 100 && scale != 125 &&
+        scale != 150)
+        profile.apolloScaleFactor = 100;
 
     return profile;
 }
@@ -613,6 +665,10 @@ StreamConfigProfileStore::snapshotFromSettings(const std::string& name) {
     profile.customWidth = custom.width;
     profile.customHeight = custom.height;
 
+    profile.setApolloOptions(
+        artemis::apollo::validateApolloHostOptions(
+            artemis::apollo::ApolloHostOptionsStore::instance().get("default")));
+
     return normalizeProfile(profile);
 }
 
@@ -711,6 +767,15 @@ bool StreamConfigProfileStore::update(const StreamConfigProfile& profile) {
             continue;
         existing = normalizeProfile(profile);
         existing.id = profile.id;
+        const auto apollo =
+            artemis::apollo::validateApolloHostOptions(existing.apolloOptions());
+        artemis::apollo::ApolloHostOptionsStore::instance().set("default",
+                                                               apollo);
+        for (const auto& [hostKey, selectedId] : m_hostProfile) {
+            if (selectedId == existing.id)
+                artemis::apollo::ApolloHostOptionsStore::instance().set(
+                    hostKey, apollo);
+        }
         save();
         return true;
     }
@@ -779,6 +844,12 @@ void StreamConfigProfileStore::setSelectedForHost(
         m_hostProfile.erase(hostKey);
     } else {
         m_hostProfile[hostKey] = profileId;
+        if (auto profile = get(profileId)) {
+            artemis::apollo::ApolloHostOptionsStore::instance().set(
+                hostKey,
+                artemis::apollo::validateApolloHostOptions(
+                    profile->apolloOptions()));
+        }
     }
     save();
 }

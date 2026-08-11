@@ -22,6 +22,10 @@
     <brls:Header title="@i18n/artemis/settings/resolution_presets" paddingTop="60" lineTop="1px"/>
     <brls:SelectorCell id="resolution_preset"/>
 
+    <brls:Header title="@i18n/artemis/overlay/apollo_options" paddingTop="60" lineTop="1px"/>
+    <brls:DetailCell id="apollo_virtual_display"/>
+    <brls:DetailCell id="apollo_scale_factor"/>
+
     <brls:Header title="@i18n/artemis/settings/presentation" paddingTop="60" lineTop="1px"/>
     <brls:SelectorCell id="scale_mode"/>
     <brls:BooleanCell id="remember_zoom_pan"/>

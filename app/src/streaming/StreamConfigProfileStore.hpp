@@ -3,6 +3,7 @@
 #include "Settings.hpp"
 #include "StreamAspectRatio.hpp"
 #include "StreamConfigProfileNormalize.hpp"
+#include "features/apollo/ApolloHostOptions.hpp"
 #include "features/input/PointerSettings.hpp"
 #include "video/VideoScale.hpp"
 
@@ -82,14 +83,40 @@ struct StreamConfigProfile {
     // Empty = leave current Settings layout unchanged on apply.
     std::string mappingLayoutTitle;
 
+    // Apollo virtual display + scale (owned by profile/settings, not Host tab).
+    artemis::apollo::VirtualDisplayTarget virtualDisplayTarget =
+        artemis::apollo::VirtualDisplayTarget::Off;
+    int virtualDisplayCustomWidth = 1280;
+    int virtualDisplayCustomHeight = 720;
+    int virtualDisplayRefreshRate = 60;
+    int apolloScaleFactor = 100;
+
     [[nodiscard]] int resolutionWidth() const {
         return streamWidthFromHeight(resolutionHeight, aspectRatio);
+    }
+
+    [[nodiscard]] artemis::apollo::ApolloHostOptions apolloOptions() const {
+        artemis::apollo::ApolloHostOptions options;
+        options.target = virtualDisplayTarget;
+        options.customWidth = virtualDisplayCustomWidth;
+        options.customHeight = virtualDisplayCustomHeight;
+        options.refreshRate = virtualDisplayRefreshRate;
+        options.scaleFactor = apolloScaleFactor > 0 ? apolloScaleFactor : 100;
+        return options;
+    }
+
+    void setApolloOptions(const artemis::apollo::ApolloHostOptions& options) {
+        virtualDisplayTarget = options.target;
+        virtualDisplayCustomWidth = options.customWidth;
+        virtualDisplayCustomHeight = options.customHeight;
+        virtualDisplayRefreshRate = options.refreshRate;
+        apolloScaleFactor = options.scaleFactor > 0 ? options.scaleFactor : 100;
     }
 };
 
 class StreamConfigProfileStore {
 public:
-    static constexpr int SchemaVersion = 8;
+    static constexpr int SchemaVersion = 9;
     static StreamConfigProfileStore& instance();
 
     const std::vector<StreamConfigProfile>& list();

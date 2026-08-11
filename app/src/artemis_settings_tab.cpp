@@ -166,9 +166,10 @@ void applyResolutionPreset(int selected) {
 ArtemisSettingsTab::ArtemisSettingsTab() {
     inflateFromXMLRes("xml/tabs/artemis_settings.xml");
 
-    const std::array<DetailCell*, 13> compactRows = {
+    const std::array<DetailCell*, 15> compactRows = {
         customResolution, width, height, exactBitrate,
         frameRate, forceFullRange, preventPacketLoss, packetSize,
+        apolloVirtualDisplay, apolloScaleFactor,
         scaleMode, rememberZoomPan, resetZoomPan, forwardMotion,
         consoleMotionFallback};
     for (auto* row : compactRows) {
@@ -218,6 +219,130 @@ ArtemisSettingsTab::ArtemisSettingsTab() {
             customResolution->setOn(true);
             refreshValues();
         });
+
+#if ARTEMIS_HAS_APOLLO_HOST_OPTIONS
+    auto apolloVdLabel = [](artemis::apollo::VirtualDisplayTarget target) {
+        using Target = artemis::apollo::VirtualDisplayTarget;
+        switch (target) {
+        case Target::Off:
+            return "artemis/overlay/vd_off"_i18n;
+        case Target::CurrentProfile:
+            return "artemis/overlay/vd_current"_i18n;
+        case Target::Handheld:
+            return "artemis/overlay/vd_handheld"_i18n;
+        case Target::Docked:
+            return "artemis/overlay/vd_docked"_i18n;
+        case Target::PortraitHandheld:
+            return "artemis/overlay/vd_portrait_handheld"_i18n;
+        case Target::PortraitDocked:
+            return "artemis/overlay/vd_portrait_docked"_i18n;
+        case Target::Custom:
+            return "artemis/overlay/vd_custom"_i18n;
+        }
+        return "artemis/overlay/vd_off"_i18n;
+    };
+    auto refreshApolloRows = [this, apolloVdLabel] {
+        const auto options =
+            artemis::apollo::validateApolloHostOptions(
+                artemis::apollo::ApolloHostOptionsStore::instance().get(
+                    "default"));
+        apolloVirtualDisplay->setText("artemis/overlay/virtual_display"_i18n);
+        apolloVirtualDisplay->setDetailText(apolloVdLabel(options.target));
+        apolloScaleFactor->setText("artemis/overlay/apollo_scale_factor"_i18n);
+        apolloScaleFactor->setDetailText(
+            fmt::format("{}%", options.scaleFactor > 0 ? options.scaleFactor
+                                                       : 100));
+    };
+    refreshApolloRows();
+    apolloVirtualDisplay->registerClickAction(
+        [this, apolloVdLabel, refreshApolloRows](View*) {
+            using Target = artemis::apollo::VirtualDisplayTarget;
+            const std::vector<Target> values = {
+                Target::Off,        Target::CurrentProfile, Target::Handheld,
+                Target::Docked,     Target::PortraitHandheld,
+                Target::PortraitDocked, Target::Custom};
+            std::vector<std::string> labels;
+            int selected = 0;
+            auto current =
+                artemis::apollo::ApolloHostOptionsStore::instance().get(
+                    "default");
+            for (size_t i = 0; i < values.size(); ++i) {
+                labels.push_back(apolloVdLabel(values[i]));
+                if (values[i] == current.target)
+                    selected = static_cast<int>(i);
+            }
+            auto* dropdown = new Dropdown(
+                "artemis/overlay/virtual_display"_i18n, labels,
+                [refreshApolloRows, values](int index) {
+                    if (index < 0 ||
+                        index >= static_cast<int>(values.size()))
+                        return;
+                    auto options =
+                        artemis::apollo::ApolloHostOptionsStore::instance()
+                            .get("default");
+                    options.target = values[static_cast<size_t>(index)];
+                    if (options.target == Target::Custom) {
+                        Application::getImeManager()->openForText(
+                            [refreshApolloRows,
+                             options](const std::string& text) mutable {
+                                if (!artemis::apollo::parseVirtualDisplaySpec(
+                                        text, options, nullptr))
+                                    return;
+                                options.target = Target::Custom;
+                                artemis::apollo::ApolloHostOptionsStore::
+                                    instance()
+                                        .set("default", options);
+                                refreshApolloRows();
+                            },
+                            "artemis/overlay/vd_custom"_i18n,
+                            "artemis/overlay/vd_custom_prompt"_i18n, 32,
+                            fmt::format("{}x{}@{}", options.customWidth,
+                                        options.customHeight,
+                                        options.refreshRate),
+                            0);
+                        return;
+                    }
+                    artemis::apollo::ApolloHostOptionsStore::instance().set(
+                        "default", options);
+                    refreshApolloRows();
+                },
+                selected);
+            Application::pushActivity(new Activity(dropdown));
+            return true;
+        });
+    apolloScaleFactor->registerClickAction([refreshApolloRows](View*) {
+        constexpr std::array values = {50, 75, 100, 125, 150};
+        std::vector<std::string> labels;
+        int selected = 2;
+        auto current =
+            artemis::apollo::ApolloHostOptionsStore::instance().get("default");
+        for (size_t i = 0; i < values.size(); ++i) {
+            labels.push_back(fmt::format("{}%", values[i]));
+            if (values[i] == current.scaleFactor)
+                selected = static_cast<int>(i);
+        }
+        auto* dropdown = new Dropdown(
+            "artemis/overlay/apollo_scale_factor"_i18n, labels,
+            [refreshApolloRows, values](int index) {
+                if (index < 0 ||
+                    index >= static_cast<int>(values.size()))
+                    return;
+                auto options =
+                    artemis::apollo::ApolloHostOptionsStore::instance().get(
+                        "default");
+                options.scaleFactor = values[static_cast<size_t>(index)];
+                artemis::apollo::ApolloHostOptionsStore::instance().set(
+                    "default", options);
+                refreshApolloRows();
+            },
+            selected);
+        Application::pushActivity(new Activity(dropdown));
+        return true;
+    });
+#else
+    apolloVirtualDisplay->setVisibility(Visibility::GONE);
+    apolloScaleFactor->setVisibility(Visibility::GONE);
+#endif
 
 #if ARTEMIS_HAS_ADVANCED_STREAM
     const auto advanced = artemis::stream::AdvancedStreamOptionsStore::instance().get();
