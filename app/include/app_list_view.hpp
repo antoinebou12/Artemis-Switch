@@ -19,7 +19,7 @@
 
 using namespace brls;
 
-class AppListView : public Box {
+class AppListView : public TabFrame {
   public:
     AppListView(const Host& host);
 
@@ -32,14 +32,15 @@ class AppListView : public Box {
     View* hintView = nullptr;
     DetailCell* webConfig = nullptr;
     DetailCell* streamProfile = nullptr;
+    Box* appsContainer = nullptr;
+    Box* hostContainer = nullptr;
     std::optional<AppInfo> currentApp;
     bool loading = false;
     bool inputBlocked = false;
     LoadingOverlay* loader = nullptr;
     void blockInput(bool block);
 
-    GridView* gridView;
-    BRLS_BIND(Box, container, "container");
+    GridView* gridView = nullptr;
 
     void setCurrentApp(const AppInfo& app);
     void terninateApp();

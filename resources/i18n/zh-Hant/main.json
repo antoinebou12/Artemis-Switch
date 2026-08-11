@@ -1,4 +1,4 @@
-{
+﻿{
     "about": {
         "about": "Moonlight-Switch是Nintendo Switch平台的一個基於Moonlight-Common-C的第三方遊戲串流用戶端",
         "link_gbatemp": "GbaTemp頁面",
@@ -194,5 +194,5 @@
         "favorites": "最愛",
         "settings": "設定"
     },
-    "title": "Moonlight"
+    "title": "Artemis Switch"
 }

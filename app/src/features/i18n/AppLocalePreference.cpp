@@ -48,15 +48,22 @@ std::vector<std::string> settings_path_candidates() {
     std::vector<std::string> paths;
 
 #ifdef __SWITCH__
+    paths.emplace_back("sdmc:/switch/Artemis-Switch/settings.json");
     paths.emplace_back("sdmc:/switch/Moonlight-Switch/settings.json");
 #else
     if (const char* home = std::getenv("HOME")) {
+        paths.push_back((std::filesystem::path(home) / "Artemis-Switch" /
+                         "settings.json")
+                            .string());
         paths.push_back((std::filesystem::path(home) / "Moonlight-Switch" /
                          "settings.json")
                             .string());
     }
 #if defined(_WIN32)
     if (const char* profile = std::getenv("USERPROFILE")) {
+        paths.push_back((std::filesystem::path(profile) / "Artemis-Switch" /
+                         "settings.json")
+                            .string());
         paths.push_back((std::filesystem::path(profile) / "Moonlight-Switch" /
                          "settings.json")
                             .string());

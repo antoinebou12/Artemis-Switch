@@ -1,4 +1,4 @@
-{
+﻿{
     "about": {
         "about": "Moonlight-Switch - это сторонний клиент потоковой передачи игр для Nintendo Switch основанный на Moonlight-Common-C",
         "link_gbatemp": "Страница на GbaTemp",
@@ -194,5 +194,5 @@
         "favorites": "Избранные",
         "settings": "Настройки"
     },
-    "title": "Moonlight"
+    "title": "Artemis Switch"
 }

@@ -14,7 +14,6 @@
 #include "utils/UsableMac.hpp"
 
 AppListView::AppListView(const Host& host) : host(host) {
-    this->inflateFromXMLRes("xml/views/app_list_view.xml");
     hostProfileKey = artemis::streaming::host_profile_key(host);
 
     auto* label = new brls::Label();
@@ -33,7 +32,17 @@ AppListView::AppListView(const Host& host) : host(host) {
     hintView = holder;
     getAppletFrameItem()->setHintView(hintView);
 
-    container->setHideHighlight(true);
+    appsContainer = new Box(Axis::COLUMN);
+    appsContainer->setAlignItems(AlignItems::STRETCH);
+    appsContainer->setPadding(24, 24, 24, 24);
+    appsContainer->setHideHighlight(true);
+    gridView = new GridView();
+    appsContainer->addView(gridView);
+
+    hostContainer = new Box(Axis::COLUMN);
+    hostContainer->setAlignItems(AlignItems::STRETCH);
+    hostContainer->setPadding(24, 24, 24, 24);
+    hostContainer->setHideHighlight(true);
 
     webConfig = new DetailCell();
     webConfig->setText("host/web_config"_i18n);
@@ -52,7 +61,7 @@ AppListView::AppListView(const Host& host) : host(host) {
         });
         return true;
     });
-    container->addView(webConfig);
+    hostContainer->addView(webConfig);
     refreshWebConfigVisibility();
 
     streamProfile = new DetailCell();
@@ -65,13 +74,15 @@ AppListView::AppListView(const Host& host) : host(host) {
             hostProfileKey, [this] { refreshStreamProfileLabel(); });
         return true;
     });
-    container->addView(streamProfile);
+    hostContainer->addView(streamProfile);
 
-    gridView = new GridView();
-    container->addView(gridView);
+    addTab("host/tab_applications"_i18n, [this] { return this->appsContainer; });
+    addTab("host/tab_host"_i18n, [this] { return this->hostContainer; });
+    focusTab(0);
+
     loader = new LoadingOverlay(this);
 
-    auto closeCurrentAction = [this, host](View* view) {
+    auto closeCurrentAction = [this](View*) {
         if (currentApp.has_value()) {
             this->terninateApp();
         }
@@ -85,7 +96,7 @@ AppListView::AppListView(const Host& host) : host(host) {
                    true);
 
     registerAction("app_list/reload_app_list"_i18n, BUTTON_Y,
-                   [this](View* view) {
+                   [this](View*) {
                        this->updateAppList();
                        return true;
                    });
@@ -248,12 +259,12 @@ void AppListView::setCurrentApp(const AppInfo& app) {
 }
 
 void AppListView::willAppear(bool resetState) {
-    Box::willAppear(resetState);
+    TabFrame::willAppear(resetState);
     updateAppList();
 }
 
 void AppListView::onLayout() {
-    Box::onLayout();
+    TabFrame::onLayout();
 
     if (loader)
         loader->layout();

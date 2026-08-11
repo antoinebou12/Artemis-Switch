@@ -295,17 +295,26 @@ ArtemisSettingsTab::ArtemisSettingsTab() {
                 WireGuardManager::instance().status_text());
         });
     wireguardConfigPath->setText("settings/wireguard_config_path"_i18n);
-    wireguardConfigPath->setDetailText(
-        Settings::instance().wireguard_config_path().empty()
-            ? "sdmc:/switch/Moonlight-Switch/wg0.conf"
-            : Settings::instance().wireguard_config_path());
+    {
+        const std::string path = Settings::instance().wireguard_config_path();
+        const std::string fallback = "sdmc:/switch/Artemis-Switch/wg0.conf";
+        const std::string shown = path.empty() ? fallback : path;
+        wireguardConfigPath->setDetailText(
+            shown.size() <= 40
+                ? shown
+                : shown.substr(0, 18) + "…" + shown.substr(shown.size() - 18));
+    }
     wireguardConfigPath->registerClickAction([this](View*) {
         const std::string current =
             Settings::instance().wireguard_config_path();
         Application::getPlatform()->getImeManager()->openForText(
             [this](const std::string& text) {
                 Settings::instance().set_wireguard_config_path(text);
-                wireguardConfigPath->setDetailText(text);
+                wireguardConfigPath->setDetailText(
+                    text.size() <= 40
+                        ? text
+                        : text.substr(0, 18) + "…" +
+                              text.substr(text.size() - 18));
                 if (Settings::instance().wireguard_enabled()) {
                     WireGuardManager::instance().enable_from_settings();
                     wireguardStatus->setDetailText(
@@ -313,7 +322,7 @@ ArtemisSettingsTab::ArtemisSettingsTab() {
                 }
             },
             "settings/wireguard_config_path_title"_i18n, "", 120,
-            current.empty() ? "sdmc:/switch/Moonlight-Switch/wg0.conf" : current,
+            current.empty() ? "sdmc:/switch/Artemis-Switch/wg0.conf" : current,
             0);
         return true;
     });
@@ -324,39 +333,6 @@ ArtemisSettingsTab::ArtemisSettingsTab() {
     wireguardConfigPath->removeFromSuperView(true);
     wireguardStatus->removeFromSuperView(true);
 #endif
-
-    easytierEnabled->init(
-        "settings/easytier_enabled"_i18n,
-        Settings::instance().easytier_enabled(), [this](bool value) {
-            Settings::instance().set_easytier_enabled(value);
-            easytierStatus->setDetailText(
-                value ? "settings/easytier_status_stub"_i18n
-                      : "settings/easytier_status_off"_i18n);
-        });
-    easytierConfigPath->setText("settings/easytier_config_path"_i18n);
-    easytierConfigPath->setDetailText(
-        Settings::instance().easytier_config_path().empty()
-            ? "sdmc:/switch/Moonlight-Switch/easytier.toml"
-            : Settings::instance().easytier_config_path());
-    easytierConfigPath->registerClickAction([this](View*) {
-        const std::string current =
-            Settings::instance().easytier_config_path();
-        Application::getPlatform()->getImeManager()->openForText(
-            [this](const std::string& text) {
-                Settings::instance().set_easytier_config_path(text);
-                easytierConfigPath->setDetailText(text);
-            },
-            "settings/easytier_config_path_title"_i18n, "", 120,
-            current.empty() ? "sdmc:/switch/Moonlight-Switch/easytier.toml"
-                            : current,
-            0);
-        return true;
-    });
-    easytierStatus->setText("settings/easytier_status"_i18n);
-    easytierStatus->setDetailText(
-        Settings::instance().easytier_enabled()
-            ? "settings/easytier_status_stub"_i18n
-            : "settings/easytier_status_off"_i18n);
 
     refreshValues();
 }

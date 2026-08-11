@@ -1,4 +1,4 @@
-{
+﻿{
     "about": {
         "about": "Moonlight-Switch는 닌텐도 스위치용 Moonlight-Common-C를 기반으로 하는 타사 게임 스트리밍 클라이언트입니다.",
         "link_gbatemp": "GbaTemp 페이지",
@@ -194,5 +194,5 @@
         "favorites": "즐겨찾기",
         "settings": "설정"
     },
-    "title": "달빛"
+    "title": "Artemis Switch"
 }

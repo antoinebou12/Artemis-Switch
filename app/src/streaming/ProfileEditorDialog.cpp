@@ -95,15 +95,11 @@ void openProfileEditor(const std::string& profileId,
         draft->name.clear();
     }
 
-    auto* outer = new brls::Box(brls::Axis::COLUMN);
-    outer->setWidth(820);
-    outer->setHeight(520);
-
     auto* scroll = new brls::ScrollingFrame();
     scroll->setGrow(1.0f);
     auto* content = new brls::Box(brls::Axis::COLUMN);
     content->setWidth(10000);
-    content->setPadding(12, 20, 12, 20);
+    content->setPadding(24, 24, 24, 24);
 
     auto* nameCell =
         addDetail(content, "artemis/settings/profile_name"_i18n,
@@ -306,32 +302,47 @@ void openProfileEditor(const std::string& profileId,
     addBool(content, "settings/usops"_i18n, draft->sops,
             [draft](bool v) { draft->sops = v; });
 
-    scroll->setContentView(content);
-    outer->addView(scroll);
-
-    auto* dialog = new brls::Dialog(outer);
-    dialog->addButton("common/cancel"_i18n, [draft] { delete draft; });
-    dialog->addButton("common/confirm"_i18n, [draft, profileId, assignHostKey,
-                                           onChanged] {
-        if (draft->name.empty()) {
-            draft->name = "Profile";
-        }
-        auto& store = StreamConfigProfileStore::instance();
-        std::string id = profileId;
-        if (id.empty()) {
-            auto created = store.create(draft->name, false);
-            draft->id = created.id;
-            id = created.id;
-        }
-        draft->id = id;
-        store.update(*draft);
-        if (!assignHostKey.empty())
-            store.setSelectedForHost(assignHostKey, id);
-        if (onChanged)
-            onChanged();
+    auto* saveCell = addDetail(content, "common/confirm"_i18n, "");
+    saveCell->registerClickAction(
+        [draft, profileId, assignHostKey, onChanged](brls::View*) {
+            if (draft->name.empty())
+                draft->name = "Profile";
+            auto& store = StreamConfigProfileStore::instance();
+            std::string id = profileId;
+            if (id.empty()) {
+                auto created = store.create(draft->name, false);
+                draft->id = created.id;
+                id = created.id;
+            }
+            draft->id = id;
+            store.update(*draft);
+            if (!assignHostKey.empty())
+                store.setSelectedForHost(assignHostKey, id);
+            if (onChanged)
+                onChanged();
+            delete draft;
+            brls::Application::popActivity();
+            return true;
+        });
+    auto* cancelCell = addDetail(content, "common/cancel"_i18n, "");
+    cancelCell->registerClickAction([draft](brls::View*) {
         delete draft;
+        brls::Application::popActivity();
+        return true;
     });
-    dialog->open();
+
+    scroll->setContentView(content);
+
+    auto* frame = new brls::AppletFrame(scroll);
+    frame->setTitle(profileId.empty() ? "artemis/settings/create_profile"_i18n
+                                      : "host/edit_profile"_i18n);
+    frame->registerAction("common/cancel"_i18n, brls::BUTTON_B,
+                          [draft](brls::View*) {
+                              delete draft;
+                              brls::Application::popActivity();
+                              return true;
+                          });
+    brls::Application::pushActivity(new brls::Activity(frame));
 }
 
 } // namespace artemis::streaming

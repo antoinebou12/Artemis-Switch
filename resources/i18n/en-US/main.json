@@ -1,4 +1,4 @@
-{
+﻿{
     "about": {
         "about": "Artemis Switch streams games from an Apollo or Sunshine PC. It is based on the original Moonlight-Switch codebase by XITRIX and Moonlight-Common-C. Apollo and Artemis (Moonlight Noir) by ClassicOldSong inspired host and client UX. Upstream licenses still apply — see LICENSE.",
         "link_gbatemp": "GbaTemp Page",
@@ -297,6 +297,8 @@
         "web_config_copy": "Copy URL",
         "stream_profile": "Stream profile",
         "stream_profile_global": "Global settings",
+        "tab_applications": "Applications",
+        "tab_host": "Host",
         "new_profile": "New profile",
         "new_profile_title": "Profile name",
         "edit_profile": "Edit profile",
@@ -355,7 +357,7 @@
         "h264": "H.264",
         "h265": "HEVC (H.265)",
         "keyboard": "Keyboard",
-        "keyboard_compact": "Moonlight",
+        "keyboard_compact": "Artemis",
         "keyboard_fingers": "Taps to open keyboard",
         "keyboard_fullsized": "Full-sized",
         "keyboard_layout": "Keyboard layout",
@@ -389,12 +391,6 @@
         "wireguard_config_path": "Config file path",
         "wireguard_config_path_title": "WireGuard .conf path",
         "wireguard_status": "Tunnel status",
-        "easytier_enabled": "Enable EasyTier (experimental)",
-        "easytier_config_path": "EasyTier config path",
-        "easytier_config_path_title": "EasyTier .toml path",
-        "easytier_status": "EasyTier status",
-        "easytier_status_off": "Off",
-        "easytier_status_stub": "Config saved; in-app EasyTier runtime not linked yet",
         "stream_audio_configuration": "Stream audio channels",
         "audio_stereo": "Stereo",
         "audio_51_surround": "5.1 surround (downmixed on Switch)",
@@ -449,5 +445,5 @@
         "favorites": "Favorites",
         "settings": "Settings"
     },
-    "title": "Moonlight"
+    "title": "Artemis Switch"
 }

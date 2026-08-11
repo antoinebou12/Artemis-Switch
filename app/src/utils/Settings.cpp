@@ -417,19 +417,6 @@ void Settings::load() {
                 }
             }
 
-            if (json_t* easytier_enabled =
-                    json_object_get(settings, "easytier_enabled")) {
-                m_easytier_enabled = json_typeof(easytier_enabled) == JSON_TRUE;
-            }
-
-            if (json_t* easytier_config_path =
-                    json_object_get(settings, "easytier_config_path")) {
-                if (json_typeof(easytier_config_path) == JSON_STRING) {
-                    m_easytier_config_path =
-                        json_string_value(easytier_config_path);
-                }
-            }
-
             if (json_t* show_host_web_config =
                     json_object_get(settings, "show_host_web_config")) {
                 m_show_host_web_config =
@@ -728,10 +715,6 @@ void Settings::save() {
                                 m_wireguard_enabled ? json_true() : json_false());
             json_object_set_new(settings, "wireguard_config_path",
                                 json_string(m_wireguard_config_path.c_str()));
-            json_object_set_new(settings, "easytier_enabled",
-                                m_easytier_enabled ? json_true() : json_false());
-            json_object_set_new(settings, "easytier_config_path",
-                                json_string(m_easytier_config_path.c_str()));
             json_object_set_new(settings, "show_host_web_config",
                                 m_show_host_web_config ? json_true()
                                                        : json_false());

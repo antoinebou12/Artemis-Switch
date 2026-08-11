@@ -21,6 +21,7 @@ unsigned int sceLibcHeapSize             = 24 * 1024 * 1024;
 #endif
 
 #include <cstdlib>
+#include <filesystem>
 
 #include <borealis.hpp>
 #include <string>
@@ -152,7 +153,39 @@ int main(int argc, char* argv[]) {
     brls::Application::setSwapInterval(1);
 #endif
 
-    auto home = Application::getPlatform()->getHomeDirectory("Moonlight-Switch");
+    auto home = Application::getPlatform()->getHomeDirectory("Artemis-Switch");
+    {
+        const auto legacy =
+            Application::getPlatform()->getHomeDirectory("Moonlight-Switch");
+        std::error_code ec;
+        const auto artemisSettings =
+            std::filesystem::path(home) / "settings.json";
+        const auto legacySettings =
+            std::filesystem::path(legacy) / "settings.json";
+        if (!std::filesystem::exists(artemisSettings, ec) &&
+            std::filesystem::exists(legacySettings, ec)) {
+            std::filesystem::create_directories(home, ec);
+            for (const char* name :
+                 {"settings.json", "profile.json", "artemis_profiles.json"}) {
+                const auto src = std::filesystem::path(legacy) / name;
+                const auto dst = std::filesystem::path(home) / name;
+                if (std::filesystem::exists(src, ec) &&
+                    !std::filesystem::exists(dst, ec)) {
+                    std::filesystem::copy_file(src, dst, ec);
+                }
+            }
+            const auto legacyKey = std::filesystem::path(legacy) / "key";
+            const auto artemisKey = std::filesystem::path(home) / "key";
+            if (std::filesystem::exists(legacyKey, ec) &&
+                !std::filesystem::exists(artemisKey, ec)) {
+                std::filesystem::copy(legacyKey, artemisKey,
+                                      std::filesystem::copy_options::recursive,
+                                      ec);
+            }
+            if (!std::filesystem::exists(artemisSettings, ec))
+                home = legacy;
+        }
+    }
     Settings::instance().set_working_dir(home);
     Settings::instance().set_launch_path(argc > 0 ? argv[0] : "");
     brls::Logger::info("Working dir, {}", home);

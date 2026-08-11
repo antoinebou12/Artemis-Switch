@@ -66,29 +66,41 @@ void QrCodeView::draw(NVGcontext* vg, float x, float y, float width, float heigh
 
 void showUrlQrDialog(const std::string& title, const std::string& url) {
     auto* container = new brls::Box(brls::Axis::COLUMN);
-    container->setAlignItems(brls::AlignItems::STRETCH);
+    container->setAlignItems(brls::AlignItems::CENTER);
+    container->setJustifyContent(brls::JustifyContent::CENTER);
     container->setWidth(500.0f);
     container->setPadding(18.0f);
 
     auto* heading = new brls::Label();
     heading->setText(title.empty() ? "host/web_config"_i18n : title);
     heading->setFontSize(20.0f);
+    heading->setHorizontalAlign(brls::HorizontalAlign::CENTER);
     heading->setMarginBottom(4.0f);
     container->addView(heading);
 
     auto* hint = new brls::Label();
     hint->setText("host/web_config_scan_hint"_i18n);
     hint->setFontSize(16.0f);
-    hint->setMarginBottom(8.0f);
+    hint->setHorizontalAlign(brls::HorizontalAlign::CENTER);
+    hint->setMarginBottom(12.0f);
     container->addView(hint);
 
+    auto* qrWrap = new brls::Box(brls::Axis::COLUMN);
+    qrWrap->setAlignItems(brls::AlignItems::CENTER);
+    qrWrap->setJustifyContent(brls::JustifyContent::CENTER);
+    qrWrap->setWidth(360.0f);
+    qrWrap->setHeight(360.0f);
     auto* qr = new QrCodeView(url);
-    container->addView(qr);
+    qr->setWidth(360.0f);
+    qr->setHeight(360.0f);
+    qrWrap->addView(qr);
+    container->addView(qrWrap);
 
     if (!qr->valid()) {
         auto* fallback = new brls::Label();
         fallback->setText("host/web_config_qr_unavailable"_i18n);
         fallback->setFontSize(16.0f);
+        fallback->setHorizontalAlign(brls::HorizontalAlign::CENTER);
         fallback->setMarginTop(8.0f);
         container->addView(fallback);
     }
@@ -96,7 +108,8 @@ void showUrlQrDialog(const std::string& title, const std::string& url) {
     auto* urlLabel = new brls::Label();
     urlLabel->setText(url);
     urlLabel->setFontSize(16.0f);
-    urlLabel->setMarginTop(8.0f);
+    urlLabel->setHorizontalAlign(brls::HorizontalAlign::CENTER);
+    urlLabel->setMarginTop(12.0f);
     container->addView(urlLabel);
 
     auto* dialog = new brls::Dialog(container);

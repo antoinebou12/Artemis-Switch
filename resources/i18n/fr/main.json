@@ -1,4 +1,4 @@
-{
+﻿{
     "about": {
         "about": "Artemis Switch diffuse les jeux d'un PC Apollo ou Sunshine. Il est basé sur le code original de Moonlight-Switch par XITRIX et Moonlight-Common-C. Apollo et Artemis (Moonlight Noir) de ClassicOldSong ont inspiré l'hôte et le client. Les licences amont s'appliquent toujours — voir LICENSE.",
         "link_gbatemp": "Page GbaTemp",
@@ -297,6 +297,8 @@
         "web_config_copy": "Copier l’URL",
         "stream_profile": "Profil de stream",
         "stream_profile_global": "Réglages globaux",
+        "tab_applications": "Applications",
+        "tab_host": "Hôte",
         "new_profile": "Nouveau profil",
         "new_profile_title": "Nom du profil",
         "edit_profile": "Modifier le profil",
@@ -355,7 +357,7 @@
         "h264": "H.264",
         "h265": "HEVC (H.265)",
         "keyboard": "Clavier",
-        "keyboard_compact": "Moonlight",
+        "keyboard_compact": "Artemis",
         "keyboard_fingers": "Taps sur écran pour ouvrir le clavier",
         "keyboard_fullsized": "Pleine largeur",
         "keyboard_layout": "Disposition du clavier",
@@ -389,12 +391,6 @@
         "wireguard_config_path": "Chemin du fichier de config",
         "wireguard_config_path_title": "Chemin du fichier WireGuard .conf",
         "wireguard_status": "État du tunnel",
-        "easytier_enabled": "Activer EasyTier (expérimental)",
-        "easytier_config_path": "Chemin config EasyTier",
-        "easytier_config_path_title": "Chemin du fichier EasyTier .toml",
-        "easytier_status": "État EasyTier",
-        "easytier_status_off": "Désactivé",
-        "easytier_status_stub": "Config enregistrée ; runtime EasyTier non lié pour l’instant",
         "stream_audio_configuration": "Canaux audio du stream",
         "audio_stereo": "Stéréo",
         "audio_51_surround": "Surround 5.1 (downmix sur Switch)",
@@ -449,5 +445,5 @@
         "favorites": "Favoris",
         "settings": "Paramètres"
     },
-    "title": "Moonlight"
+    "title": "Artemis Switch"
 }

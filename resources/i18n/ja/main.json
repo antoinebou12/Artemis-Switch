@@ -1,4 +1,4 @@
-{
+﻿{
     "about": {
         "about": "Moonlight-Switch is a third-party game streaming client based on Moonlight-Common-C for the Nintendo Switch",
         "link_gbatemp": "GbaTemp Page",
@@ -194,5 +194,5 @@
         "favorites": "Favorites",
         "settings": "設定"
     },
-    "title": "Moonlight"
+    "title": "Artemis Switch"
 }

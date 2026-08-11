@@ -1,4 +1,4 @@
-{
+﻿{
     "about": {
         "about": "Moonlight-Switch é um aplicativo terceiro para streaming de jogos baseado no Moonlight-Common-C para Nintendo Switch",
         "link_gbatemp": "Página do GbaTemp",
@@ -194,5 +194,5 @@
         "favorites": "Favoritos",
         "settings": "Configurações"
     },
-    "title": "Moonlight"
+    "title": "Artemis Switch"
 }

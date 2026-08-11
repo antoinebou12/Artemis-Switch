@@ -11,95 +11,61 @@
 using namespace brls::literals;
 
 namespace artemis::streaming {
+namespace {
 
-std::string profile_detail_label(const std::string& hostKey) {
-    auto& store = StreamConfigProfileStore::instance();
-    const auto selectedId = store.selectedForHost(hostKey);
-    if (selectedId.empty())
-        return "host/stream_profile_global"_i18n;
-    if (auto profile = store.get(selectedId))
-        return profile->name;
-    return "host/stream_profile_global"_i18n;
+brls::Box* makePageColumn() {
+    auto* column = new brls::Box(brls::Axis::COLUMN);
+    column->setAlignItems(brls::AlignItems::STRETCH);
+    column->setPadding(24, 24, 24, 24);
+    return column;
 }
 
-void open_host_profile_picker(const std::string& hostKey,
-                              const std::function<void()>& onChanged) {
-    auto& store = StreamConfigProfileStore::instance();
-    const auto& profiles = store.list();
-    std::vector<std::string> options;
-    options.reserve(profiles.size() + 2);
-    options.push_back("host/stream_profile_global"_i18n);
-    int selected = 0;
-    const auto currentId = store.selectedForHost(hostKey);
-    for (size_t i = 0; i < profiles.size(); ++i) {
-        options.push_back(profiles[i].name);
-        if (!currentId.empty() && profiles[i].id == currentId)
-            selected = static_cast<int>(i + 1);
-    }
-    options.push_back("artemis/settings/manage_profiles"_i18n);
+void pushContentPage(const std::string& title, brls::Box* content) {
+    auto* scroll = new brls::ScrollingFrame();
+    scroll->setContentView(content);
+    auto* frame = new brls::AppletFrame(scroll);
+    frame->setTitle(title);
+    brls::Application::pushActivity(new brls::Activity(frame));
+}
 
-    auto* dropdown = new brls::Dropdown(
-        "host/stream_profile"_i18n, options,
-        [hostKey, onChanged](int index) {
-            auto& store = StreamConfigProfileStore::instance();
-            const auto profiles = store.list();
-            if (index <= 0) {
-                store.clearSelectedForHost(hostKey);
-            } else if (index == static_cast<int>(profiles.size() + 1)) {
-                open_manage_host_profile(hostKey, onChanged);
-                return;
-            } else {
-                const size_t profileIndex = static_cast<size_t>(index - 1);
-                if (profileIndex < profiles.size())
-                    store.setSelectedForHost(hostKey, profiles[profileIndex].id);
+brls::DetailCell* addRow(brls::Box* column, const std::string& text,
+                         const std::string& detail = {}) {
+    auto* cell = new brls::DetailCell();
+    cell->setText(text);
+    if (!detail.empty())
+        cell->setDetailText(detail);
+    cell->title->setSingleLine(true);
+    cell->detail->setSingleLine(true);
+    column->addView(cell);
+    return cell;
+}
+
+void open_profile_actions_page(const StreamConfigProfile& profile,
+                               const std::string& hostKey,
+                               const std::function<void()>& onChanged) {
+    auto* column = makePageColumn();
+    const auto profileId = profile.id;
+
+    addRow(column, "common/edit"_i18n)
+        ->registerClickAction([profileId, onChanged](brls::View*) {
+            open_edit_profile(profileId, onChanged);
+            return true;
+        });
+    addRow(column, "artemis/settings/duplicate_profile"_i18n)
+        ->registerClickAction([profileId, hostKey, onChanged](brls::View*) {
+            auto copy =
+                StreamConfigProfileStore::instance().duplicate(profileId, {});
+            if (!hostKey.empty()) {
+                StreamConfigProfileStore::instance().setSelectedForHost(
+                    hostKey, copy.id);
             }
             if (onChanged)
                 onChanged();
-        },
-        selected);
-    brls::Application::pushActivity(new brls::Activity(dropdown));
-}
-
-void open_create_host_profile(const std::string& hostKey,
-                              const std::function<void()>& onChanged) {
-    openProfileEditor({}, hostKey, onChanged);
-}
-
-void open_edit_profile(const std::string& profileId,
-                       const std::function<void()>& onChanged) {
-    if (profileId.empty())
-        return;
-    openProfileEditor(profileId, {}, onChanged);
-}
-
-namespace {
-
-void open_profile_actions(const StreamConfigProfile& profile,
-                          const std::string& hostKey,
-                          const std::function<void()>& onChanged) {
-    auto* dialog = new brls::Dialog(
-        fmt::format("{} — {}", "host/manage_profile"_i18n, profile.name));
-    const auto profileId = profile.id;
-
-    dialog->addButton("common/edit"_i18n, [profileId, onChanged] {
-        brls::sync([profileId, onChanged] {
-            open_edit_profile(profileId, onChanged);
+            brls::Application::popActivity();
+            return true;
         });
-    });
-    dialog->addButton("artemis/settings/duplicate_profile"_i18n,
-                      [profileId, hostKey, onChanged] {
-                          auto copy =
-                              StreamConfigProfileStore::instance().duplicate(
-                                  profileId, {});
-                          if (!hostKey.empty()) {
-                              StreamConfigProfileStore::instance()
-                                  .setSelectedForHost(hostKey, copy.id);
-                          }
-                          if (onChanged)
-                              onChanged();
-                      });
-    dialog->addButton("common/remove"_i18n, [profileId, hostKey, onChanged] {
-        brls::sync([profileId, hostKey, onChanged] {
+    addRow(column, "common/remove"_i18n)
+        ->registerClickAction([profileId, hostKey, onChanged](brls::View*) {
             auto* confirm =
                 new brls::Dialog("host/delete_profile_message"_i18n);
             confirm->addButton("common/cancel"_i18n, [] {});
@@ -115,89 +81,138 @@ void open_profile_actions(const StreamConfigProfile& profile,
                                    }
                                    if (onChanged)
                                        onChanged();
+                                   brls::Application::popActivity();
                                });
             confirm->open();
+            return true;
         });
-    });
-    dialog->addButton("common/close"_i18n, [] {});
-    dialog->open();
+
+    pushContentPage(
+        fmt::format("{} — {}", "host/manage_profile"_i18n, profile.name),
+        column);
 }
 
 } // namespace
 
-void open_manage_host_profile(const std::string& hostKey,
+std::string profile_detail_label(const std::string& hostKey) {
+    auto& store = StreamConfigProfileStore::instance();
+    const auto selectedId = store.selectedForHost(hostKey);
+    if (selectedId.empty())
+        return "host/stream_profile_global"_i18n;
+    if (auto profile = store.get(selectedId))
+        return profile->name;
+    return "host/stream_profile_global"_i18n;
+}
+
+void open_host_profile_picker(const std::string& hostKey,
                               const std::function<void()>& onChanged) {
+    auto* column = makePageColumn();
     auto& store = StreamConfigProfileStore::instance();
     const auto profiles = store.list();
-    std::vector<std::string> options;
-    options.reserve(profiles.size() + 3);
+    const auto currentId = store.selectedForHost(hostKey);
+
+    addRow(column, "host/stream_profile_global"_i18n,
+           currentId.empty() ? "hints/on"_i18n : "")
+        ->registerClickAction([hostKey, onChanged](brls::View*) {
+            StreamConfigProfileStore::instance().clearSelectedForHost(hostKey);
+            if (onChanged)
+                onChanged();
+            brls::Application::popActivity();
+            return true;
+        });
+
     for (const auto& profile : profiles) {
-        options.push_back(fmt::format("{} ({}p {}fps)", profile.name,
-                                      profile.resolutionHeight, profile.fps));
-    }
-    options.push_back("artemis/settings/create_profile"_i18n);
-    options.push_back("artemis/settings/export_profiles"_i18n);
-    options.push_back("artemis/settings/import_profiles"_i18n);
-
-    auto* dropdown = new brls::Dropdown(
-        "artemis/settings/manage_profiles"_i18n, options,
-        [hostKey, onChanged](int index) {
-            auto& store = StreamConfigProfileStore::instance();
-            const auto profiles = store.list();
-            const int createIndex = static_cast<int>(profiles.size());
-            const int exportIndex = createIndex + 1;
-            const int importIndex = createIndex + 2;
-
-            if (index >= 0 && index < createIndex) {
-                open_profile_actions(profiles[static_cast<size_t>(index)],
-                                     hostKey, onChanged);
-                return;
-            }
-            if (index == createIndex) {
-                brls::sync([hostKey, onChanged] {
-                    openProfileEditor({}, hostKey, onChanged);
+        const bool selected = !currentId.empty() && profile.id == currentId;
+        addRow(column, profile.name, selected ? "hints/on"_i18n : "")
+            ->registerClickAction(
+                [hostKey, id = profile.id, onChanged](brls::View*) {
+                    StreamConfigProfileStore::instance().setSelectedForHost(
+                        hostKey, id);
+                    if (onChanged)
+                        onChanged();
+                    brls::Application::popActivity();
+                    return true;
                 });
-                return;
-            }
-            if (index == exportIndex) {
-                openJsonFileBrowser(
-                    JsonFileBrowserMode::Export,
-                    [](const std::string& path) {
-                        if (StreamConfigProfileStore::instance().exportJson(
-                                path)) {
-                            showAlert(fmt::format(
-                                "{} {}",
-                                "artemis/settings/export_profiles_done"_i18n,
-                                path));
-                        } else {
-                            showError(
-                                "artemis/settings/export_profiles_error"_i18n);
-                        }
-                    });
-                return;
-            }
-            if (index == importIndex) {
-                openJsonFileBrowser(
-                    JsonFileBrowserMode::Import,
-                    [onChanged](const std::string& path) {
-                        std::string error;
-                        if (StreamConfigProfileStore::instance().importJson(
-                                path, true, &error)) {
-                            showAlert(
-                                "artemis/settings/import_profiles_done"_i18n);
-                            if (onChanged)
-                                onChanged();
-                        } else {
-                            showError(
-                                error.empty()
-                                    ? "artemis/settings/import_profiles_error"_i18n
-                                    : error);
-                        }
-                    });
-            }
-        },
-        0);
-    brls::Application::pushActivity(new brls::Activity(dropdown));
+    }
+
+    addRow(column, "artemis/settings/manage_profiles"_i18n)
+        ->registerClickAction([hostKey, onChanged](brls::View*) {
+            open_manage_host_profile(hostKey, onChanged);
+            return true;
+        });
+
+    pushContentPage("host/stream_profile"_i18n, column);
+}
+
+void open_create_host_profile(const std::string& hostKey,
+                              const std::function<void()>& onChanged) {
+    openProfileEditor({}, hostKey, onChanged);
+}
+
+void open_edit_profile(const std::string& profileId,
+                       const std::function<void()>& onChanged) {
+    if (profileId.empty())
+        return;
+    openProfileEditor(profileId, {}, onChanged);
+}
+
+void open_manage_host_profile(const std::string& hostKey,
+                              const std::function<void()>& onChanged) {
+    auto* column = makePageColumn();
+    auto& store = StreamConfigProfileStore::instance();
+    const auto profiles = store.list();
+
+    for (const auto& profile : profiles) {
+        addRow(column, profile.name,
+               fmt::format("{}p {}fps", profile.resolutionHeight, profile.fps))
+            ->registerClickAction([profile, hostKey, onChanged](brls::View*) {
+                open_profile_actions_page(profile, hostKey, onChanged);
+                return true;
+            });
+    }
+
+    addRow(column, "artemis/settings/create_profile"_i18n)
+        ->registerClickAction([hostKey, onChanged](brls::View*) {
+            openProfileEditor({}, hostKey, onChanged);
+            return true;
+        });
+    addRow(column, "artemis/settings/export_profiles"_i18n)
+        ->registerClickAction([](brls::View*) {
+            openJsonFileBrowser(
+                JsonFileBrowserMode::Export, [](const std::string& path) {
+                    if (StreamConfigProfileStore::instance().exportJson(path)) {
+                        showAlert(fmt::format(
+                            "{} {}", "artemis/settings/export_profiles_done"_i18n,
+                            path));
+                    } else {
+                        showError(
+                            "artemis/settings/export_profiles_error"_i18n);
+                    }
+                });
+            return true;
+        });
+    addRow(column, "artemis/settings/import_profiles"_i18n)
+        ->registerClickAction([onChanged](brls::View*) {
+            openJsonFileBrowser(
+                JsonFileBrowserMode::Import,
+                [onChanged](const std::string& path) {
+                    std::string error;
+                    if (StreamConfigProfileStore::instance().importJson(
+                            path, true, &error)) {
+                        showAlert("artemis/settings/import_profiles_done"_i18n);
+                        if (onChanged)
+                            onChanged();
+                    } else {
+                        showError(
+                            error.empty()
+                                ? "artemis/settings/import_profiles_error"_i18n
+                                : error);
+                    }
+                });
+            return true;
+        });
+
+    pushContentPage("artemis/settings/manage_profiles"_i18n, column);
 }
 
 } // namespace artemis::streaming
