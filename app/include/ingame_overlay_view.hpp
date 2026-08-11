@@ -87,6 +87,11 @@ class OptionsTab : public brls::Box {
     BRLS_BIND(brls::DetailCell, optionsDiagnostics, "options_diagnostics");
     BRLS_BIND(brls::DetailCell, optionsClipboard, "options_clipboard");
     BRLS_BIND(brls::DetailCell, optionsRotation, "options_rotation");
+    BRLS_BIND(brls::DetailCell, optionsScaleMode, "options_scale_mode");
+    BRLS_BIND(brls::DetailCell, optionsZoom, "options_zoom");
+    BRLS_BIND(brls::DetailCell, optionsPanX, "options_pan_x");
+    BRLS_BIND(brls::DetailCell, optionsPanY, "options_pan_y");
+    BRLS_BIND(brls::DetailCell, optionsResetZoomPan, "options_reset_zoom_pan");
     BRLS_BIND(brls::DetailCell, guideKeyButtons, "guide_key_buttons");
     BRLS_BIND(brls::SelectorCell, guideBySystemButton, "guide_by_system_button");
     BRLS_BIND(brls::Header, rumbleForceHeader, "rumble_slider_header");

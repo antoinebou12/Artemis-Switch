@@ -28,6 +28,11 @@
             <brls:Header title="@i18n/artemis/overlay/apollo_options" paddingTop="60"/>
             <brls:DetailCell id="options_clipboard"/>
             <brls:DetailCell id="options_rotation"/>
+            <brls:DetailCell id="options_scale_mode"/>
+            <brls:DetailCell id="options_zoom"/>
+            <brls:DetailCell id="options_pan_x"/>
+            <brls:DetailCell id="options_pan_y"/>
+            <brls:DetailCell id="options_reset_zoom_pan"/>
 
             <brls:Header title="@i18n/settings/guide_key" paddingTop="60"/>
             <brls:DetailCell id="guide_key_buttons"/>
