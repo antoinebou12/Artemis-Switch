@@ -14,6 +14,8 @@
 [![Status](https://img.shields.io/badge/status-experimental-orange)](#project-status)
 
 **Native Moonlight-compatible game streaming for Nintendo Switch / Horizon OS.**
+<img width="1080" height="607" alt="image" src="https://github.com/user-attachments/assets/8d5c5659-5331-451d-8690-ddab305036ab" />
+<img width="1080" height="607" alt="image" src="https://github.com/user-attachments/assets/2dcdb96f-2d12-4d61-84ba-b3957b8a20dc" />
 
 Author: [antoinebou12](https://github.com/antoinebou12)
 
