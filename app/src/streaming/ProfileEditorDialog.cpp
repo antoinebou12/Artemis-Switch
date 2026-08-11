@@ -5,6 +5,7 @@
 #include "ProfileEditorDialog.hpp"
 
 #include "StreamConfigProfileNormalize.hpp"
+#include "features/stream/AdvancedStreamOptions.hpp"
 #include "keyboard_view.hpp"
 #include "views/boolean_slider_cell.hpp"
 
@@ -649,6 +650,62 @@ void openProfileEditor(const std::string& profileId,
     addBool(content, "artemis/settings/prevent_packet_loss"_i18n,
             draft->preventPacketLoss,
             [draft](bool v) { draft->preventPacketLoss = v; });
+
+    auto packetSizeLabel = [](int size) -> std::string {
+        if (size <= 0)
+            return "artemis/settings/packet_size_auto"_i18n;
+        return std::to_string(size);
+    };
+    auto* packetSizeCell =
+        addDetail(content, "artemis/settings/packet_size"_i18n,
+                  packetSizeLabel(draft->packetSize));
+    packetSizeCell->registerClickAction(
+        [draft, packetSizeCell, packetSizeLabel](brls::View*) {
+            const std::vector<int> presets = {
+                artemis::stream::kPacketSizeAuto, 1024, 1346,
+                artemis::stream::kPacketSizeDefault};
+            std::vector<std::string> labels = {
+                "artemis/settings/packet_size_auto"_i18n, "1024", "1346",
+                "1392", "artemis/settings/packet_size_custom"_i18n};
+            int selected = 4;
+            for (size_t i = 0; i < presets.size(); ++i) {
+                if (presets[i] == draft->packetSize) {
+                    selected = static_cast<int>(i);
+                    break;
+                }
+            }
+            auto* dropdown = new brls::Dropdown(
+                "artemis/settings/packet_size"_i18n, labels,
+                [draft, packetSizeCell, packetSizeLabel,
+                 presets](int index) {
+                    if (index >= 0 &&
+                        index < static_cast<int>(presets.size())) {
+                        draft->packetSize = presets[static_cast<size_t>(index)];
+                        packetSizeCell->setDetailText(
+                            packetSizeLabel(draft->packetSize));
+                        return;
+                    }
+                    const int current =
+                        draft->packetSize > 0
+                            ? draft->packetSize
+                            : artemis::stream::kPacketSizeDefault;
+                    brls::Application::getImeManager()->openForNumber(
+                        [draft, packetSizeCell,
+                         packetSizeLabel](long number) {
+                            draft->packetSize =
+                                artemis::stream::clampPacketSize(
+                                    static_cast<int>(number));
+                            packetSizeCell->setDetailText(
+                                packetSizeLabel(draft->packetSize));
+                        },
+                        "artemis/settings/packet_size"_i18n,
+                        "artemis/settings/packet_size_hint"_i18n, 5,
+                        std::to_string(current), "", "", 0);
+                },
+                selected);
+            brls::Application::pushActivity(new brls::Activity(dropdown));
+            return true;
+        });
 
 #ifdef __SWITCH__
     {

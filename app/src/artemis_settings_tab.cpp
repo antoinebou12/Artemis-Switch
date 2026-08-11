@@ -150,9 +150,9 @@ void applyResolutionPreset(int selected) {
 ArtemisSettingsTab::ArtemisSettingsTab() {
     inflateFromXMLRes("xml/tabs/artemis_settings.xml");
 
-    const std::array<DetailCell*, 12> compactRows = {
+    const std::array<DetailCell*, 13> compactRows = {
         customResolution, width, height, exactBitrate,
-        frameRate, forceFullRange, preventPacketLoss,
+        frameRate, forceFullRange, preventPacketLoss, packetSize,
         scaleMode, rememberZoomPan, resetZoomPan, forwardMotion,
         consoleMotionFallback};
     for (auto* row : compactRows) {
@@ -217,11 +217,61 @@ ArtemisSettingsTab::ArtemisSettingsTab() {
         options.preventPacketLoss = enabled;
         artemis::stream::AdvancedStreamOptionsStore::instance().set(options);
     });
+
+    const auto packetPresets = std::vector<int>{
+        artemis::stream::kPacketSizeAuto, 1024, 1346,
+        artemis::stream::kPacketSizeDefault};
+    int packetSelection = 0;
+    for (size_t i = 0; i < packetPresets.size(); ++i) {
+        if (packetPresets[i] == advanced.packetSize) {
+            packetSelection = static_cast<int>(i);
+            break;
+        }
+        if (i + 1 == packetPresets.size() && advanced.packetSize > 0)
+            packetSelection = static_cast<int>(packetPresets.size()); // Custom
+    }
+    packetSize->init(
+        "artemis/settings/packet_size"_i18n,
+        {"artemis/settings/packet_size_auto"_i18n, "1024", "1346", "1392",
+         "artemis/settings/packet_size_custom"_i18n},
+        packetSelection,
+        [packetPresets](int selected) {
+            auto options =
+                artemis::stream::AdvancedStreamOptionsStore::instance().get();
+            if (selected >= 0 &&
+                selected < static_cast<int>(packetPresets.size())) {
+                options.packetSize = packetPresets[static_cast<size_t>(selected)];
+                artemis::stream::AdvancedStreamOptionsStore::instance().set(
+                    options);
+                return;
+            }
+            // Custom: ask for an explicit byte size.
+            const int current =
+                options.packetSize > 0
+                    ? options.packetSize
+                    : artemis::stream::kPacketSizeDefault;
+            Application::getImeManager()->openForNumber(
+                [](long number) {
+                    auto opts = artemis::stream::AdvancedStreamOptionsStore::
+                        instance()
+                            .get();
+                    opts.packetSize = artemis::stream::clampPacketSize(
+                        static_cast<int>(number));
+                    artemis::stream::AdvancedStreamOptionsStore::instance().set(
+                        opts);
+                },
+                "artemis/settings/packet_size"_i18n,
+                "artemis/settings/packet_size_hint"_i18n, 5,
+                std::to_string(current), "", "", 0);
+        });
 #else
     forceFullRange->init("artemis/settings/force_full_range"_i18n, false, [](bool) {});
     preventPacketLoss->init("artemis/settings/prevent_packet_loss"_i18n, false, [](bool) {});
+    packetSize->init("artemis/settings/packet_size"_i18n,
+                     {"artemis/settings/packet_size_auto"_i18n}, 0, [](int) {});
     forceFullRange->setEnabled(false);
     preventPacketLoss->setEnabled(false);
+    packetSize->setEnabled(false);
 #endif
 
 #if ARTEMIS_HAS_VIDEO_SCALE

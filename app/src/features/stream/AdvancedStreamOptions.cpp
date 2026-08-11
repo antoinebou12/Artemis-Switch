@@ -18,4 +18,21 @@ int normalizeFrameRate(int requestedFps, const AdvancedStreamOptions& options) {
     });
 }
 
+int clampPacketSize(int packetSize) {
+    if (packetSize <= kPacketSizeAuto)
+        return kPacketSizeAuto;
+    return std::clamp(packetSize, kPacketSizeMin, kPacketSizeMax);
+}
+
+int resolveStreamPacketSize(int packetSize, bool preventPacketLoss) {
+    const int clamped = clampPacketSize(packetSize);
+    if (clamped == kPacketSizeAuto) {
+        return preventPacketLoss ? kPacketSizeVpnFriendly : kPacketSizeDefault;
+    }
+    // Packet-loss guard only overrides the common default; explicit sizes win.
+    if (preventPacketLoss && clamped == kPacketSizeDefault)
+        return kPacketSizeVpnFriendly;
+    return clamped;
+}
+
 } // namespace artemis::stream

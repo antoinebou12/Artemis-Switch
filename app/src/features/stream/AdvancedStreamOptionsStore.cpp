@@ -52,6 +52,10 @@ void AdvancedStreamOptionsStore::reload() {
         m_options.forceFullRangeVideo = json_is_true(value);
     if (json_t* value = json_object_get(root, "prevent_packet_loss"))
         m_options.preventPacketLoss = json_is_true(value);
+    if (json_t* value = json_object_get(root, "packet_size");
+        value && json_is_integer(value))
+        m_options.packetSize =
+            clampPacketSize(static_cast<int>(json_integer_value(value)));
 
     json_decref(root);
 }
@@ -67,6 +71,8 @@ bool AdvancedStreamOptionsStore::save() const {
                         m_options.forceFullRangeVideo ? json_true() : json_false());
     json_object_set_new(root, "prevent_packet_loss",
                         m_options.preventPacketLoss ? json_true() : json_false());
+    json_object_set_new(root, "packet_size",
+                        json_integer(clampPacketSize(m_options.packetSize)));
 
     const int result = json_dump_file(root, storePath().string().c_str(), JSON_INDENT(4));
     json_decref(root);

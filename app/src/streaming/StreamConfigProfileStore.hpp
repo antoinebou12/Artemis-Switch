@@ -29,6 +29,8 @@ struct StreamConfigProfile {
     bool useHwDecoding = true;
     bool forceFullRangeVideo = false;
     bool preventPacketLoss = false;
+    // 0 = Auto (see artemis::stream::resolveStreamPacketSize).
+    int packetSize = 0;
     bool customResolutionEnabled = false;
     int customWidth = 1920;
     int customHeight = 1080;
@@ -84,7 +86,7 @@ struct StreamConfigProfile {
 
 class StreamConfigProfileStore {
 public:
-    static constexpr int SchemaVersion = 5;
+    static constexpr int SchemaVersion = 6;
     static StreamConfigProfileStore& instance();
 
     const std::vector<StreamConfigProfile>& list();

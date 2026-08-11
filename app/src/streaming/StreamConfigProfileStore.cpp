@@ -143,6 +143,9 @@ json_t* profileToJson(const StreamConfigProfile& profile) {
                                                     : json_false());
     json_object_set_new(item, "prevent_packet_loss",
                         profile.preventPacketLoss ? json_true() : json_false());
+    json_object_set_new(item, "packet_size",
+                        json_integer(artemis::stream::clampPacketSize(
+                            profile.packetSize)));
     json_object_set_new(item, "custom_resolution_enabled",
                         profile.customResolutionEnabled ? json_true()
                                                         : json_false());
@@ -266,6 +269,10 @@ StreamConfigProfile profileFromJson(json_t* object) {
         profile.forceFullRangeVideo = jsonToBool(full);
     if (json_t* loss = json_object_get(object, "prevent_packet_loss"))
         profile.preventPacketLoss = jsonToBool(loss);
+    if (json_t* packetSize = json_object_get(object, "packet_size");
+        json_is_integer(packetSize))
+        profile.packetSize = artemis::stream::clampPacketSize(
+            static_cast<int>(json_integer_value(packetSize)));
     if (json_t* custom = json_object_get(object, "custom_resolution_enabled"))
         profile.customResolutionEnabled = jsonToBool(custom);
     if (json_t* customW = json_object_get(object, "custom_width");
@@ -436,6 +443,8 @@ void applyProfileToSettings(const StreamConfigProfile& profile) {
         artemis::stream::AdvancedStreamOptionsStore::instance().get();
     advanced.forceFullRangeVideo = profile.forceFullRangeVideo;
     advanced.preventPacketLoss = profile.preventPacketLoss;
+    advanced.packetSize =
+        artemis::stream::clampPacketSize(profile.packetSize);
     artemis::stream::AdvancedStreamOptionsStore::instance().set(advanced);
 
     artemis::video::VideoScaleStore::instance().set(profile.scaleMode);
@@ -483,6 +492,7 @@ StreamConfigProfile normalizeProfile(StreamConfigProfile profile) {
     profile.rumbleForce = std::clamp(profile.rumbleForce, 0.0f, 1.0f);
     profile.mouseSpeedMultiplier =
         std::clamp(profile.mouseSpeedMultiplier, 0, 100);
+    profile.packetSize = artemis::stream::clampPacketSize(profile.packetSize);
     profile.keyboardFingers = std::clamp(profile.keyboardFingers, 0, 10);
     if (profile.keyboardLocale < 0)
         profile.keyboardLocale = 0;
@@ -577,6 +587,8 @@ StreamConfigProfileStore::snapshotFromSettings(const std::string& name) {
         artemis::stream::AdvancedStreamOptionsStore::instance().get();
     profile.forceFullRangeVideo = advanced.forceFullRangeVideo;
     profile.preventPacketLoss = advanced.preventPacketLoss;
+    profile.packetSize =
+        artemis::stream::clampPacketSize(advanced.packetSize);
     profile.scaleMode = artemis::video::VideoScaleStore::instance().get();
 
     const auto custom = StreamProfileStore::instance().get();
