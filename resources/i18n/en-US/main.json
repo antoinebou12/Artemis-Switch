@@ -42,6 +42,8 @@
         "reload_app_list": "Reload",
         "run_current": "Run current app",
         "running": "Running",
+        "search": "Search apps",
+        "search_hint": "Filter by name",
         "star": "Star",
         "terminate": "Terminate",
         "terminate_current_app": "Terminate current app",

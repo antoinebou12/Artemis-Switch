@@ -35,12 +35,16 @@ class AppListView : public Box {
     DetailCell* webConfig = nullptr;
     DetailCell* streamProfile = nullptr;
     DetailCell* virtualDisplay = nullptr;
+    DetailCell* appSearch = nullptr;
     Sidebar* sidebar = nullptr;
     Box* contentColumn = nullptr;
     Box* appsContainer = nullptr;
     Box* hostContainer = nullptr;
     Pane activePane = Pane::Applications;
     std::optional<AppInfo> currentApp;
+    AppInfoList cachedApps;
+    std::string appSearchQuery;
+    int cachedCurrentGame = 0;
     bool loading = false;
     bool inputBlocked = false;
     LoadingOverlay* loader = nullptr;
@@ -52,6 +56,9 @@ class AppListView : public Box {
     void setCurrentApp(const AppInfo& app);
     void terninateApp();
     void updateAppList();
+    void rebuildAppGrid();
+    void promptAppSearch();
+    void refreshAppSearchLabel();
     void updateFavoriteAction(AppCell* cell, Host host, const AppInfo& app);
     void refreshStreamProfileLabel();
     void refreshWebConfigVisibility();

@@ -16,6 +16,8 @@
 #include "streaming/ProfileEditorDialog.hpp"
 #include "streaming/StreamConfigProfileStore.hpp"
 
+#include <algorithm>
+#include <cctype>
 #include <fmt/format.h>
 
 namespace {
@@ -38,6 +40,13 @@ std::string vdTargetLabel(artemis::apollo::VirtualDisplayTarget target) {
         return "artemis/overlay/vd_custom"_i18n;
     }
     return "artemis/overlay/vd_off"_i18n;
+}
+
+std::string lowercaseCopy(std::string value) {
+    for (char& ch : value)
+        ch = static_cast<char>(
+            std::tolower(static_cast<unsigned char>(ch)));
+    return value;
 }
 } // namespace
 
@@ -85,6 +94,16 @@ AppListView::AppListView(const Host& host) : Box(Axis::ROW), host(host) {
     appsContainer->setPadding(24, 24, 24, 24);
     appsContainer->setHideHighlight(true);
     appsContainer->setGrow(1.0f);
+    appSearch = new DetailCell();
+    appSearch->setText("app_list/search"_i18n);
+    appSearch->title->setSingleLine(true);
+    appSearch->detail->setSingleLine(true);
+    refreshAppSearchLabel();
+    appSearch->registerClickAction([this](View*) {
+        promptAppSearch();
+        return true;
+    });
+    appsContainer->addView(appSearch);
     gridView = new GridView();
     appsContainer->addView(gridView);
     contentColumn->addView(appsContainer);
@@ -300,6 +319,12 @@ AppListView::AppListView(const Host& host) : Box(Axis::ROW), host(host) {
     registerAction("", brls::ControllerButton::BUTTON_BACK, closeCurrentAction,
                    true);
 
+    registerAction("app_list/search"_i18n, BUTTON_LB, [this](View*) {
+        if (activePane != Pane::Applications)
+            return false;
+        promptAppSearch();
+        return true;
+    });
     registerAction("app_list/reload_app_list"_i18n, BUTTON_Y, [this](View*) {
         if (activePane == Pane::Host) {
             const auto selected =
@@ -364,10 +389,12 @@ void AppListView::showPane(Pane pane, bool focusContent) {
 
     setActionAvailable(BUTTON_Y, true);
     setActionAvailable(BUTTON_X, !apps);
+    setActionAvailable(BUTTON_LB, apps);
     setActionAvailable(BUTTON_RB, true);
     updateActionHint(BUTTON_Y, apps ? "app_list/reload_app_list"_i18n
                                     : "host/edit_profile"_i18n);
     updateActionHint(BUTTON_X, "host/delete_profile"_i18n);
+    updateActionHint(BUTTON_LB, "app_list/search"_i18n);
 
     if (!focusContent)
         return;
@@ -512,32 +539,31 @@ void AppListView::updateAppList() {
                         blockInput(false);
 
                         if (result.isSuccess()) {
-                            AppInfoList sortedApps = result.value();
-                            const auto server = GameStreamClient::instance().server_data(host);
+                            cachedApps = result.value();
+                            cachedCurrentGame = currentGame;
+                            const auto server =
+                                GameStreamClient::instance().server_data(host);
                             if (!server.isApollo()) {
                                 std::stable_sort(
-                                    sortedApps.begin(), sortedApps.end(),
-                                    [this, currentGame](const AppInfo& l, const AppInfo& r) {
-                                        const int lScore = (l.app_id == currentGame ? 2 : 0) +
-                                            (Settings::instance().is_favorite(this->host, l.app_id) ? 1 : 0);
-                                        const int rScore = (r.app_id == currentGame ? 2 : 0) +
-                                            (Settings::instance().is_favorite(this->host, r.app_id) ? 1 : 0);
+                                    cachedApps.begin(), cachedApps.end(),
+                                    [this, currentGame](const AppInfo& l,
+                                                       const AppInfo& r) {
+                                        const int lScore =
+                                            (l.app_id == currentGame ? 2 : 0) +
+                                            (Settings::instance().is_favorite(
+                                                 this->host, l.app_id)
+                                                 ? 1
+                                                 : 0);
+                                        const int rScore =
+                                            (r.app_id == currentGame ? 2 : 0) +
+                                            (Settings::instance().is_favorite(
+                                                 this->host, r.app_id)
+                                                 ? 1
+                                                 : 0);
                                         return lScore > rScore;
                                     });
                             }
-
-                            for (const AppInfo& app : sortedApps) {
-                                if (app.app_id == currentGame)
-                                    setCurrentApp(app);
-
-                                auto* cell =
-                                    new AppCell(host, app, currentGame);
-                                cell->setFavorite(
-                                    Settings::instance().is_favorite(
-                                        host, app.app_id));
-                                gridView->addView(cell);
-                                this->updateFavoriteAction(cell, host, app);
-                            }
+                            rebuildAppGrid();
                             // Prefer the normal TabFrame focus: sidebar item 0.
                             if (sidebar && sidebar->getItem(0))
                                 Application::giveFocus(sidebar->getItem(0));
@@ -553,6 +579,51 @@ void AppListView::updateAppList() {
                 showError(result.error(), [this] { this->dismiss(); });
             }
         });
+}
+
+void AppListView::refreshAppSearchLabel() {
+    if (!appSearch)
+        return;
+    if (appSearchQuery.empty())
+        appSearch->setDetailText("app_list/search_hint"_i18n);
+    else
+        appSearch->setDetailText(appSearchQuery);
+}
+
+void AppListView::promptAppSearch() {
+    Application::getImeManager()->openForText(
+        [this](const std::string& text) {
+            appSearchQuery = text;
+            refreshAppSearchLabel();
+            rebuildAppGrid();
+        },
+        "app_list/search"_i18n, "app_list/search_hint"_i18n, 40,
+        appSearchQuery, 0);
+}
+
+void AppListView::rebuildAppGrid() {
+    if (!gridView)
+        return;
+    gridView->clearViews();
+    currentApp = std::nullopt;
+    hintView->setVisibility(Visibility::GONE);
+
+    const std::string needle = lowercaseCopy(appSearchQuery);
+    for (const AppInfo& app : cachedApps) {
+        if (!needle.empty()) {
+            const auto haystack = lowercaseCopy(app.name);
+            if (haystack.find(needle) == std::string::npos)
+                continue;
+        }
+        if (app.app_id == cachedCurrentGame)
+            setCurrentApp(app);
+
+        auto* cell = new AppCell(host, app, cachedCurrentGame);
+        cell->setFavorite(
+            Settings::instance().is_favorite(host, app.app_id));
+        gridView->addView(cell);
+        updateFavoriteAction(cell, host, app);
+    }
 }
 
 void AppListView::setCurrentApp(const AppInfo& app) {

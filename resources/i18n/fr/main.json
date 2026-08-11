@@ -42,6 +42,8 @@
         "reload_app_list": "Recharger",
         "run_current": "Exécuter l'application",
         "running": "En cours d'exécution",
+        "search": "Rechercher des apps",
+        "search_hint": "Filtrer par nom",
         "star": "Favori",
         "terminate": "Fermer",
         "terminate_current_app": "Fermer l'application en cours",
