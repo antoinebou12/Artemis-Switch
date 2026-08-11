@@ -1,0 +1,1602 @@
+
+
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="install.html">
+      
+      
+      
+      <link rel="icon" href="">
+    
+    
+      
+        <title>Settings - Artemis Switch</title>
+      
+    
+    
+      
+        
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+        <link rel="stylesheet" type="text/css" href="_static/sphinx_immaterial_theme.74c816e3f9967dd6e.min.css?v=6cfe2491" />
+        <link rel="stylesheet" type="text/css" href="_static/css/custom.css?v=a16f98ff" />
+    <script>__md_scope=new URL(".",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="red" data-md-color-accent="red">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#where-settings-live" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="index.html" title="Artemis Switch" class="md-header__button md-logo" aria-label="Artemis Switch" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Artemis Switch
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Settings
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="red" data-md-color-accent="red"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="red" data-md-color-accent="red"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="Share" aria-label="Share" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/antoinebou12/Artemis-Switch" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.7.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8M97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    antoinebou12/Artemis-Switch
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="install.html" class="md-tabs__link">
+        
+  
+    
+  
+  <span>Install</span>
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+    
+  
+  
+    <li class="md-tabs__item md-tabs__item--active">
+      <a href="#" class="md-tabs__link">
+        
+  
+    
+  
+  <span>Settings</span>
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="index.html" title="Artemis Switch" class="md-nav__button md-logo" aria-label="Artemis Switch" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+    </a>
+    Artemis Switch
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/antoinebou12/Artemis-Switch" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.7.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8M97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    antoinebou12/Artemis-Switch
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="install.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>Install</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    <span>Settings</span>
+    
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="#" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>Settings</span>
+    
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary">
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#where-settings-live" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Where settings live</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#language" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Language</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#quality" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Quality</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#video-bitrate" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Video bitrate</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#image-adjustments" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Image Adjustments</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#stream" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Stream</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#host-device" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Host device</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#controller-keys" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Controller keys</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#dead-zones" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Dead zones</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rumble-force" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Rumble force</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#single-joycon" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Single Joycon</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#guide-key-clicks-immediately" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Guide key <wbr>(clicks immediately)</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ingame-overlay" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Ingame overlay</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mouse-input-mode" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Mouse input mode</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#keyboard" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Keyboard</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mouse" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Mouse</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#debug-settings" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Debug <wbr>(Settings)</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#artemis-stream" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Artemis Stream</span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Artemis Stream">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#custom-resolution" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Custom resolution</span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#frame-rate-video" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Frame Rate &amp; Video</span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#resolution-presets" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Resolution presets</span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#apollo-display" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Apollo &amp; display</span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#presentation" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Presentation</span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#motion" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Motion</span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#vpn" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>VPN</span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#stream-profiles" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Stream profiles</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#add-host" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Add host</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#connected-host" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Connected host</span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Connected host">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#applications" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Applications</span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#host" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Host</span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#in-stream-overlay-quick" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>In-<wbr>stream overlay — Quick</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#in-stream-overlay-options" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>In-<wbr>stream overlay — Options</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#in-stream-overlay-performance" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>In-<wbr>stream overlay — Performance</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#credits-for-these-options" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Credits for these options</span>
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary">
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#where-settings-live" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Where settings live</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#language" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Language</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#quality" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Quality</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#video-bitrate" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Video bitrate</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#image-adjustments" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Image Adjustments</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#stream" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Stream</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#host-device" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Host device</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#controller-keys" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Controller keys</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#dead-zones" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Dead zones</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rumble-force" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Rumble force</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#single-joycon" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Single Joycon</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#guide-key-clicks-immediately" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Guide key <wbr>(clicks immediately)</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ingame-overlay" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Ingame overlay</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mouse-input-mode" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Mouse input mode</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#keyboard" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Keyboard</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mouse" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Mouse</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#debug-settings" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Debug <wbr>(Settings)</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#artemis-stream" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Artemis Stream</span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Artemis Stream">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#custom-resolution" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Custom resolution</span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#frame-rate-video" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Frame Rate &amp; Video</span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#resolution-presets" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Resolution presets</span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#apollo-display" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Apollo &amp; display</span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#presentation" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Presentation</span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#motion" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Motion</span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#vpn" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>VPN</span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#stream-profiles" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Stream profiles</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#add-host" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Add host</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#connected-host" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Connected host</span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Connected host">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#applications" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Applications</span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#host" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Host</span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#in-stream-overlay-quick" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>In-<wbr>stream overlay — Quick</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#in-stream-overlay-options" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>In-<wbr>stream overlay — Options</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#in-stream-overlay-performance" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>In-<wbr>stream overlay — Performance</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#credits-for-these-options" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Credits for these options</span>
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset" role="main">
+                
+                
+                  
+
+
+<h1 id="settings">Settings<a class="headerlink" href="#settings" title="Link to this heading">¶</a></h1>
+<p>Every option in Artemis Switch, with the same labels as the app. Stream profiles use the same layout as Settings; assigned profiles override the global defaults for that host.</p>
+<p>Bitrate, codec, resolution, and most stream fields apply on the <strong>next</strong> connection. Overlay Options can change a few presentation and input values while a stream is running.</p>
+<h2 id="where-settings-live">Where settings live<a class="headerlink" href="#where-settings-live" title="Link to this heading">¶</a></h2>
+<table class="docutils data align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Place</p></th>
+<th class="head"><p>What it is</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><strong>Settings</strong> tab</p></td>
+<td><p>Global Moonlight client options, then the Artemis <strong>Stream</strong> block</p></td>
+</tr>
+<tr class="row-odd"><td><p><strong>Stream profiles</strong></p></td>
+<td><p>Named copy of those stream fields (<code class="docutils literal notranslate"><span class="pre">profile.json</span></code>); assign per host</p></td>
+</tr>
+<tr class="row-even"><td><p><strong>Host</strong> tab (connected)</p></td>
+<td><p>Web config QR and which profile this host uses</p></td>
+</tr>
+<tr class="row-odd"><td><p><strong>In-stream overlay</strong></p></td>
+<td><p>Quick actions, Options, Performance, Debug</p></td>
+</tr>
+</tbody>
+</table>
+<hr class="docutils" />
+<h2 id="language">Language<a class="headerlink" href="#language" title="Link to this heading">¶</a></h2>
+<dl class="simple myst">
+<dt>Language</dt><dd><p>UI language. <strong>System</strong> follows the Switch locale. Restart the app after changing it.</p>
+</dd>
+</dl>
+<hr class="docutils" />
+<h2 id="quality">Quality<a class="headerlink" href="#quality" title="Link to this heading">¶</a></h2>
+<p>Higher quality needs more decode work. 1080p high bitrate usually wants CPU/GPU overclock.</p>
+<dl class="simple myst">
+<dt>FPS</dt><dd><p>Stream frame rate requested from the host (typical steps 30 / 40 / 60 / 90 / 120). The Artemis <strong>Frame rate</strong> row is the same value when you use a profile.</p>
+</dd>
+<dt>Resolution</dt><dd><p>Stream width × height sent to Sunshine/Apollo. <strong>Native</strong> follows the Switch output. Custom sizes live under Artemis <strong>Use custom resolution</strong>.</p>
+</dd>
+<dt>Aspect ratio</dt><dd><p><strong>16:9</strong> or <strong>4:3</strong>. Changes how the requested resolution is interpreted with the scale mode.</p>
+</dd>
+<dt>Resolution scale</dt><dd><p>Extra scale factor on the requested stream size (host still encodes the negotiated resolution).</p>
+</dd>
+<dt>Video codec</dt><dd><p><strong>H.264</strong>, <strong>HEVC (H.265)</strong>, or <strong>AV1 (Experimental)</strong>. Switch has no hardware AV1 in this build; AV1 may fail to open. Prefer H.264 or HEVC.</p>
+</dd>
+<dt>Request HDR Video</dt><dd><p>Ask the host for HDR. Only useful if the host and display path actually output HDR.</p>
+</dd>
+<dt>Decoder Threads</dt><dd><p>Software-decode thread count. <strong>0 (No use threads)</strong> leaves it to FFmpeg. Hardware decode ignores this.</p>
+</dd>
+<dt>Enable hardware acceleration</dt><dd><p>Use Switch NVDEC when the codec allows it. Leave on unless you are debugging decode.</p>
+</dd>
+</dl>
+<hr class="docutils" />
+<h2 id="video-bitrate">Video bitrate<a class="headerlink" href="#video-bitrate" title="Link to this heading">¶</a></h2>
+<dl class="simple myst">
+<dt>Video bitrate</dt><dd><p>Target encode bitrate in Mbps. Moonlight/GameStream negotiates during setup; Artemis saves the slider for the <strong>next</strong> stream. The Artemis <strong>Exact bitrate</strong> row sets the same value as a number (1–100 Mbps).</p>
+</dd>
+</dl>
+<hr class="docutils" />
+<h2 id="image-adjustments">Image Adjustments<a class="headerlink" href="#image-adjustments" title="Link to this heading">¶</a></h2>
+<dl class="simple myst">
+<dt>Dithering</dt><dd><p>Reduce banding on gradients. Slider when enabled.</p>
+</dd>
+<dt>Upscaling (FSR1)</dt><dd><p>Run an upscaler after decode (FSR1 / SGSR1 / NIS, depending on build). Helps when the stream is below the Switch output size.</p>
+</dd>
+<dt>Upscaling mode</dt><dd><p>Which upscaler to use when upscaling is on.</p>
+</dd>
+<dt>RCAS sharpening (FSR)</dt><dd><p>Contrast-adaptive sharpen after upscale. Too high looks crunchy.</p>
+</dd>
+</dl>
+<p>These four also appear in the in-stream <strong>Options</strong> tab so you can tweak without leaving the game.</p>
+<hr class="docutils" />
+<h2 id="stream">Stream<a class="headerlink" href="#stream" title="Link to this heading">¶</a></h2>
+<dl class="simple myst">
+<dt>Audio driver</dt><dd><p>Audio output backend on the Switch.</p>
+</dd>
+<dt>Use Streaming Optimal Playable Settings</dt><dd><p>Apply Moonlight’s “optimal” preset for the current resolution/FPS. Overrides some quality fields.</p>
+</dd>
+<dt>Play Audio on PC</dt><dd><p>Also play audio on the host while streaming.</p>
+</dd>
+<dt>Stream audio channels</dt><dd><p><strong>Stereo</strong> or <strong>5.1 surround (downmixed on Switch)</strong>. Surround is mixed down on the client.</p>
+</dd>
+<dt>Quit host app on disconnect</dt><dd><p>Terminate the streamed app on the PC when you disconnect. Off leaves the app running.</p>
+</dd>
+<dt>Allow volume amplification</dt><dd><p>Let the overlay volume slider go above 100%.</p>
+</dd>
+</dl>
+<hr class="docutils" />
+<h2 id="host-device">Host device<a class="headerlink" href="#host-device" title="Link to this heading">¶</a></h2>
+<dl class="simple myst">
+<dt>Host device</dt><dd><p><strong>Windows</strong>, <strong>macOS</strong>, or <strong>Linux</strong>. Changes host-shortcut labels (Win vs Command vs Super) and which keyboard combos Quick Actions send. This is a global OS/device setting, not per host.</p>
+</dd>
+</dl>
+<hr class="docutils" />
+<h2 id="controller-keys">Controller keys<a class="headerlink" href="#controller-keys" title="Link to this heading">¶</a></h2>
+<dl class="simple myst">
+<dt>Swap A/B for UI</dt><dd><p>Swap A and B in Artemis menus only. Separate from in-game mapping.</p>
+</dd>
+<dt>Swap X/Y for UI</dt><dd><p>Swap X and Y in Artemis menus only.</p>
+</dd>
+<dt>Game keys mapping</dt><dd><p>In-game pad layout. <strong>Xbox (Default)</strong> keeps Xbox positions. <strong>Switch (Swap A/B and X/Y)</strong> matches Nintendo face buttons. You can create extra layouts and bind each button.</p>
+</dd>
+</dl>
+<hr class="docutils" />
+<h2 id="dead-zones">Dead zones<a class="headerlink" href="#dead-zones" title="Link to this heading">¶</a></h2>
+<dl class="simple myst">
+<dt>Left stick / Right stick</dt><dd><p>Ignore stick motion below this percent so drift does not move the camera or cursor.</p>
+</dd>
+</dl>
+<hr class="docutils" />
+<h2 id="rumble-force">Rumble force<a class="headerlink" href="#rumble-force" title="Link to this heading">¶</a></h2>
+<dl class="simple myst">
+<dt>Rumble force</dt><dd><p>Scale host rumble to the Switch motors (0–100%).</p>
+</dd>
+</dl>
+<hr class="docutils" />
+<h2 id="single-joycon">Single Joycon<a class="headerlink" href="#single-joycon" title="Link to this heading">¶</a></h2>
+<dl class="simple myst">
+<dt>Use Stick as D-Pad</dt><dd><p>Map the remaining stick to D-pad when using a single Joy-Con.</p>
+</dd>
+</dl>
+<hr class="docutils" />
+<h2 id="guide-key-clicks-immediately">Guide key (clicks immediately)<a class="headerlink" href="#guide-key-clicks-immediately" title="Link to this heading">¶</a></h2>
+<dl class="simple myst">
+<dt>Buttons combination</dt><dd><p>Button chord that sends the Xbox Guide / host Guide click.</p>
+</dd>
+<dt>Use system button</dt><dd><p>Optional Home or Screenshot button as Guide (cannot share a system button with overlay).</p>
+</dd>
+</dl>
+<hr class="docutils" />
+<h2 id="ingame-overlay">Ingame overlay<a class="headerlink" href="#ingame-overlay" title="Link to this heading">¶</a></h2>
+<dl class="simple myst">
+<dt>Hold to open in seconds</dt><dd><p>How long to hold the overlay chord. <strong>0 (Immediately)</strong> opens on press. Default chord is <strong>−</strong> + <strong>+</strong> (or hold Escape on a USB keyboard).</p>
+</dd>
+<dt>Buttons combination</dt><dd><p>Chord that opens the overlay.</p>
+</dd>
+<dt>Use system button</dt><dd><p>Optional Home or Screenshot as overlay (must not collide with Guide).</p>
+</dd>
+<dt>Debug stats position</dt><dd><p>Corner for on-stream debug stats when debugging is on: top/bottom × left/right.</p>
+</dd>
+<dt>Disable swipe to open overlay</dt><dd><p>Ignore the screen-edge swipe that opens the overlay.</p>
+</dd>
+</dl>
+<hr class="docutils" />
+<h2 id="mouse-input-mode">Mouse input mode<a class="headerlink" href="#mouse-input-mode" title="Link to this heading">¶</a></h2>
+<dl class="simple myst">
+<dt>Hold time / Buttons combination</dt><dd><p>Chord that enters mouse-input mode (touch + sticks act as a mouse). Same idea as the overlay chord.</p>
+</dd>
+</dl>
+<hr class="docutils" />
+<h2 id="keyboard">Keyboard<a class="headerlink" href="#keyboard" title="Link to this heading">¶</a></h2>
+<dl class="simple myst">
+<dt>Keyboard type</dt><dd><p>On-screen keyboard: <strong>Artemis</strong> (compact), <strong>Full-sized</strong>, or <strong>Numbers &amp; symbols</strong>.</p>
+</dd>
+<dt>Keyboard layout</dt><dd><p>Key labels / locale for the on-screen keyboard (includes <strong>Switch keyboard language</strong>).</p>
+</dd>
+<dt>Taps to open keyboard</dt><dd><p>How many simultaneous fingers open the keyboard (default three-finger tap). Also in overlay Options.</p>
+</dd>
+</dl>
+<hr class="docutils" />
+<h2 id="mouse">Mouse<a class="headerlink" href="#mouse" title="Link to this heading">¶</a></h2>
+<dl class="simple myst">
+<dt>Touchscreen mode</dt><dd><p>Treat the touch screen as a mouse (move cursor, tap to click). Overlay <strong>Touch screen</strong> can turn this off for the current stream.</p>
+</dd>
+<dt>Swap mouse ZR/ZL</dt><dd><p>Swap left/right click when using ZR/ZL as mouse buttons while touching.</p>
+</dd>
+<dt>Swap mouse scroll</dt><dd><p>Invert scroll direction.</p>
+</dd>
+<dt>Swap mouse sticks</dt><dd><p>Swap which stick moves the cursor vs which stick scrolls.</p>
+</dd>
+<dt>Mouse speed</dt><dd><p>Cursor speed multiplier. Also on overlay Options.</p>
+</dd>
+</dl>
+<hr class="docutils" />
+<h2 id="debug-settings">Debug (Settings)<a class="headerlink" href="#debug-settings" title="Link to this heading">¶</a></h2>
+<dl class="simple myst">
+<dt>Show host web config</dt><dd><p>Show the Sunshine/Apollo web-config row and QR on the connected Host tab.</p>
+</dd>
+<dt>Write log</dt><dd><p>Write a log file for troubleshooting.</p>
+</dd>
+</dl>
+<hr class="docutils" />
+<h2 id="artemis-stream">Artemis Stream<a class="headerlink" href="#artemis-stream" title="Link to this heading">¶</a></h2>
+<p>This block is at the bottom of Settings. Stream profiles edit the same fields.</p>
+<h3 id="custom-resolution">Custom resolution<a class="headerlink" href="#custom-resolution" title="Link to this heading">¶</a></h3>
+<dl class="simple myst">
+<dt>Use custom resolution</dt><dd><p>Ignore the Quality resolution picker and send width × height below. Width/height rows hide when this is off.</p>
+</dd>
+<dt>Custom width / Custom height</dt><dd><p>Exact stream size (width 640–1920, height 360–1080).</p>
+</dd>
+<dt>Exact bitrate</dt><dd><p>Bitrate in Mbps as a number instead of the Quality slider (1–100).</p>
+</dd>
+</dl>
+<h3 id="frame-rate-video">Frame Rate &amp; Video<a class="headerlink" href="#frame-rate-video" title="Link to this heading">¶</a></h3>
+<dl class="simple myst">
+<dt>Frame rate</dt><dd><p>Same as Quality <strong>FPS</strong>.</p>
+</dd>
+<dt>Full-range video</dt><dd><p>Request full-range (0–255) instead of limited (16–235). Match what the host encodes.</p>
+</dd>
+<dt>Packet-loss guard</dt><dd><p>When packet size is Auto/1392, use <strong>1024</strong> bytes for low-MTU or VPN links. Sunshine may still clamp packet size on the host.</p>
+</dd>
+<dt>Low latency pacing</dt><dd><p>Occupancy / alpha-beta frame pacing aimed at lower input lag. <strong>Off by default</strong>; can stutter more on unstable Wi-Fi.</p>
+</dd>
+<dt>Packet size</dt><dd><p>RTP payload size: <strong>Auto</strong> (1392, or 1024 with packet-loss guard), a preset, or <strong>Custom</strong> (200–65535 bytes).</p>
+</dd>
+</dl>
+<h3 id="resolution-presets">Resolution presets<a class="headerlink" href="#resolution-presets" title="Link to this heading">¶</a></h3>
+<dl class="simple myst">
+<dt>Preset</dt><dd><p>Quick sizes: Handheld 1280×720, Docked 1920×1080, 4:3 handheld/docked, or Custom. Applies resolution and aspect; does not replace a named stream profile.</p>
+</dd>
+</dl>
+<h3 id="apollo-display">Apollo &amp; display<a class="headerlink" href="#apollo-display" title="Link to this heading">¶</a></h3>
+<p>These live in Settings and in the stream profile. They are <strong>not</strong> on the Host tab. Launch uses the selected profile.</p>
+<dl class="simple myst">
+<dt>Apollo virtual display</dt><dd><p>Ask Apollo to create a virtual display for this stream: Off, current profile size, handheld, docked, portrait, or custom <code class="docutils literal notranslate"><span class="pre">WIDTHxHEIGHT&#64;HZ</span></code>. Needs Apollo with the virtual-display driver installed. Sunshine hosts ignore this.</p>
+</dd>
+<dt>Apollo scale factor</dt><dd><p>DPI / scale sent to Apollo for that virtual display.</p>
+</dd>
+</dl>
+<h3 id="presentation">Presentation<a class="headerlink" href="#presentation" title="Link to this heading">¶</a></h3>
+<dl class="simple myst">
+<dt>Video scale mode</dt><dd><p>How decoded video is drawn: <strong>Fit</strong> (letterbox), <strong>Fill</strong> (crop), <strong>Stretch</strong> (distort), plus Zoom/Pan from the overlay.</p>
+</dd>
+<dt>Remember Zoom &amp; Pan</dt><dd><p>Keep zoom and pan between sessions.</p>
+</dd>
+<dt>Reset Zoom &amp; Pan</dt><dd><p>Return to 1.0×, centered.</p>
+</dd>
+</dl>
+<h3 id="motion">Motion<a class="headerlink" href="#motion" title="Link to this heading">¶</a></h3>
+<dl class="simple myst">
+<dt>Controller motion</dt><dd><p>Forward Joy-Con / controller gyro and accelerometer to the host (Sunshine DS4-style motion on player 1).</p>
+</dd>
+<dt>Console motion</dt><dd><p>Handheld console-motion fallback. <strong>Off by default.</strong> libnx SevenSixAxis may be present, but vectors are not treated as gyro/accel until they are mapped.</p>
+</dd>
+</dl>
+<h3 id="vpn">VPN<a class="headerlink" href="#vpn" title="Link to this heading">¶</a></h3>
+<dl class="simple myst">
+<dt>Enable WireGuard tunnel</dt><dd><p>Bring up a WireGuard tunnel from a <code class="docutils literal notranslate"><span class="pre">.conf</span></code> on the SD card before connecting.</p>
+</dd>
+<dt>Config file path</dt><dd><p>Path to that <code class="docutils literal notranslate"><span class="pre">.conf</span></code>.</p>
+</dd>
+<dt>Tunnel status</dt><dd><p>Last known tunnel state (informational).</p>
+</dd>
+</dl>
+<hr class="docutils" />
+<h2 id="stream-profiles">Stream profiles<a class="headerlink" href="#stream-profiles" title="Link to this heading">¶</a></h2>
+<p>Named full settings snapshots with the same sections as Settings (video, presentation, stream, audio, keyboard, mouse, controller, Apollo virtual display / scale). Stored as <code class="docutils literal notranslate"><span class="pre">profile.json</span></code>.</p>
+<dl class="simple myst">
+<dt>Default profile</dt><dd><p>Global fallback when a host has no assigned profile.</p>
+</dd>
+<dt>Manage profiles</dt><dd><p>Create, rename, duplicate, delete.</p>
+</dd>
+<dt>Export / Import profiles</dt><dd><p>Write or read <code class="docutils literal notranslate"><span class="pre">profile.json</span></code>. App list can import/export the same file.</p>
+</dd>
+</dl>
+<p>On a connected host:</p>
+<ul class="simple">
+<li><p><strong>Applications</strong> tab: pick a game; the profile row selects which snapshot to launch with.</p></li>
+<li><p><strong>Host</strong> tab: assign the profile for that host.</p></li>
+<li><p>Host ready page: <strong>RB</strong> / <strong>Y</strong> / <strong>X</strong> for quick edit / delete (see on-screen hints).</p></li>
+</ul>
+<p>There is no separate global “Artemis Profiles” settings section. Edit profiles from the host UI or the profile editor page (not a popup).</p>
+<hr class="docutils" />
+<h2 id="add-host">Add host<a class="headerlink" href="#add-host" title="Link to this heading">¶</a></h2>
+<dl class="simple myst">
+<dt>Host IP</dt><dd><p>Manual address (LAN, Tailscale, or public IP).</p>
+</dd>
+<dt>Add address</dt><dd><p>Extra endpoint for the same host.</p>
+</dd>
+<dt>Connect</dt><dd><p>Pair / connect to the typed address.</p>
+</dd>
+<dt>Search</dt><dd><p>LAN discovery list. Pick a found host instead of typing an IP.</p>
+</dd>
+</dl>
+<hr class="docutils" />
+<h2 id="connected-host">Connected host<a class="headerlink" href="#connected-host" title="Link to this heading">¶</a></h2>
+<h3 id="applications">Applications<a class="headerlink" href="#applications" title="Link to this heading">¶</a></h3>
+<p>Game grid plus the stream-profile row. Starting an app uses the selected profile.</p>
+<h3 id="host">Host<a class="headerlink" href="#host" title="Link to this heading">¶</a></h3>
+<dl class="simple myst">
+<dt>Host web config</dt><dd><p>QR and URL for the Sunshine/Apollo web UI (add apps, see PIN). If QR drawing fails, the URL is still shown.</p>
+</dd>
+<dt>Stream profile</dt><dd><p>Profile assigned to this host, or <strong>Global settings</strong>. New / Edit / Delete / rename live here.</p>
+</dd>
+<dt>Wake up</dt><dd><p>Send Wake-on-LAN if the host was configured for it.</p>
+</dd>
+</dl>
+<hr class="docutils" />
+<h2 id="in-stream-overlay-quick">In-stream overlay — Quick<a class="headerlink" href="#in-stream-overlay-quick" title="Link to this heading">¶</a></h2>
+<dl class="simple myst">
+<dt>Keyboard</dt><dd><p>Open the on-screen keyboard.</p>
+</dd>
+<dt>Mouse</dt><dd><p>Enter mouse-input mode (next to Keyboard on purpose).</p>
+</dd>
+<dt>Move window left / right</dt><dd><p>Host shortcut to move the focused window to the left or right display. Labels follow <strong>Host device</strong>.</p>
+</dd>
+<dt>Touch screen</dt><dd><p><strong>On</strong> or <strong>Off</strong> for touch-as-mouse this session.</p>
+</dd>
+<dt>Host shortcuts</dt><dd><p>Keyboard presets (Escape, fullscreen, paste, Start/Command/Super, desktop, Game Bar, task switcher, task manager / Force quit, IME switch, and the same move-window actions). Not the same as server commands.</p>
+</dd>
+<dt>Restart server</dt><dd><p>Matched host command if the host advertises it.</p>
+</dd>
+<dt>Reset display</dt><dd><p>Matched host command if advertised.</p>
+</dd>
+<dt>Server commands</dt><dd><p>Apollo host scripts, distinct from keyboard shortcuts.</p>
+</dd>
+<dt>Volume</dt><dd><p>Client volume. Amplification above 100% requires <strong>Allow volume amplification</strong>.</p>
+</dd>
+</dl>
+<hr class="docutils" />
+<h2 id="in-stream-overlay-options">In-stream overlay — Options<a class="headerlink" href="#in-stream-overlay-options" title="Link to this heading">¶</a></h2>
+<dl class="simple myst">
+<dt>Input overlay</dt><dd><p>Extra on-stream input helper.</p>
+</dd>
+<dt>Keyboard type / Taps to open keyboard</dt><dd><p>Same as Settings → Keyboard.</p>
+</dd>
+<dt>Pointer mode</dt><dd><p>How touch/mouse pointer is interpreted (trackpad, gaming trackpad, multi-touch, absolute, swapped absolute, or disabled).</p>
+</dd>
+<dt>Controllers</dt><dd><p>Connected pads, player slots, rumble + motion, rumble tests.</p>
+</dd>
+<dt>Clipboard</dt><dd><p>Apollo-only fetch / edit / upload / paste of host clipboard text.</p>
+</dd>
+<dt>Video rotation</dt><dd><p>Rotate the presented video (portrait virtual displays).</p>
+</dd>
+<dt>Scale mode</dt><dd><p>Same as Settings <strong>Video scale mode</strong>, live.</p>
+</dd>
+<dt>Low latency pacing</dt><dd><p>Same as Settings, toggleable during a stream.</p>
+</dd>
+<dt>Zoom / Pan X / Pan Y</dt><dd><p>Manual framing. Reset returns to 1.0× centered.</p>
+</dd>
+<dt>Guide key</dt><dd><p>Same chord / system-button options as Settings.</p>
+</dd>
+<dt>Mouse speed</dt><dd><p>Same as Settings.</p>
+</dd>
+<dt>Image Adjustments</dt><dd><p>Dithering, upscaling, upscaling mode, RCAS — same as Settings.</p>
+</dd>
+</dl>
+<hr class="docutils" />
+<h2 id="in-stream-overlay-performance">In-stream overlay — Performance<a class="headerlink" href="#in-stream-overlay-performance" title="Link to this heading">¶</a></h2>
+<p>Live telemetry for the current stream. Not persistent settings except Debug at the bottom.</p>
+<table class="docutils data align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Row</p></th>
+<th class="head"><p>Meaning</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Bitrate</p></td>
+<td><p>Configured stream bitrate</p></td>
+</tr>
+<tr class="row-odd"><td><p>Switch Wi-Fi</p></td>
+<td><p>Client Wi-Fi signal; graph under the row</p></td>
+</tr>
+<tr class="row-even"><td><p>Receive / Decode / Render</p></td>
+<td><p>Stage latencies</p></td>
+</tr>
+<tr class="row-odd"><td><p>Packet loss</p></td>
+<td><p>Reported loss</p></td>
+</tr>
+<tr class="row-even"><td><p>Host / Network / Decoder / Rendered FPS</p></td>
+<td><p>Pipeline frame rates (graphs on network and decoder)</p></td>
+</tr>
+<tr class="row-odd"><td><p>Frame queue</p></td>
+<td><p>Queued decoded frames</p></td>
+</tr>
+<tr class="row-even"><td><p>Presentation</p></td>
+<td><p>Current scale / presentation path</p></td>
+</tr>
+<tr class="row-odd"><td><p>Mode, CPU / GPU / Memory clock, Battery</p></td>
+<td><p>Switch runtime</p></td>
+</tr>
+<tr class="row-even"><td><p>Benchmark</p></td>
+<td><p>Start / stop / save / clear a timing capture</p></td>
+</tr>
+<tr class="row-odd"><td><p>Show debugging view</p></td>
+<td><p>On-stream debug overlay</p></td>
+</tr>
+<tr class="row-even"><td><p>On-screen log</p></td>
+<td><p>Overlay log lines</p></td>
+</tr>
+</tbody>
+</table>
+<p>Debug sits under Stream Performance after Benchmark.</p>
+<hr class="docutils" />
+<h2 id="credits-for-these-options">Credits for these options<a class="headerlink" href="#credits-for-these-options" title="Link to this heading">¶</a></h2>
+<p>Moonlight-Switch (XITRIX) is the base client. Frame-rate-sync / low-latency pacing is adapted from nyanpasu64’s Moonlight-Switch work (<a class="reference external" href="https://github.com/XITRIX/Moonlight-Switch/issues/323">#323</a>). Apollo virtual display and related host commands follow Apollo / Artemis Classic behavior.</p>
+
+
+
+
+
+
+
+  
+  
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="install.html" class="md-footer__link md-footer__link--prev" aria-label="Previous: Install">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                Install
+              </div>
+            </div>
+          </a>
+        
+        
+      </nav>
+    
+  
+  
+  
+  <div class="md-footer-meta md-typeset">
+    
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-footer-copyright__highlight">
+        &#169; Copyright 2024-2026, antoinebou12.
+        
+    </div>
+  
+    Created using
+    <a href="https://www.sphinx-doc.org/" target="_blank" rel="noopener">Sphinx</a>
+    8.2.3.
+     and
+    <a href="https://github.com/jbms/sphinx-immaterial/" target="_blank" rel="noopener">Sphinx-Immaterial</a>
+  
+</div>
+      
+    </div>
+    
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    <script id="__config" type="application/json">{"base": ".", "features": ["content.tabs.link", "navigation.footer", "navigation.tabs", "navigation.top", "navigation.tracking", "search.highlight", "search.share", "toc.follow", "toc.sticky"], "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    
+      
+        <script src="_static/sphinx_immaterial_theme.32136f45f91ae6956.min.js?v=a7a9472a"></script>
+    
+  </body>
+</html>

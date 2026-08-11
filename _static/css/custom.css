@@ -1,0 +1,9 @@
+/* Keep the Material layout close to ipc-toolkit: readable body, quiet code. */
+.md-typeset h1,
+.md-typeset h2 {
+    font-weight: 600;
+}
+
+.md-typeset dl dt {
+    font-weight: 600;
+}
