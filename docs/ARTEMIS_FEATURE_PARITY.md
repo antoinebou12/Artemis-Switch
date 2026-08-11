@@ -72,7 +72,7 @@ This document is for **XITRIX** and other Moonlight-Switch maintainers, and for 
 
 ### Fork packaging (Artemis-Switch only; not requested upstream)
 
-- NRO branding Artemis Switch, version **1.5.1**, About/version strings.
+- NRO branding Artemis Switch, version **1.5.2**, About/version strings.
 - Portable unit tests + i18n consistency (en-US + fr) for new strings.
 - Multi-OS CI on the fork: portable Linux tests/sanitizers + All Builds (Linux, Windows, macOS, Android, Vita, Switch).
 
