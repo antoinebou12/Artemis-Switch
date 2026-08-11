@@ -1,4 +1,4 @@
-﻿{
+{
     "about": {
         "about": "Artemis Switch diffuse les jeux d'un PC Apollo ou Sunshine. Il est basé sur le code original de Moonlight-Switch par XITRIX et Moonlight-Common-C. Apollo et Artemis (Moonlight Noir) de ClassicOldSong ont inspiré l'hôte et le client. Les licences amont s'appliquent toujours — voir LICENSE.",
         "link_gbatemp": "Page GbaTemp",
@@ -123,8 +123,8 @@
             "move_window_help": "Déplacer le jeu actif :",
             "move_window_left": "Déplacer à gauche",
             "move_window_right": "Déplacer à droite",
-            "move_window_left_hint": "Win+Shift+Gauche",
-            "move_window_right_hint": "Win+Shift+Droite",
+            "move_window_left_hint": "",
+            "move_window_right_hint": "",
             "left_display": "Gauche",
             "right_display": "Droite",
             "target_display": "Écran PC",
@@ -149,7 +149,7 @@
             "pc_slot": "Emplacement PC",
             "rumble_motion": "Vibration + mouvement",
             "mouse_controls": "Souris",
-            "touch_controls": "Tactile",
+            "touch_controls": "Contrôle écran tactile",
             "pointer_mode": "Mode du pointeur",
             "clipboard": "Presse-papiers",
             "fetch_edit_paste": "Récupérer · Modifier · Coller",
@@ -198,7 +198,32 @@
             "quit_host_app": "Fermer sur le PC",
             "start": "Démarrer",
             "stop": "Arrêter",
-            "requires_benchmark": "Nécessite le module de test de performance"
+            "requires_benchmark": "Nécessite le module de test de performance",
+            "shortcut": {
+                "escape": "Échap",
+                "fullscreen": "Plein écran",
+                "close_window": "Fermer la fenêtre",
+                "toggle_fullscreen": "Basculer plein écran",
+                "paste": "Coller",
+                "meta_windows": "Menu Démarrer",
+                "meta_macos": "Menu Commande",
+                "meta_linux": "Touche Super",
+                "desktop": "Afficher le bureau",
+                "game_bar": "Game Bar",
+                "task_switcher": "Sélecteur de tâches",
+                "reverse_tab": "Focus précédent",
+                "task_manager": "Gestionnaire des tâches",
+                "task_manager_macos": "Forcer à quitter",
+                "switch_host_ime": "Changer de langue clavier",
+                "move_window_left": "Déplacer à gauche",
+                "move_window_right": "Déplacer à droite"
+            },
+            "touch_trackpad": "Trackpad naturel",
+            "touch_trackpad_gaming": "Trackpad jeu",
+            "touch_multitouch": "Multi-touch",
+            "touch_absolute": "Pointeur absolu",
+            "touch_absolute_swapped": "Absolu (inversé)",
+            "touch_disabled": "Tactile désactivé"
         },
         "performance": {
             "title": "Performances",
@@ -288,13 +313,13 @@
         "wake_up": "Réveiller",
         "wake_up_error": "L'hôte n'a pas pu être réveillé",
         "wake_up_message": "Réveil en cours...",
-        "web_config": "Config web de l’hôte",
+        "web_config": "Config web de l'hôte",
         "web_config_hint": "Afficher le QR",
-        "web_config_message": "Ouvrez cette URL sur le PC ou le téléphone pour ajouter des apps dans Sunshine/Apollo :",
-        "web_config_no_address": "Aucune adresse d’hôte disponible",
+        "web_config_message": "Ouvrez cette URL sur votre PC ou téléphone pour ajouter des apps dans Sunshine/Apollo :",
+        "web_config_no_address": "Aucune adresse d'hôte disponible",
         "web_config_scan_hint": "Scannez avec votre téléphone",
-        "web_config_qr_unavailable": "Le QR n’a pas pu être affiché. Utilisez l’URL ci-dessous.",
-        "web_config_copy": "Copier l’URL",
+        "web_config_qr_unavailable": "QR indisponible. Utilisez l'URL ci-dessous.",
+        "web_config_copy": "Copier l'URL",
         "stream_profile": "Profil de stream",
         "stream_profile_global": "Réglages globaux",
         "tab_applications": "Applications",
@@ -308,7 +333,7 @@
         "rename_profile": "Renommer le profil",
         "rename_profile_title": "Renommer le profil",
         "edit_profile_resolution": "Résolution",
-        "snapshot_profile": "Mettre à jour depuis les réglages actuels",
+        "snapshot_profile": "Mettre à jour depuis les réglages",
         "delete_profile_message": "Supprimer ce profil de stream ?"
     },
     "mapping_layout_editor": {
@@ -420,7 +445,13 @@
         "video_bitrate": "Débit vidéo",
         "video_codec": "Codec vidéo",
         "volume_amplification": "Amplification du volume",
-        "zero_threads": "0 (pas de threads)"
+        "zero_threads": "0 (pas de threads)",
+        "host_device": "Appareil hôte",
+        "host_device_windows": "Windows",
+        "host_device_macos": "macOS",
+        "host_device_linux": "Linux",
+        "swap_ui_ab": "Inverser / (A/B) dans l'interface",
+        "swap_ui_xy": "Inverser / (X/Y) dans l'interface"
     },
     "streaming": {
         "connection": "Connexion",

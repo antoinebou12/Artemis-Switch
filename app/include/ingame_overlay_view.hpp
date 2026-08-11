@@ -51,9 +51,12 @@ class QuickTab : public brls::Box {
     BRLS_BIND(brls::DetailCell, quickKeyboard, "quick_keyboard");
     BRLS_BIND(brls::DetailCell, quickMoveLeft, "quick_move_left");
     BRLS_BIND(brls::DetailCell, quickMoveRight, "quick_move_right");
+    BRLS_BIND(brls::DetailCell, quickTouch, "quick_touch");
     BRLS_BIND(brls::DetailCell, quickHostShortcuts, "quick_host_shortcuts");
     BRLS_BIND(brls::DetailCell, quickServerCommands, "quick_server_commands");
     BRLS_BIND(brls::DetailCell, quickMouse, "quick_mouse");
+    BRLS_BIND(brls::Header, volumeHeader, "volume_header");
+    BRLS_BIND(brls::Slider, volumeSlider, "volume_slider");
 };
 
 // MARK: - Options Tab
@@ -84,8 +87,6 @@ class OptionsTab : public brls::Box {
     BRLS_BIND(brls::DetailCell, optionsRotation, "options_rotation");
     BRLS_BIND(brls::DetailCell, guideKeyButtons, "guide_key_buttons");
     BRLS_BIND(brls::SelectorCell, guideBySystemButton, "guide_by_system_button");
-    BRLS_BIND(brls::Header, volumeHeader, "volume_header");
-    BRLS_BIND(brls::Slider, volumeSlider, "volume_slider");
     BRLS_BIND(brls::Header, rumbleForceHeader, "rumble_slider_header");
     BRLS_BIND(brls::Slider, rumbleForceSlider, "rumble_slider");
     BRLS_BIND(brls::BooleanCell, swapStickToDpad, "swap_stick_to_dpad");
@@ -94,8 +95,6 @@ class OptionsTab : public brls::Box {
     BRLS_BIND(brls::Header, imageAdjustmentsHeader, "image_adjustments_header");
     BRLS_BIND(BooleanSliderCell, ditheringButton, "dithering");
     BRLS_BIND(BooleanSliderCell, rcasButton, "rcas");
-    BRLS_BIND(brls::BooleanCell, debugButton, "debug");
     BRLS_BIND(brls::BooleanCell, upscalingButton, "upscaling");
     BRLS_BIND(brls::SelectorCell, upscalingModeButton, "upscaling_mode");
-    BRLS_BIND(brls::BooleanCell, onscreenLogButton, "onscreen_log");
 };

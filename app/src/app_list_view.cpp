@@ -11,6 +11,8 @@
 #include "features/ui/QrCodeView.hpp"
 #include "streaming/HostProfileKey.hpp"
 #include "streaming/HostStreamProfileUi.hpp"
+#include "streaming/ProfileEditorDialog.hpp"
+#include "streaming/StreamConfigProfileStore.hpp"
 
 AppListView::AppListView(const Host& host) : Box(Axis::ROW), host(host) {
     hostProfileKey = artemis::streaming::host_profile_key(host);
@@ -129,11 +131,51 @@ AppListView::AppListView(const Host& host) : Box(Axis::ROW), host(host) {
     registerAction("", brls::ControllerButton::BUTTON_BACK, closeCurrentAction,
                    true);
 
-    registerAction("app_list/reload_app_list"_i18n, BUTTON_Y,
-                   [this](View*) {
-                       this->updateAppList();
-                       return true;
-                   });
+    registerAction("app_list/reload_app_list"_i18n, BUTTON_Y, [this](View*) {
+        if (activePane == Pane::Host) {
+            const auto selected =
+                artemis::streaming::StreamConfigProfileStore::instance()
+                    .selectedForHost(hostProfileKey);
+            brls::sync([this, selected] {
+                if (selected.empty()) {
+                    artemis::streaming::openProfileEditor(
+                        {}, hostProfileKey,
+                        [this] { refreshStreamProfileLabel(); });
+                } else {
+                    artemis::streaming::openProfileEditor(
+                        selected, hostProfileKey,
+                        [this] { refreshStreamProfileLabel(); });
+                }
+            });
+            return true;
+        }
+        this->updateAppList();
+        return true;
+    });
+    registerAction("host/delete_profile"_i18n, BUTTON_X, [this](View*) {
+        if (activePane != Pane::Host)
+            return false;
+        const auto selected =
+            artemis::streaming::StreamConfigProfileStore::instance()
+                .selectedForHost(hostProfileKey);
+        if (selected.empty()) {
+            showError("host/manage_profile_none"_i18n);
+            return true;
+        }
+        brls::sync([this, selected] {
+            auto* confirm = new brls::Dialog("host/delete_profile_message"_i18n);
+            confirm->addButton("common/cancel"_i18n, [] {});
+            confirm->addButton("common/remove"_i18n, [this, selected] {
+                auto& store =
+                    artemis::streaming::StreamConfigProfileStore::instance();
+                store.remove(selected);
+                store.clearSelectedForHost(hostProfileKey);
+                refreshStreamProfileLabel();
+            });
+            confirm->open();
+        });
+        return true;
+    });
     registerAction("host/new_profile"_i18n, BUTTON_RB, [this](View*) {
         showPane(Pane::Host, true);
         if (sidebar && sidebar->getItem(1))
@@ -150,6 +192,13 @@ void AppListView::showPane(Pane pane, bool focusContent) {
     const bool apps = pane == Pane::Applications;
     appsContainer->setVisibility(apps ? Visibility::VISIBLE : Visibility::GONE);
     hostContainer->setVisibility(apps ? Visibility::GONE : Visibility::VISIBLE);
+
+    setActionAvailable(BUTTON_Y, true);
+    setActionAvailable(BUTTON_X, !apps);
+    setActionAvailable(BUTTON_RB, true);
+    updateActionHint(BUTTON_Y, apps ? "app_list/reload_app_list"_i18n
+                                    : "host/edit_profile"_i18n);
+    updateActionHint(BUTTON_X, "host/delete_profile"_i18n);
 
     if (!focusContent)
         return;

@@ -233,7 +233,8 @@ int main(int argc, char* argv[]) {
     }
 
     brls::Application::enableDebuggingView(Settings::instance().write_log());
-    brls::Application::setSwapInputKeys(Settings::instance().swap_ui_keys());
+    brls::Application::setSwapABInputKeys(Settings::instance().swap_ui_ab());
+    brls::Application::setSwapXYInputKeys(Settings::instance().swap_ui_xy());
 
     // Run the app. The Vita development loop waits for this marker so a
     // successful launch means at least one complete Borealis frame rendered.

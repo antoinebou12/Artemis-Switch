@@ -1,4 +1,4 @@
-﻿{
+{
     "about": {
         "about": "Moonlight-Switch는 닌텐도 스위치용 Moonlight-Common-C를 기반으로 하는 타사 게임 스트리밍 클라이언트입니다.",
         "link_gbatemp": "GbaTemp 페이지",
@@ -83,7 +83,29 @@
         "wait": "기다려 주세요...",
         "wake_up": "깨우기",
         "wake_up_error": "호스트를 깨울 수 없음",
-        "wake_up_message": "깨우기 보내기"
+        "wake_up_message": "깨우기 보내기",
+        "web_config": "호스트 웹 설정",
+        "web_config_hint": "QR 표시",
+        "web_config_message": "PC나 휴대폰에서 이 URL을 열어 Sunshine/Apollo에 앱을 추가하세요:",
+        "web_config_no_address": "호스트 주소가 없습니다",
+        "web_config_scan_hint": "휴대폰으로 스캔",
+        "web_config_qr_unavailable": "QR을 그릴 수 없습니다. 아래 URL을 사용하세요.",
+        "web_config_copy": "URL 복사",
+        "stream_profile": "스트림 프로필",
+        "stream_profile_global": "전역 설정",
+        "tab_applications": "애플리케이션",
+        "tab_host": "호스트",
+        "new_profile": "새 프로필",
+        "new_profile_title": "프로필 이름",
+        "edit_profile": "프로필 편집",
+        "delete_profile": "프로필 삭제",
+        "manage_profile": "프로필 관리",
+        "manage_profile_none": "이 호스트에 할당된 프로필이 없습니다",
+        "rename_profile": "프로필 이름 변경",
+        "rename_profile_title": "프로필 이름 변경",
+        "edit_profile_resolution": "해상도",
+        "snapshot_profile": "현재 설정에서 업데이트",
+        "delete_profile_message": "이 스트림 프로필을 삭제할까요?"
     },
     "mapping_layout_editor": {
         "remove": "레이아웃 제거",
@@ -162,7 +184,7 @@
         "swap_mouse_keys": "마우스  및  버튼 교체",
         "swap_mouse_scroll": "마우스 세로 스크롤 방향 바꾸기",
         "swap_stick_to_dpad": "스틱을 십자패드로 사용",
-        "swap_ui": "교체 / 및 / UI 용",
+        "swap_ui": "UI용 / 및 / 교체",
         "system_button_duplication_error": "다른 작업이 이미 이 시스템 버튼을 사용하고 있습니다.",
         "touchscreen_mouse_mode": "터치스크린 모드",
         "use_hw_decoding": "하드웨어 가속 활성화",
@@ -171,7 +193,13 @@
         "video_bitrate": "동영상 전송율",
         "video_codec": "동영상 코덱",
         "volume_amplification": "볼륨 증폭 허용",
-        "zero_threads": "0 (스레드 사용 안 함)"
+        "zero_threads": "0 (스레드 사용 안 함)",
+        "host_device": "호스트 장치",
+        "host_device_windows": "Windows",
+        "host_device_macos": "macOS",
+        "host_device_linux": "Linux",
+        "swap_ui_ab": "UI용 / (A/B) 교체",
+        "swap_ui_xy": "UI용 / (X/Y) 교체"
     },
     "streaming": {
         "connection": "연결",
@@ -194,5 +222,37 @@
         "favorites": "즐겨찾기",
         "settings": "설정"
     },
-    "title": "Artemis Switch"
+    "title": "Artemis Switch",
+    "artemis": {
+        "overlay": {
+            "shortcut": {
+                "escape": "Esc",
+                "fullscreen": "전체 화면",
+                "close_window": "창 닫기",
+                "toggle_fullscreen": "전체 화면 전환",
+                "paste": "붙여넣기",
+                "meta_windows": "시작 메뉴",
+                "meta_macos": "명령 메뉴",
+                "meta_linux": "Super 키",
+                "desktop": "바탕 화면 표시",
+                "game_bar": "게임 바",
+                "task_switcher": "작업 전환",
+                "reverse_tab": "이전 포커스",
+                "task_manager": "작업 관리자",
+                "task_manager_macos": "강제 종료",
+                "switch_host_ime": "키보드 언어 전환",
+                "move_window_left": "창 왼쪽 이동",
+                "move_window_right": "창 오른쪽 이동"
+            },
+            "touch_controls": "터치 화면 제어",
+            "touch_trackpad": "내추럴 트랙패드",
+            "touch_trackpad_gaming": "게임 트랙패드",
+            "touch_multitouch": "멀티터치",
+            "touch_absolute": "절대 포인터",
+            "touch_absolute_swapped": "절대(전환)",
+            "touch_disabled": "터치 끄기",
+            "move_window_left_hint": "",
+            "move_window_right_hint": ""
+        }
+    }
 }

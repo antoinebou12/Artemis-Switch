@@ -1,4 +1,4 @@
-﻿{
+{
     "about": {
         "about": "Moonlight-Switch是Nintendo Switch平台的一個基於Moonlight-Common-C的第三方遊戲串流用戶端",
         "link_gbatemp": "GbaTemp頁面",
@@ -83,7 +83,29 @@
         "wait": "等待中……",
         "wake_up": "喚醒",
         "wake_up_error": "無法喚醒主機",
-        "wake_up_message": "發送喚醒請求"
+        "wake_up_message": "發送喚醒請求",
+        "web_config": "主機網頁設定",
+        "web_config_hint": "顯示 QR",
+        "web_config_message": "在電腦或手機開啟此網址，以便在 Sunshine/Apollo 新增應用：",
+        "web_config_no_address": "沒有可用的主機位址",
+        "web_config_scan_hint": "用手機掃描",
+        "web_config_qr_unavailable": "無法繪製 QR，請使用下方網址。",
+        "web_config_copy": "複製網址",
+        "stream_profile": "串流設定檔",
+        "stream_profile_global": "全域設定",
+        "tab_applications": "應用程式",
+        "tab_host": "主機",
+        "new_profile": "新增設定檔",
+        "new_profile_title": "設定檔名稱",
+        "edit_profile": "編輯設定檔",
+        "delete_profile": "刪除設定檔",
+        "manage_profile": "管理設定檔",
+        "manage_profile_none": "此主機未指派設定檔",
+        "rename_profile": "重新命名設定檔",
+        "rename_profile_title": "重新命名設定檔",
+        "edit_profile_resolution": "解析度",
+        "snapshot_profile": "從目前設定更新",
+        "delete_profile_message": "刪除此串流設定檔？"
     },
     "mapping_layout_editor": {
         "remove": "移除佈局",
@@ -162,7 +184,7 @@
         "swap_mouse_keys": "對調滑鼠的和按鍵",
         "swap_mouse_scroll": "反轉滑鼠垂直滾動方向",
         "swap_stick_to_dpad": "使用搖桿作為D-Pad",
-        "swap_ui": "在主畫面中對調/和/按鍵",
+        "swap_ui": "在介面中對調 / 和 /",
         "system_button_duplication_error": "Another action already use this system button.",
         "touchscreen_mouse_mode": "觸摸屏模式",
         "use_hw_decoding": "啟用硬體加速",
@@ -171,7 +193,13 @@
         "video_bitrate": "影片位元率",
         "video_codec": "影片解碼器",
         "volume_amplification": "允許放大音量",
-        "zero_threads": "0（不使用執行緒）"
+        "zero_threads": "0（不使用執行緒）",
+        "host_device": "主機裝置",
+        "host_device_windows": "Windows",
+        "host_device_macos": "macOS",
+        "host_device_linux": "Linux",
+        "swap_ui_ab": "在介面中對調 /（A/B）",
+        "swap_ui_xy": "在介面中對調 /（X/Y）"
     },
     "streaming": {
         "connection": "連接選項",
@@ -194,5 +222,37 @@
         "favorites": "最愛",
         "settings": "設定"
     },
-    "title": "Artemis Switch"
+    "title": "Artemis Switch",
+    "artemis": {
+        "overlay": {
+            "shortcut": {
+                "escape": "Esc",
+                "fullscreen": "全螢幕",
+                "close_window": "關閉視窗",
+                "toggle_fullscreen": "切換全螢幕",
+                "paste": "貼上",
+                "meta_windows": "開始功能表",
+                "meta_macos": "指令功能表",
+                "meta_linux": "Super 鍵",
+                "desktop": "顯示桌面",
+                "game_bar": "Game Bar",
+                "task_switcher": "工作切換",
+                "reverse_tab": "上一個焦點",
+                "task_manager": "工作管理員",
+                "task_manager_macos": "強制結束",
+                "switch_host_ime": "切換鍵盤語言",
+                "move_window_left": "視窗左移",
+                "move_window_right": "視窗右移"
+            },
+            "touch_controls": "觸控螢幕控制",
+            "touch_trackpad": "自然觸控板",
+            "touch_trackpad_gaming": "遊戲觸控板",
+            "touch_multitouch": "多點觸控",
+            "touch_absolute": "絕對指標",
+            "touch_absolute_swapped": "絕對（交換）",
+            "touch_disabled": "觸控關閉",
+            "move_window_left_hint": "",
+            "move_window_right_hint": ""
+        }
+    }
 }

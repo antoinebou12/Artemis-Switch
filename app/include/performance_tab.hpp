@@ -4,17 +4,21 @@
 
 #include "wifi_performance_graph.hpp"
 
+class StreamingView;
+
 class PerformanceTab : public brls::Box {
 public:
-    PerformanceTab();
+    explicit PerformanceTab(StreamingView* streamView = nullptr);
     ~PerformanceTab() override;
 
-    static brls::View* create() { return new PerformanceTab(); }
+    static brls::View* create() { return new PerformanceTab(nullptr); }
 
 private:
     void refresh();
     void updateBenchmarkStatus();
     void scheduleRefresh();
+
+    StreamingView* streamView = nullptr;
 
     BRLS_BIND(brls::DetailCell, network, "network");
     BRLS_BIND(brls::DetailCell, wifiSignal, "wifi_signal");
@@ -39,6 +43,8 @@ private:
     BRLS_BIND(brls::DetailCell, benchmarkAction, "benchmark_action");
     BRLS_BIND(brls::DetailCell, benchmarkSave, "benchmark_save");
     BRLS_BIND(brls::DetailCell, benchmarkReset, "benchmark_reset");
+    BRLS_BIND(brls::BooleanCell, debugButton, "debug");
+    BRLS_BIND(brls::BooleanCell, onscreenLogButton, "onscreen_log");
     uint64_t previousReceived = 0;
     uint64_t previousDropped = 0;
     size_t refreshTask = 0;

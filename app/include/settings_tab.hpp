@@ -38,7 +38,8 @@ class SettingsTab : public brls::Box {
               "stream_audio_configuration");
     BRLS_BIND(brls::BooleanCell, terminateAppOnDisconnect,
               "terminate_app_on_disconnect");
-    BRLS_BIND(brls::BooleanCell, swapUi, "swap_ui");
+    BRLS_BIND(brls::BooleanCell, swapUiAb, "swap_ui_ab");
+    BRLS_BIND(brls::BooleanCell, swapUiXy, "swap_ui_xy");
     BRLS_BIND(brls::DetailCell, swapGame, "swap_game");
     BRLS_BIND(brls::DetailCell, deadzoneStickLeft, "dead_zone_stick_left");
     BRLS_BIND(brls::DetailCell, deadzoneStickRight, "dead_zone_stick_right");
@@ -58,6 +59,7 @@ class SettingsTab : public brls::Box {
     BRLS_BIND(brls::SelectorCell, keyboardLocale, "keyboard_locale");
     BRLS_BIND(brls::SelectorCell, keyboardFingers, "keyboard_fingers");
     BRLS_BIND(brls::BooleanCell, volumeAmplification, "volume_amplification");
+    BRLS_BIND(brls::SelectorCell, hostDeviceOs, "host_device_os");
     BRLS_BIND(brls::BooleanCell, touchscreenMouseMode, "touchscreen_mouse_mode");
     BRLS_BIND(brls::BooleanCell, swapMouseKeys, "swap_mouse_keys");
     BRLS_BIND(brls::BooleanCell, swapMouseScroll, "swap_mouse_scroll");

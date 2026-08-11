@@ -476,15 +476,24 @@ SettingsTab::SettingsTab() {
             Settings::instance().set_terminate_app_on_disconnect(value);
         });
 
-    swapUi->init("settings/swap_ui"_i18n, Settings::instance().swap_ui_keys(),
-                 [](bool value) {
-                     Settings::instance().set_swap_ui_keys(value);
-                     brls::async([value] {
-                         brls::sync([value] {
-                             brls::Application::setSwapInputKeys(value);
-                         });
-                     });
-                 });
+    swapUiAb->init("settings/swap_ui_ab"_i18n, Settings::instance().swap_ui_ab(),
+                   [](bool value) {
+                       Settings::instance().set_swap_ui_ab(value);
+                       brls::async([value] {
+                           brls::sync([value] {
+                               brls::Application::setSwapABInputKeys(value);
+                           });
+                       });
+                   });
+    swapUiXy->init("settings/swap_ui_xy"_i18n, Settings::instance().swap_ui_xy(),
+                   [](bool value) {
+                       Settings::instance().set_swap_ui_xy(value);
+                       brls::async([value] {
+                           brls::sync([value] {
+                               brls::Application::setSwapXYInputKeys(value);
+                           });
+                       });
+                   });
 
     std::vector<std::string> layouts;
     for (KeyMappingLayout layout : *Settings::instance().get_mapping_laouts())
@@ -844,6 +853,33 @@ SettingsTab::SettingsTab() {
             if (!value && Settings::instance().get_volume() > 100)
                 Settings::instance().set_volume(100);
         });
+
+    {
+        const std::vector<std::string> osOptions = {
+            "settings/host_device_windows"_i18n, "settings/host_device_macos"_i18n,
+            "settings/host_device_linux"_i18n};
+        int selected = 0;
+        switch (Settings::instance().host_device_os()) {
+        case HostDeviceOs::MacOS:
+            selected = 1;
+            break;
+        case HostDeviceOs::Linux:
+            selected = 2;
+            break;
+        case HostDeviceOs::Windows:
+        default:
+            selected = 0;
+            break;
+        }
+        hostDeviceOs->init("settings/host_device"_i18n, osOptions, selected,
+                           [](int index) {
+                               Settings::instance().set_host_device_os(
+                                   index == 1   ? HostDeviceOs::MacOS
+                                   : index == 2 ? HostDeviceOs::Linux
+                                                : HostDeviceOs::Windows);
+                               Settings::instance().save();
+                           });
+    }
 
     touchscreenMouseMode->init("settings/touchscreen_mouse_mode"_i18n,
                                Settings::instance().touchscreen_mouse_mode(),

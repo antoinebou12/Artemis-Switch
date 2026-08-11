@@ -1,5 +1,6 @@
 #pragma once
 
+#include "HostDeviceOs.hpp"
 #include "Singleton.hpp"
 #include "UsableMac.hpp"
 #include <borealis.hpp>
@@ -306,6 +307,9 @@ class Settings : public Singleton<Settings> {
         return m_show_host_web_config;
     }
 
+    void set_host_device_os(HostDeviceOs os) { m_host_device_os = os; }
+    [[nodiscard]] HostDeviceOs host_device_os() const { return m_host_device_os; }
+
     void set_stream_audio_configuration(StreamAudioConfiguration config) {
         m_stream_audio_configuration = config;
     }
@@ -323,8 +327,20 @@ class Settings : public Singleton<Settings> {
     void set_write_log(bool write_log) { m_write_log = write_log; }
     [[nodiscard]] bool write_log() const { return m_write_log; }
 
-    void set_swap_ui_keys(bool swap_ui_keys) { m_swap_ui_keys = swap_ui_keys; }
-    [[nodiscard]] bool swap_ui_keys() const { return m_swap_ui_keys; }
+    void set_swap_ui_ab(bool value) { m_swap_ui_ab = value; }
+    [[nodiscard]] bool swap_ui_ab() const { return m_swap_ui_ab; }
+
+    void set_swap_ui_xy(bool value) { m_swap_ui_xy = value; }
+    [[nodiscard]] bool swap_ui_xy() const { return m_swap_ui_xy; }
+
+    // Legacy combined helper used by older callers / migration.
+    void set_swap_ui_keys(bool swap_ui_keys) {
+        m_swap_ui_ab = swap_ui_keys;
+        m_swap_ui_xy = swap_ui_keys;
+    }
+    [[nodiscard]] bool swap_ui_keys() const {
+        return m_swap_ui_ab || m_swap_ui_xy;
+    }
 
     void set_swap_joycon_stick_to_dpad(bool value) { m_swap_joycon_stick_to_dpad = value; }
     [[nodiscard]] bool swap_joycon_stick_to_dpad() const { return m_swap_joycon_stick_to_dpad; }
@@ -457,10 +473,12 @@ class Settings : public Singleton<Settings> {
     bool m_wireguard_enabled = false;
     std::string m_wireguard_config_path;
     bool m_show_host_web_config = true;
+    HostDeviceOs m_host_device_os = HostDeviceOs::Windows;
     StreamAudioConfiguration m_stream_audio_configuration = STREAM_AUDIO_STEREO;
     bool m_terminate_app_on_disconnect = false;
     bool m_write_log = false;
-    bool m_swap_ui_keys = false;
+    bool m_swap_ui_ab = false;
+    bool m_swap_ui_xy = false;
     bool m_swap_joycon_stick_to_dpad = false;
     bool m_touchscreen_mouse_mode = false;
     bool m_swap_mouse_keys = false;

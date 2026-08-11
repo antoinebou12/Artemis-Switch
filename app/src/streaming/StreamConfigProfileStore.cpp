@@ -156,8 +156,13 @@ json_t* profileToJson(const StreamConfigProfile& profile) {
     json_object_set_new(item, "mouse_speed_multiplier",
                         json_integer(profile.mouseSpeedMultiplier));
 
+    json_object_set_new(item, "swap_ui_ab",
+                        profile.swapUiAb ? json_true() : json_false());
+    json_object_set_new(item, "swap_ui_xy",
+                        profile.swapUiXy ? json_true() : json_false());
     json_object_set_new(item, "swap_ui_keys",
-                        profile.swapUiKeys ? json_true() : json_false());
+                        (profile.swapUiAb || profile.swapUiXy) ? json_true()
+                                                               : json_false());
     json_object_set_new(item, "deadzone_left",
                         json_real(static_cast<double>(profile.deadzoneLeft)));
     json_object_set_new(item, "deadzone_right",
@@ -257,8 +262,15 @@ StreamConfigProfile profileFromJson(json_t* object) {
         profile.mouseSpeedMultiplier =
             static_cast<int>(json_integer_value(mouseSpeed));
 
-    if (json_t* swapUi = json_object_get(object, "swap_ui_keys"))
-        profile.swapUiKeys = jsonToBool(swapUi);
+    if (json_t* swapUi = json_object_get(object, "swap_ui_keys")) {
+        const bool value = jsonToBool(swapUi);
+        profile.swapUiAb = value;
+        profile.swapUiXy = value;
+    }
+    if (json_t* swapUiAb = json_object_get(object, "swap_ui_ab"))
+        profile.swapUiAb = jsonToBool(swapUiAb);
+    if (json_t* swapUiXy = json_object_get(object, "swap_ui_xy"))
+        profile.swapUiXy = jsonToBool(swapUiXy);
     profile.deadzoneLeft =
         jsonToFloat(json_object_get(object, "deadzone_left"),
                     profile.deadzoneLeft);
@@ -299,7 +311,10 @@ void applyProfileToSettings(const StreamConfigProfile& profile) {
     settings.set_swap_mouse_scroll(profile.swapMouseScroll);
     settings.set_swap_mouse_sticks(profile.swapMouseSticks);
     settings.set_mouse_speed_multiplier(profile.mouseSpeedMultiplier);
-    settings.set_swap_ui_keys(profile.swapUiKeys);
+    settings.set_swap_ui_ab(profile.swapUiAb);
+    settings.set_swap_ui_xy(profile.swapUiXy);
+    brls::Application::setSwapABInputKeys(profile.swapUiAb);
+    brls::Application::setSwapXYInputKeys(profile.swapUiXy);
     settings.set_deadzone_stick_left(profile.deadzoneLeft);
     settings.set_deadzone_stick_right(profile.deadzoneRight);
     settings.set_rumble_force(profile.rumbleForce);
@@ -402,7 +417,8 @@ StreamConfigProfileStore::snapshotFromSettings(const std::string& name) {
     profile.swapMouseScroll = settings.swap_mouse_scroll();
     profile.swapMouseSticks = settings.swap_mouse_sticks();
     profile.mouseSpeedMultiplier = settings.get_mouse_speed_multiplier();
-    profile.swapUiKeys = settings.swap_ui_keys();
+    profile.swapUiAb = settings.swap_ui_ab();
+    profile.swapUiXy = settings.swap_ui_xy();
     profile.deadzoneLeft = settings.get_deadzone_stick_left();
     profile.deadzoneRight = settings.get_deadzone_stick_right();
     profile.rumbleForce = settings.get_rumble_force();

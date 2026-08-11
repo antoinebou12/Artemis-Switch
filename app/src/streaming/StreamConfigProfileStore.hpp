@@ -52,7 +52,8 @@ struct StreamConfigProfile {
     int mouseSpeedMultiplier = 47;
 
     // Controller
-    bool swapUiKeys = false;
+    bool swapUiAb = false;
+    bool swapUiXy = false;
     float deadzoneLeft = 0.0f;
     float deadzoneRight = 0.0f;
     float rumbleForce = 1.0f;

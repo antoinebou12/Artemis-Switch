@@ -423,6 +423,25 @@ void Settings::load() {
                     json_typeof(show_host_web_config) == JSON_TRUE;
             }
 
+            if (json_t* host_device_os =
+                    json_object_get(settings, "host_device_os")) {
+                if (json_typeof(host_device_os) == JSON_STRING) {
+                    const std::string value = json_string_value(host_device_os);
+                    if (value == "macos")
+                        m_host_device_os = HostDeviceOs::MacOS;
+                    else if (value == "linux")
+                        m_host_device_os = HostDeviceOs::Linux;
+                    else
+                        m_host_device_os = HostDeviceOs::Windows;
+                } else if (json_typeof(host_device_os) == JSON_INTEGER) {
+                    const int value = static_cast<int>(json_integer_value(host_device_os));
+                    m_host_device_os =
+                        value == 1   ? HostDeviceOs::MacOS
+                        : value == 2 ? HostDeviceOs::Linux
+                                     : HostDeviceOs::Windows;
+                }
+            }
+
             if (json_t* stream_audio_configuration =
                     json_object_get(settings, "stream_audio_configuration")) {
                 if (json_typeof(stream_audio_configuration) == JSON_INTEGER) {
@@ -442,7 +461,15 @@ void Settings::load() {
             }
             
             if (json_t* swap_ui_keys = json_object_get(settings, "swap_ui_keys")) {
-                m_swap_ui_keys = json_typeof(swap_ui_keys) == JSON_TRUE;
+                const bool value = json_typeof(swap_ui_keys) == JSON_TRUE;
+                m_swap_ui_ab = value;
+                m_swap_ui_xy = value;
+            }
+            if (json_t* swap_ui_ab = json_object_get(settings, "swap_ui_ab")) {
+                m_swap_ui_ab = json_typeof(swap_ui_ab) == JSON_TRUE;
+            }
+            if (json_t* swap_ui_xy = json_object_get(settings, "swap_ui_xy")) {
+                m_swap_ui_xy = json_typeof(swap_ui_xy) == JSON_TRUE;
             }
 
             if (json_t* swap_joycon_stick_to_dpad = json_object_get(settings, "swap_joycon_stick_to_dpad")) {
@@ -718,13 +745,25 @@ void Settings::save() {
             json_object_set_new(settings, "show_host_web_config",
                                 m_show_host_web_config ? json_true()
                                                        : json_false());
+            json_object_set_new(
+                settings, "host_device_os",
+                json_string(m_host_device_os == HostDeviceOs::MacOS   ? "macos"
+                            : m_host_device_os == HostDeviceOs::Linux ? "linux"
+                                                                      : "windows"));
             json_object_set_new(settings, "stream_audio_configuration",
                                 json_integer(m_stream_audio_configuration));
             json_object_set_new(settings, "terminate_app_on_disconnect",
                                 m_terminate_app_on_disconnect ? json_true()
                                                              : json_false());
             json_object_set_new(settings, "write_log", m_write_log ? json_true() : json_false());
-            json_object_set_new(settings, "swap_ui_keys", m_swap_ui_keys ? json_true() : json_false());
+            json_object_set_new(settings, "swap_ui_ab",
+                                m_swap_ui_ab ? json_true() : json_false());
+            json_object_set_new(settings, "swap_ui_xy",
+                                m_swap_ui_xy ? json_true() : json_false());
+            // Keep legacy key so older builds still see a combined toggle.
+            json_object_set_new(settings, "swap_ui_keys",
+                                (m_swap_ui_ab || m_swap_ui_xy) ? json_true()
+                                                               : json_false());
             json_object_set_new(settings, "swap_joycon_stick_to_dpad", m_swap_joycon_stick_to_dpad ? json_true() : json_false());
             json_object_set_new(settings, "touchscreen_mouse_mode", m_touchscreen_mouse_mode ? json_true() : json_false());
             json_object_set_new(settings, "swap_mouse_keys", m_swap_mouse_keys ? json_true() : json_false());

@@ -745,11 +745,15 @@ bool MoonlightInputManager::moveActiveWindowToDisplay(bool moveRight) {
     const auto direction = moveRight
         ? artemis::input::DisplayDirection::Right
         : artemis::input::DisplayDirection::Left;
-    const short arrow = direction == artemis::input::DisplayDirection::Right
-                            ? artemis::input::VirtualKeyRightArrow
-                            : artemis::input::VirtualKeyLeftArrow;
-    return sendKeyboardShortcut({artemis::input::VirtualKeyLeftWindows,
-                                 artemis::input::VirtualKeyLeftShift, arrow});
+    const auto events = artemis::input::moveActiveWindowShortcut(
+        direction, Settings::instance().host_device_os());
+    std::vector<short> keys;
+    keys.reserve(3);
+    for (const auto& event : events) {
+        if (event.pressed)
+            keys.push_back(event.virtualKey);
+    }
+    return sendKeyboardShortcut(keys);
 }
 
 bool MoonlightInputManager::sendKeyboardShortcut(const std::vector<short>& keys) {

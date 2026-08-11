@@ -3,11 +3,12 @@ cmake_minimum_required(VERSION 3.10)
 set(EXTERN_PATH ${CMAKE_CURRENT_SOURCE_DIR}/extern)
 set(ARTEMIS_BOREALIS_SOURCE ${EXTERN_PATH}/borealis)
 set(ARTEMIS_BOREALIS_PATCHED ${CMAKE_BINARY_DIR}/extern/borealis-patched)
-set(ARTEMIS_BOREALIS_PATCH
-    ${CMAKE_CURRENT_SOURCE_DIR}/patches/borealis-handheld-motion-source.patch)
+set(ARTEMIS_BOREALIS_PATCHES
+    ${CMAKE_CURRENT_SOURCE_DIR}/patches/borealis-handheld-motion-source.patch
+    ${CMAKE_CURRENT_SOURCE_DIR}/patches/borealis-split-swap-ab-xy.patch)
 
-# The source submodule stays pinned and clean. Apply the narrow handheld motion
-# source marker to a build-directory copy, just like the common-C protocol patch.
+# The source submodule stays pinned and clean. Apply Artemis Borealis patches to
+# a build-directory copy, just like the common-C protocol patch.
 if(NOT EXISTS "${ARTEMIS_BOREALIS_PATCHED}/library/CMakeLists.txt")
     file(COPY "${ARTEMIS_BOREALIS_SOURCE}/"
          DESTINATION "${ARTEMIS_BOREALIS_PATCHED}")
@@ -24,29 +25,38 @@ execute_process(
 if(NOT ARTEMIS_BOREALIS_PATCH_REPO_INIT EQUAL 0)
     message(FATAL_ERROR "Failed to initialize Borealis build patch workspace")
 endif()
-execute_process(
-    COMMAND "${ARTEMIS_GIT_EXECUTABLE}" apply --check "${ARTEMIS_BOREALIS_PATCH}"
-    WORKING_DIRECTORY "${ARTEMIS_BOREALIS_PATCHED}"
-    RESULT_VARIABLE ARTEMIS_BOREALIS_PATCH_CHECK
-    OUTPUT_QUIET ERROR_QUIET)
-if(ARTEMIS_BOREALIS_PATCH_CHECK EQUAL 0)
+foreach(ARTEMIS_BOREALIS_PATCH IN LISTS ARTEMIS_BOREALIS_PATCHES)
+    get_filename_component(ARTEMIS_BOREALIS_PATCH_NAME
+                           "${ARTEMIS_BOREALIS_PATCH}" NAME)
     execute_process(
-        COMMAND "${ARTEMIS_GIT_EXECUTABLE}" apply "${ARTEMIS_BOREALIS_PATCH}"
+        COMMAND "${ARTEMIS_GIT_EXECUTABLE}" apply --check
+                "${ARTEMIS_BOREALIS_PATCH}"
         WORKING_DIRECTORY "${ARTEMIS_BOREALIS_PATCHED}"
-        RESULT_VARIABLE ARTEMIS_BOREALIS_PATCH_RESULT)
-    if(NOT ARTEMIS_BOREALIS_PATCH_RESULT EQUAL 0)
-        message(FATAL_ERROR "Failed to apply Borealis handheld motion patch")
-    endif()
-else()
-    execute_process(
-        COMMAND "${ARTEMIS_GIT_EXECUTABLE}" apply --reverse --check "${ARTEMIS_BOREALIS_PATCH}"
-        WORKING_DIRECTORY "${ARTEMIS_BOREALIS_PATCHED}"
-        RESULT_VARIABLE ARTEMIS_BOREALIS_PATCH_ALREADY_APPLIED
+        RESULT_VARIABLE ARTEMIS_BOREALIS_PATCH_CHECK
         OUTPUT_QUIET ERROR_QUIET)
-    if(NOT ARTEMIS_BOREALIS_PATCH_ALREADY_APPLIED EQUAL 0)
-        message(FATAL_ERROR "Borealis handheld motion patch no longer applies")
+    if(ARTEMIS_BOREALIS_PATCH_CHECK EQUAL 0)
+        execute_process(
+            COMMAND "${ARTEMIS_GIT_EXECUTABLE}" apply
+                    "${ARTEMIS_BOREALIS_PATCH}"
+            WORKING_DIRECTORY "${ARTEMIS_BOREALIS_PATCHED}"
+            RESULT_VARIABLE ARTEMIS_BOREALIS_PATCH_RESULT)
+        if(NOT ARTEMIS_BOREALIS_PATCH_RESULT EQUAL 0)
+            message(FATAL_ERROR
+                    "Failed to apply Borealis patch ${ARTEMIS_BOREALIS_PATCH_NAME}")
+        endif()
+    else()
+        execute_process(
+            COMMAND "${ARTEMIS_GIT_EXECUTABLE}" apply --reverse --check
+                    "${ARTEMIS_BOREALIS_PATCH}"
+            WORKING_DIRECTORY "${ARTEMIS_BOREALIS_PATCHED}"
+            RESULT_VARIABLE ARTEMIS_BOREALIS_PATCH_ALREADY_APPLIED
+            OUTPUT_QUIET ERROR_QUIET)
+        if(NOT ARTEMIS_BOREALIS_PATCH_ALREADY_APPLIED EQUAL 0)
+            message(FATAL_ERROR
+                    "Borealis patch ${ARTEMIS_BOREALIS_PATCH_NAME} no longer applies")
+        endif()
     endif()
-endif()
+endforeach()
 set(BOREALIS_LIBRARY ${ARTEMIS_BOREALIS_PATCHED}/library)
 
 # build options

@@ -1,7 +1,11 @@
 #include "performance_tab.hpp"
 
+#include "Settings.hpp"
+#include "streaming_view.hpp"
+
 #include "MoonlightSession.hpp"
 #include "Settings.hpp"
+#include "streaming_view.hpp"
 #include "features/performance/PerformanceLite.hpp"
 #include "utils/ArtemisPlatformFeatures.hpp"
 
@@ -196,7 +200,8 @@ artemis::benchmark::ExportSummary exportSummary(
 #endif
 }
 
-PerformanceTab::PerformanceTab() {
+PerformanceTab::PerformanceTab(StreamingView* streamView)
+    : streamView(streamView) {
     inflateFromXMLRes("xml/views/ingame_overlay/performance_tab.xml");
 
     const std::array<DetailCell*, 22> compactRows = {
@@ -290,6 +295,19 @@ PerformanceTab::PerformanceTab() {
 
     refresh();
     scheduleRefresh();
+
+    onscreenLogButton->init("streaming/show_logs"_i18n,
+                            Settings::instance().write_log(), [](bool value) {
+                                Settings::instance().set_write_log(value);
+                                brls::Application::enableDebuggingView(value);
+                            });
+    debugButton->init(
+        "streaming/debug_info"_i18n,
+        streamView ? streamView->draw_stats : false,
+        [streamView](bool value) {
+            if (streamView)
+                streamView->draw_stats = value;
+        });
 }
 
 PerformanceTab::~PerformanceTab() {

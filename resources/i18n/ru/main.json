@@ -1,4 +1,4 @@
-﻿{
+{
     "about": {
         "about": "Moonlight-Switch - это сторонний клиент потоковой передачи игр для Nintendo Switch основанный на Moonlight-Common-C",
         "link_gbatemp": "Страница на GbaTemp",
@@ -83,7 +83,29 @@
         "wait": "Ожидайте...",
         "wake_up": "Разбудить",
         "wake_up_error": "Не удалось разбудить хост",
-        "wake_up_message": "Пытаемся разбудить"
+        "wake_up_message": "Пытаемся разбудить",
+        "web_config": "Веб-настройки хоста",
+        "web_config_hint": "Показать QR",
+        "web_config_message": "Откройте этот URL на ПК или телефоне, чтобы добавить приложения в Sunshine/Apollo:",
+        "web_config_no_address": "Адрес хоста недоступен",
+        "web_config_scan_hint": "Сканируйте телефоном",
+        "web_config_qr_unavailable": "Не удалось нарисовать QR. Используйте URL ниже.",
+        "web_config_copy": "Копировать URL",
+        "stream_profile": "Профиль стрима",
+        "stream_profile_global": "Глобальные настройки",
+        "tab_applications": "Приложения",
+        "tab_host": "Хост",
+        "new_profile": "Новый профиль",
+        "new_profile_title": "Имя профиля",
+        "edit_profile": "Изменить профиль",
+        "delete_profile": "Удалить профиль",
+        "manage_profile": "Управление профилем",
+        "manage_profile_none": "Этому хосту не назначен профиль",
+        "rename_profile": "Переименовать профиль",
+        "rename_profile_title": "Переименовать профиль",
+        "edit_profile_resolution": "Разрешение",
+        "snapshot_profile": "Обновить из текущих настроек",
+        "delete_profile_message": "Удалить этот профиль стрима?"
     },
     "mapping_layout_editor": {
         "remove": "Удалить схему",
@@ -162,7 +184,7 @@
         "swap_mouse_keys": "Поменять кнопки  и  местами",
         "swap_mouse_scroll": "Поменять направление вертикального скролла",
         "swap_stick_to_dpad": "Использовать стик как D-Pad",
-        "swap_ui": "Поменять / и / местами для интерфейса",
+        "swap_ui": "Поменять / и / для интерфейса",
         "system_button_duplication_error": "Другое действие уже использует эту системную кнопку.",
         "touchscreen_mouse_mode": "Touchscreen режим",
         "use_hw_decoding": "Включить аппаратное ускорение",
@@ -171,7 +193,13 @@
         "video_bitrate": "Битрейт видео",
         "video_codec": "Видео кодек",
         "volume_amplification": "Разрешить усиление громкости",
-        "zero_threads": "0 (Не использовать потоки)"
+        "zero_threads": "0 (Не использовать потоки)",
+        "host_device": "Устройство хоста",
+        "host_device_windows": "Windows",
+        "host_device_macos": "macOS",
+        "host_device_linux": "Linux",
+        "swap_ui_ab": "Поменять / (A/B) для интерфейса",
+        "swap_ui_xy": "Поменять / (X/Y) для интерфейса"
     },
     "streaming": {
         "connection": "Соединение",
@@ -194,5 +222,37 @@
         "favorites": "Избранные",
         "settings": "Настройки"
     },
-    "title": "Artemis Switch"
+    "title": "Artemis Switch",
+    "artemis": {
+        "overlay": {
+            "shortcut": {
+                "escape": "Esc",
+                "fullscreen": "Полный экран",
+                "close_window": "Закрыть окно",
+                "toggle_fullscreen": "Переключить полный экран",
+                "paste": "Вставить",
+                "meta_windows": "Меню Пуск",
+                "meta_macos": "Меню Command",
+                "meta_linux": "Клавиша Super",
+                "desktop": "Показать рабочий стол",
+                "game_bar": "Game Bar",
+                "task_switcher": "Переключатель задач",
+                "reverse_tab": "Предыдущий фокус",
+                "task_manager": "Диспетчер задач",
+                "task_manager_macos": "Принудительно закрыть",
+                "switch_host_ime": "Сменить язык клавиатуры",
+                "move_window_left": "Окно влево",
+                "move_window_right": "Окно вправо"
+            },
+            "touch_controls": "Сенсорное управление",
+            "touch_trackpad": "Обычный трекпад",
+            "touch_trackpad_gaming": "Игровой трекпад",
+            "touch_multitouch": "Мультитач",
+            "touch_absolute": "Абсолютный указатель",
+            "touch_absolute_swapped": "Абсолютный (обмен)",
+            "touch_disabled": "Сенсор выкл.",
+            "move_window_left_hint": "",
+            "move_window_right_hint": ""
+        }
+    }
 }

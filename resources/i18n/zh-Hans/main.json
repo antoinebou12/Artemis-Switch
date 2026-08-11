@@ -1,4 +1,4 @@
-﻿{
+{
     "about": {
         "about": "Moonlight-Switch是Nintendo Switch平台的一个基于Moonlight-Common-C的第三方游戏串流客户端",
         "link_gbatemp": "GbaTemp页面",
@@ -83,7 +83,29 @@
         "wait": "等待中……",
         "wake_up": "唤醒",
         "wake_up_error": "无法唤醒主机",
-        "wake_up_message": "发送唤醒请求"
+        "wake_up_message": "发送唤醒请求",
+        "web_config": "主机网页配置",
+        "web_config_hint": "显示二维码",
+        "web_config_message": "在电脑或手机打开此链接，以便在 Sunshine/Apollo 中添加应用：",
+        "web_config_no_address": "没有可用的主机地址",
+        "web_config_scan_hint": "用手机扫描",
+        "web_config_qr_unavailable": "无法绘制二维码，请使用下方链接。",
+        "web_config_copy": "复制链接",
+        "stream_profile": "串流配置",
+        "stream_profile_global": "全局设置",
+        "tab_applications": "应用",
+        "tab_host": "主机",
+        "new_profile": "新建配置",
+        "new_profile_title": "配置名称",
+        "edit_profile": "编辑配置",
+        "delete_profile": "删除配置",
+        "manage_profile": "管理配置",
+        "manage_profile_none": "此主机未分配配置",
+        "rename_profile": "重命名配置",
+        "rename_profile_title": "重命名配置",
+        "edit_profile_resolution": "分辨率",
+        "snapshot_profile": "从当前设置更新",
+        "delete_profile_message": "删除此串流配置？"
     },
     "mapping_layout_editor": {
         "remove": "移除布局",
@@ -162,7 +184,7 @@
         "swap_mouse_keys": "对调鼠标的和按键",
         "swap_mouse_scroll": "反转鼠标垂直滚动方向",
         "swap_stick_to_dpad": "使用摇杆作为D-Pad",
-        "swap_ui": "在主画面中对调/和/按键",
+        "swap_ui": "在界面中对调 / 和 /",
         "system_button_duplication_error": "系统按键被占用",
         "touchscreen_mouse_mode": "触摸屏模式",
         "use_hw_decoding": "启用硬件加速",
@@ -171,7 +193,13 @@
         "video_bitrate": "视频码率",
         "video_codec": "视频解码器",
         "volume_amplification": "允许放大音量",
-        "zero_threads": "0（不使用线程）"
+        "zero_threads": "0（不使用线程）",
+        "host_device": "主机设备",
+        "host_device_windows": "Windows",
+        "host_device_macos": "macOS",
+        "host_device_linux": "Linux",
+        "swap_ui_ab": "在界面中对调 /（A/B）",
+        "swap_ui_xy": "在界面中对调 /（X/Y）"
     },
     "streaming": {
         "connection": "连接选项",
@@ -194,5 +222,37 @@
         "favorites": "最爱",
         "settings": "设置"
     },
-    "title": "Artemis Switch"
+    "title": "Artemis Switch",
+    "artemis": {
+        "overlay": {
+            "shortcut": {
+                "escape": "Esc",
+                "fullscreen": "全屏",
+                "close_window": "关闭窗口",
+                "toggle_fullscreen": "切换全屏",
+                "paste": "粘贴",
+                "meta_windows": "开始菜单",
+                "meta_macos": "命令菜单",
+                "meta_linux": "Super 键",
+                "desktop": "显示桌面",
+                "game_bar": "游戏栏",
+                "task_switcher": "任务切换",
+                "reverse_tab": "上一焦点",
+                "task_manager": "任务管理器",
+                "task_manager_macos": "强制退出",
+                "switch_host_ime": "切换键盘语言",
+                "move_window_left": "窗口左移",
+                "move_window_right": "窗口右移"
+            },
+            "touch_controls": "触摸屏控制",
+            "touch_trackpad": "自然触控板",
+            "touch_trackpad_gaming": "游戏触控板",
+            "touch_multitouch": "多点触控",
+            "touch_absolute": "绝对指针",
+            "touch_absolute_swapped": "绝对（交换）",
+            "touch_disabled": "触摸关闭",
+            "move_window_left_hint": "",
+            "move_window_right_hint": ""
+        }
+    }
 }

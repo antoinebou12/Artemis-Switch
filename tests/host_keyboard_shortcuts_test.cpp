@@ -1,8 +1,10 @@
 #include "../app/src/features/input/HostKeyboardShortcuts.hpp"
+#include "../app/src/utils/HostDeviceOs.hpp"
 
 #include <cassert>
 #include <optional>
 #include <string>
+#include <vector>
 
 using namespace artemis::input;
 
@@ -16,12 +18,30 @@ void verifyCommonSequence(const std::array<HostKeyEvent, 6>& events) {
     assert(events[5].virtualKey == VirtualKeyLeftWindows && !events[5].pressed);
 }
 
+bool hasId(const std::vector<KeyboardShortcut>& presets, const std::string& id) {
+    for (const auto& preset : presets) {
+        if (preset.id == id)
+            return true;
+    }
+    return false;
+}
+
+const KeyboardShortcut* findId(const std::vector<KeyboardShortcut>& presets,
+                               const std::string& id) {
+    for (const auto& preset : presets) {
+        if (preset.id == id)
+            return &preset;
+    }
+    return nullptr;
+}
+
 int main() {
     const auto left = moveActiveWindowShortcut(DisplayDirection::Left);
     verifyCommonSequence(left);
     assert(left[2].virtualKey == VirtualKeyLeftArrow);
 
-    const auto right = moveActiveWindowShortcut(DisplayDirection::Right);
+    const auto right = moveActiveWindowShortcut(
+        DisplayDirection::Right, HostDeviceOs::MacOS);
     verifyCommonSequence(right);
     assert(right[2].virtualKey == VirtualKeyRightArrow);
 
@@ -43,8 +63,28 @@ int main() {
     assert(!virtualKeyFromSymbol("powershell.exe").has_value());
     assert(symbolFromVirtualKey(0x41) == std::optional<std::string>{"A"});
 
-    const auto& presets = standardShortcuts();
-    assert(presets.size() >= 14);
-    for (const auto& preset : presets) assert(validateShortcut(preset).valid);
+    const auto& windows = standardShortcuts(HostDeviceOs::Windows);
+    assert(windows.size() >= 14);
+    for (const auto& preset : windows)
+        assert(validateShortcut(preset).valid);
+    assert(hasId(windows, "game_bar"));
+    assert(findId(windows, "game_bar")->windowsOnly);
+    assert(findId(windows, "paste")->keys ==
+           (std::vector<short>{VirtualKeyLeftControl, 0x56}));
+
+    const auto& macos = standardShortcuts(HostDeviceOs::MacOS);
+    assert(!hasId(macos, "game_bar"));
+    assert(findId(macos, "paste")->keys ==
+           (std::vector<short>{VirtualKeyLeftWindows, 0x56}));
+    assert(findId(macos, "close_window")->keys ==
+           (std::vector<short>{VirtualKeyLeftWindows, 0x51}));
+
+    const auto& linux = standardShortcuts(HostDeviceOs::Linux);
+    assert(!hasId(linux, "game_bar"));
+    assert(findId(linux, "paste")->keys ==
+           (std::vector<short>{VirtualKeyLeftControl, 0x56}));
+
+    // Default overload stays Windows-compatible for callers.
+    assert(standardShortcuts().size() == windows.size());
     return 0;
 }

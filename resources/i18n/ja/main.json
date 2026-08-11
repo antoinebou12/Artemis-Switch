@@ -1,4 +1,4 @@
-﻿{
+{
     "about": {
         "about": "Moonlight-Switch is a third-party game streaming client based on Moonlight-Common-C for the Nintendo Switch",
         "link_gbatemp": "GbaTemp Page",
@@ -83,7 +83,29 @@
         "wait": "待機中...",
         "wake_up": "起動",
         "wake_up_error": "ホストを起動することができませんでしたt",
-        "wake_up_message": "起を送信する"
+        "wake_up_message": "起を送信する",
+        "web_config": "ホスト Web 設定",
+        "web_config_hint": "QR を表示",
+        "web_config_message": "PC やスマホでこの URL を開き、Sunshine/Apollo にアプリを追加:",
+        "web_config_no_address": "ホストアドレスがありません",
+        "web_config_scan_hint": "スマホでスキャン",
+        "web_config_qr_unavailable": "QR を描画できません。下の URL を使用してください。",
+        "web_config_copy": "URL をコピー",
+        "stream_profile": "ストリームプロファイル",
+        "stream_profile_global": "全体設定",
+        "tab_applications": "アプリ",
+        "tab_host": "ホスト",
+        "new_profile": "新規プロファイル",
+        "new_profile_title": "プロファイル名",
+        "edit_profile": "プロファイルを編集",
+        "delete_profile": "プロファイルを削除",
+        "manage_profile": "プロファイル管理",
+        "manage_profile_none": "このホストにプロファイルがありません",
+        "rename_profile": "プロファイル名を変更",
+        "rename_profile_title": "プロファイル名を変更",
+        "edit_profile_resolution": "解像度",
+        "snapshot_profile": "現在の設定から更新",
+        "delete_profile_message": "このストリームプロファイルを削除しますか？"
     },
     "mapping_layout_editor": {
         "remove": "Remove layout",
@@ -162,7 +184,7 @@
         "swap_mouse_keys": "マウスを交換する  and  ボタン",
         "swap_mouse_scroll": "マウスの垂直スクロール方向を入れ替えます",
         "swap_stick_to_dpad": "Use Stick as D-Pad",
-        "swap_ui": "UIと交換",
+        "swap_ui": "UI の / と / を入替",
         "system_button_duplication_error": "Another action already use this system button.",
         "touchscreen_mouse_mode": "Touchscreen mode",
         "use_hw_decoding": "Enable hardware acceleration",
@@ -171,7 +193,13 @@
         "video_bitrate": "ビデオビットレート",
         "video_codec": "ビデオコーデック",
         "volume_amplification": "ボリューム増幅を許可する",
-        "zero_threads": "0 (使用しないスレッド)"
+        "zero_threads": "0 (使用しないスレッド)",
+        "host_device": "ホスト端末",
+        "host_device_windows": "Windows",
+        "host_device_macos": "macOS",
+        "host_device_linux": "Linux",
+        "swap_ui_ab": "UI の / (A/B) を入替",
+        "swap_ui_xy": "UI の / (X/Y) を入替"
     },
     "streaming": {
         "connection": "接続",
@@ -194,5 +222,37 @@
         "favorites": "Favorites",
         "settings": "設定"
     },
-    "title": "Artemis Switch"
+    "title": "Artemis Switch",
+    "artemis": {
+        "overlay": {
+            "shortcut": {
+                "escape": "Esc",
+                "fullscreen": "フルスクリーン",
+                "close_window": "ウィンドウを閉じる",
+                "toggle_fullscreen": "フルスクリーン切替",
+                "paste": "貼り付け",
+                "meta_windows": "スタートメニュー",
+                "meta_macos": "コマンドメニュー",
+                "meta_linux": "Superキー",
+                "desktop": "デスクトップを表示",
+                "game_bar": "ゲームバー",
+                "task_switcher": "タスク切替",
+                "reverse_tab": "前のフォーカス",
+                "task_manager": "タスクマネージャー",
+                "task_manager_macos": "強制終了",
+                "switch_host_ime": "入力言語を切替",
+                "move_window_left": "ウィンドウを左へ",
+                "move_window_right": "ウィンドウを右へ"
+            },
+            "touch_controls": "タッチ操作",
+            "touch_trackpad": "ナチュラルトラックパッド",
+            "touch_trackpad_gaming": "ゲーム用トラックパッド",
+            "touch_multitouch": "マルチタッチ",
+            "touch_absolute": "絶対ポインター",
+            "touch_absolute_swapped": "絶対（入替）",
+            "touch_disabled": "タッチ無効",
+            "move_window_left_hint": "",
+            "move_window_right_hint": ""
+        }
+    }
 }

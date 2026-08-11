@@ -11,6 +11,7 @@
 
 #include "helper.hpp"
 #include "ingame_overlay_view.hpp"
+#include "performance_tab.hpp"
 #include "streaming_input_overlay.hpp"
 #include "button_selecting_dialog.hpp"
 #include "UpscalingSupport.hpp"
@@ -269,6 +270,9 @@ IngameOverlay::IngameOverlay(StreamingView* streamView)
         "QuickTab", [streamView]() { return new QuickTab(streamView); });
     brls::Application::registerXMLView(
         "OptionsTab", [streamView]() { return new OptionsTab(streamView); });
+    brls::Application::registerXMLView(
+        "PerformanceTab",
+        [streamView]() { return new PerformanceTab(streamView); });
 
     this->inflateFromXMLRes("xml/views/ingame_overlay/overlay.xml");
 
@@ -309,12 +313,51 @@ LogoutTab::LogoutTab(StreamingView* streamView) : streamView(streamView) {
 }
 
 // MARK: - Quick Tab
+namespace {
+std::string shortcutFeatureLabel(const std::string& id, HostDeviceOs os) {
+    if (id == "meta") {
+        if (os == HostDeviceOs::MacOS)
+            return "artemis/overlay/shortcut/meta_macos"_i18n;
+        if (os == HostDeviceOs::Linux)
+            return "artemis/overlay/shortcut/meta_linux"_i18n;
+        return "artemis/overlay/shortcut/meta_windows"_i18n;
+    }
+    if (id == "task_manager" && os == HostDeviceOs::MacOS)
+        return "artemis/overlay/shortcut/task_manager_macos"_i18n;
+    return brls::getStr("artemis/overlay/shortcut/" + id);
+}
+
+std::string pointerModeFeatureLabel(artemis::input::PointerMode mode) {
+    using Mode = artemis::input::PointerMode;
+    switch (mode) {
+    case Mode::MultiTouch:
+        return "artemis/overlay/touch_multitouch"_i18n;
+    case Mode::Absolute:
+        return "artemis/overlay/touch_absolute"_i18n;
+    case Mode::AbsoluteSwapped:
+        return "artemis/overlay/touch_absolute_swapped"_i18n;
+    case Mode::TrackpadGaming:
+        return "artemis/overlay/touch_trackpad_gaming"_i18n;
+    case Mode::Disabled:
+        return "artemis/overlay/touch_disabled"_i18n;
+    case Mode::TrackpadNatural:
+    default:
+        return "artemis/overlay/touch_trackpad"_i18n;
+    }
+}
+
+void syncLegacyTouchscreenFlag(artemis::input::PointerMode mode) {
+    Settings::instance().set_touchscreen_mouse_mode(
+        mode == artemis::input::PointerMode::MultiTouch);
+}
+} // namespace
+
 QuickTab::QuickTab(StreamingView* streamView) : streamView(streamView) {
     this->inflateFromXMLRes("xml/views/ingame_overlay/quick_tab.xml");
 
-    const std::array<DetailCell*, 6> quickRows = {
-        quickKeyboard,       quickMoveLeft,       quickMoveRight,
-        quickHostShortcuts,  quickServerCommands, quickMouse};
+    const std::array<DetailCell*, 7> quickRows = {
+        quickKeyboard,      quickMoveLeft,       quickMoveRight, quickTouch,
+        quickHostShortcuts, quickServerCommands, quickMouse};
     for (auto* row : quickRows) {
         row->title->setSingleLine(true);
         row->detail->setSingleLine(true);
@@ -329,9 +372,7 @@ QuickTab::QuickTab(StreamingView* streamView) : streamView(streamView) {
     const auto wireMoveWindow = [](DetailCell* cell, bool moveRight) {
         cell->setText(moveRight ? "artemis/overlay/move_window_right"_i18n
                                 : "artemis/overlay/move_window_left"_i18n);
-        cell->setDetailText(moveRight
-                                ? "artemis/overlay/move_window_right_hint"_i18n
-                                : "artemis/overlay/move_window_left_hint"_i18n);
+        cell->setDetailText("");
         cell->registerClickAction([cell, moveRight](View*) {
             const bool sent =
                 MoonlightInputManager::moveActiveWindowToDisplay(moveRight);
@@ -343,30 +384,59 @@ QuickTab::QuickTab(StreamingView* streamView) : streamView(streamView) {
     wireMoveWindow(quickMoveLeft, false);
     wireMoveWindow(quickMoveRight, true);
 
+    auto refreshTouchLabel = [this] {
+        const auto mode =
+            artemis::input::InputSettingsStore::instance().pointer().mode;
+        quickTouch->setText("artemis/overlay/touch_controls"_i18n);
+        quickTouch->setDetailText(pointerModeFeatureLabel(mode));
+    };
+    refreshTouchLabel();
+    quickTouch->registerClickAction([this, refreshTouchLabel](View*) {
+        auto& store = artemis::input::InputSettingsStore::instance();
+        auto settings = store.pointer();
+        constexpr std::array modes = {
+            artemis::input::PointerMode::TrackpadNatural,
+            artemis::input::PointerMode::MultiTouch,
+            artemis::input::PointerMode::Disabled,
+        };
+        const auto current =
+            std::find(modes.begin(), modes.end(), settings.mode);
+        settings.mode = current == modes.end() || std::next(current) == modes.end()
+                            ? modes.front()
+                            : *std::next(current);
+        MoonlightInputManager::instance().dropInput();
+        store.setPointer(settings);
+        syncLegacyTouchscreenFlag(settings.mode);
+        refreshTouchLabel();
+        return true;
+    });
+
     quickHostShortcuts->setText("artemis/overlay/host_shortcuts"_i18n);
     quickHostShortcuts->setDetailText(
         "artemis/overlay/host_shortcuts_hint"_i18n);
     quickHostShortcuts->registerClickAction([this](View*) {
-        const auto& presets = artemis::input::standardShortcuts();
+        const auto os = Settings::instance().host_device_os();
+        const auto& presets = artemis::input::standardShortcuts(os);
         std::vector<std::string> names;
         std::vector<size_t> indexes;
         names.reserve(presets.size());
         indexes.reserve(presets.size());
         for (size_t i = 0; i < presets.size(); ++i) {
-            // Left/Right move have dedicated Quick rows.
             if (presets[i].id == "move_window_left" ||
                 presets[i].id == "move_window_right")
                 continue;
-            names.push_back(presets[i].name);
+            if (presets[i].windowsOnly && os != HostDeviceOs::Windows)
+                continue;
+            names.push_back(shortcutFeatureLabel(presets[i].id, os));
             indexes.push_back(i);
         }
         auto* dropdown = new Dropdown(
             "artemis/overlay/host_shortcuts"_i18n, names,
-            [this, indexes](int selected) {
+            [this, indexes, os](int selected) {
                 if (selected < 0 ||
                     static_cast<size_t>(selected) >= indexes.size())
                     return;
-                const auto& presets = artemis::input::standardShortcuts();
+                const auto& presets = artemis::input::standardShortcuts(os);
                 const bool sent = MoonlightInputManager::sendKeyboardShortcut(
                     presets[indexes[selected]].keys);
                 quickHostShortcuts->setDetailText(
@@ -436,6 +506,19 @@ QuickTab::QuickTab(StreamingView* streamView) : streamView(streamView) {
         });
         return true;
     });
+
+    volumeHeader->setSubtitle(
+        std::to_string(Settings::instance().get_volume()) + "%");
+    float amplification =
+        Settings::instance().get_volume_amplification() ? 500.0f : 100.0f;
+    float progress = (float) Settings::instance().get_volume() / amplification;
+    volumeSlider->getProgressEvent()->subscribe(
+        [this, amplification](float progress) {
+            int volume = int(progress * amplification);
+            Settings::instance().set_volume(volume);
+            volumeHeader->setSubtitle(std::to_string(volume) + "%");
+        });
+    volumeSlider->setProgress(progress);
 }
 
 // MARK: - Options Tab
@@ -456,7 +539,7 @@ OptionsTab::OptionsTab(StreamingView* streamView) : streamView(streamView) {
     auto& inputStore = artemis::input::InputSettingsStore::instance();
     optionsPointerMode->setText("artemis/overlay/pointer_mode"_i18n);
     optionsPointerMode->setDetailText(
-        artemis::input::pointerModeName(inputStore.pointer().mode));
+        pointerModeFeatureLabel(inputStore.pointer().mode));
     optionsPointerMode->registerClickAction([this](View*) {
         auto& store = artemis::input::InputSettingsStore::instance();
         auto settings = store.pointer();
@@ -474,8 +557,9 @@ OptionsTab::OptionsTab(StreamingView* streamView) : streamView(streamView) {
                             : *std::next(current);
         MoonlightInputManager::instance().dropInput();
         store.setPointer(settings);
+        syncLegacyTouchscreenFlag(settings.mode);
         optionsPointerMode->setDetailText(
-            artemis::input::pointerModeName(settings.mode));
+            pointerModeFeatureLabel(settings.mode));
         return true;
     });
 
@@ -581,19 +665,6 @@ OptionsTab::OptionsTab(StreamingView* streamView) : streamView(streamView) {
     guideBySystemButton->setDetailTextColor(color);
 #endif
 
-    volumeHeader->setSubtitle(
-        std::to_string(Settings::instance().get_volume()) + "%");
-    float amplification =
-        Settings::instance().get_volume_amplification() ? 500.0f : 100.0f;
-    float progress = (float) Settings::instance().get_volume() / amplification;
-    volumeSlider->getProgressEvent()->subscribe(
-        [this, amplification](float progress) {
-            int volume = int(progress * amplification);
-            Settings::instance().set_volume(volume);
-            volumeHeader->setSubtitle(std::to_string(volume) + "%");
-        });
-    volumeSlider->setProgress(progress);
-
     float rumbleForceProgress = Settings::instance().get_rumble_force();
     rumbleForceSlider->getProgressEvent()->subscribe([this](float value) {
         std::stringstream stream;
@@ -682,16 +753,6 @@ OptionsTab::OptionsTab(StreamingView* streamView) : streamView(streamView) {
 
     swapStickToDpad->init("settings/swap_stick_to_dpad"_i18n, Settings::instance().swap_joycon_stick_to_dpad(),
                           [](bool value) { Settings::instance().set_swap_joycon_stick_to_dpad(value); });
-
-    onscreenLogButton->init("streaming/show_logs"_i18n,
-                            Settings::instance().write_log(), [](bool value) {
-                                Settings::instance().set_write_log(value);
-                                brls::Application::enableDebuggingView(value);
-                            });
-
-    debugButton->init(
-        "streaming/debug_info"_i18n, streamView->draw_stats,
-        [streamView](bool value) { streamView->draw_stats = value; });
 
 #ifdef SUPPORT_UPSCALING
     if (!isVideoUpscalingSupported()) {

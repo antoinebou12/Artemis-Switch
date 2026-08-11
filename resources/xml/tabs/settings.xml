@@ -101,13 +101,23 @@
                 
             <brls:BooleanCell
                 id="volume_amplification"/>
+
+            <brls:Header
+                title="@i18n/settings/host_device"
+                paddingTop="60"/>
+
+            <brls:SelectorCell
+                id="host_device_os"/>
                 
             <brls:Header
                 title="@i18n/settings/keys"
                 paddingTop="60"/>
                 
             <brls:BooleanCell
-                id="swap_ui"/>
+                id="swap_ui_ab"/>
+
+            <brls:BooleanCell
+                id="swap_ui_xy"/>
                 
             <brls:DetailCell
                 id="swap_game"/>

@@ -18,9 +18,12 @@
             <brls:DetailCell id="quick_keyboard"/>
             <brls:DetailCell id="quick_move_left"/>
             <brls:DetailCell id="quick_move_right"/>
+            <brls:DetailCell id="quick_touch"/>
             <brls:DetailCell id="quick_host_shortcuts"/>
             <brls:DetailCell id="quick_server_commands"/>
             <brls:DetailCell id="quick_mouse"/>
+            <brls:Header id="volume_header" paddingTop="60" title="@i18n/streaming/volume"/>
+            <brls:Slider id="volume_slider" width="auto" height="84"/>
         </brls:Box>
     </brls:ScrollingFrame>
 </brls:Box>

@@ -33,9 +33,6 @@
             <brls:DetailCell id="guide_key_buttons"/>
             <brls:SelectorCell id="guide_by_system_button"/>
 
-            <brls:Header id="volume_header" paddingTop="60" title="@i18n/streaming/volume"/>
-            <brls:Slider id="volume_slider" width="auto" height="84"/>
-
             <brls:Header id="rumble_slider_header" title="@i18n/settings/rumble_force" subtitle="" paddingTop="60" lineTop="1px"/>
             <brls:Slider id="rumble_slider" width="auto" height="84" grow="1"/>
 
@@ -50,10 +47,6 @@
             <brls:BooleanCell id="upscaling"/>
             <brls:SelectorCell id="upscaling_mode"/>
             <BooleanSliderCell id="rcas"/>
-
-            <brls:Header title="@i18n/settings/debug" paddingTop="60" lineTop="1px"/>
-            <brls:BooleanCell id="debug"/>
-            <brls:BooleanCell id="onscreen_log"/>
         </brls:Box>
     </brls:ScrollingFrame>
 </brls:Box>

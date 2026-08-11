@@ -15,6 +15,9 @@
             paddingBottom="@style/brls/tab_details/padding_bottom"
             paddingLeft="@style/brls/tab_details/padding_left">
             <brls:Header title="@i18n/artemis/performance/title"/>
+            <brls:Header title="@i18n/settings/debug" paddingTop="0"/>
+            <brls:BooleanCell id="debug"/>
+            <brls:BooleanCell id="onscreen_log"/>
             <brls:DetailCell id="network"/>
             <brls:DetailCell id="wifi_signal"/>
             <WifiPerformanceGraph

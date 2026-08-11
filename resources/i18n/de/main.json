@@ -1,4 +1,4 @@
-﻿{
+{
     "about": {
         "about": "Moonlight-Switch ist ein Drittanbieter game streaming Client basierend auf Moonlight-Common-C für die Nintendo Switch",
         "link_gbatemp": "GbaTemp",
@@ -83,7 +83,29 @@
         "wait": "Warten...",
         "wake_up": "Aufwecken",
         "wake_up_error": "Host konnte nicht geweckt werden",
-        "wake_up_message": "Host wird geweckt"
+        "wake_up_message": "Host wird geweckt",
+        "web_config": "Host-Webkonfiguration",
+        "web_config_hint": "QR-Code anzeigen",
+        "web_config_message": "Öffnen Sie diese URL auf PC oder Handy, um Apps in Sunshine/Apollo hinzuzufügen:",
+        "web_config_no_address": "Keine Host-Adresse verfügbar",
+        "web_config_scan_hint": "Mit dem Handy scannen",
+        "web_config_qr_unavailable": "QR konnte nicht gezeichnet werden. URL unten nutzen.",
+        "web_config_copy": "URL kopieren",
+        "stream_profile": "Stream-Profil",
+        "stream_profile_global": "Globale Einstellungen",
+        "tab_applications": "Anwendungen",
+        "tab_host": "Host",
+        "new_profile": "Neues Profil",
+        "new_profile_title": "Profilname",
+        "edit_profile": "Profil bearbeiten",
+        "delete_profile": "Profil löschen",
+        "manage_profile": "Profil verwalten",
+        "manage_profile_none": "Diesem Host ist kein Profil zugewiesen",
+        "rename_profile": "Profil umbenennen",
+        "rename_profile_title": "Profil umbenennen",
+        "edit_profile_resolution": "Auflösung",
+        "snapshot_profile": "Aus aktuellen Einstellungen aktualisieren",
+        "delete_profile_message": "Dieses Stream-Profil löschen?"
     },
     "mapping_layout_editor": {
         "remove": "Layout entfernen",
@@ -162,7 +184,7 @@
         "swap_mouse_keys": " und  Tasten tauschen",
         "swap_mouse_scroll": "Scrollrichtung umkehren",
         "swap_stick_to_dpad": "Use Stick as D-Pad",
-        "swap_ui": "Für UI tauschen",
+        "swap_ui": "/ und / für UI tauschen",
         "system_button_duplication_error": "Another action already use this system button.",
         "touchscreen_mouse_mode": "Touchscreen mode",
         "use_hw_decoding": "Enable hardware acceleration",
@@ -171,7 +193,13 @@
         "video_bitrate": "Video Bitrate",
         "video_codec": "Video Codec",
         "volume_amplification": "Lautstärkeverstärkung zulassen",
-        "zero_threads": "0 (Keine Threads benutzen)"
+        "zero_threads": "0 (Keine Threads benutzen)",
+        "host_device": "Host-Gerät",
+        "host_device_windows": "Windows",
+        "host_device_macos": "macOS",
+        "host_device_linux": "Linux",
+        "swap_ui_ab": "/ (A/B) für UI tauschen",
+        "swap_ui_xy": "/ (X/Y) für UI tauschen"
     },
     "streaming": {
         "connection": "Verbindung",
@@ -194,5 +222,37 @@
         "favorites": "Favoriten",
         "settings": "Einstellungen"
     },
-    "title": "Artemis Switch"
+    "title": "Artemis Switch",
+    "artemis": {
+        "overlay": {
+            "shortcut": {
+                "escape": "Escape",
+                "fullscreen": "Vollbild",
+                "close_window": "Fenster schließen",
+                "toggle_fullscreen": "Vollbild umschalten",
+                "paste": "Einfügen",
+                "meta_windows": "Startmenü",
+                "meta_macos": "Befehlstaste-Menü",
+                "meta_linux": "Super-Taste",
+                "desktop": "Desktop anzeigen",
+                "game_bar": "Game Bar",
+                "task_switcher": "Taskwechsel",
+                "reverse_tab": "Vorheriger Fokus",
+                "task_manager": "Task-Manager",
+                "task_manager_macos": "Beenden erzwingen",
+                "switch_host_ime": "Tastatursprache wechseln",
+                "move_window_left": "Fenster nach links",
+                "move_window_right": "Fenster nach rechts"
+            },
+            "touch_controls": "Touchscreen-Steuerung",
+            "touch_trackpad": "Natürliches Trackpad",
+            "touch_trackpad_gaming": "Gaming-Trackpad",
+            "touch_multitouch": "Multi-Touch",
+            "touch_absolute": "Absoluter Zeiger",
+            "touch_absolute_swapped": "Absolut (getauscht)",
+            "touch_disabled": "Touch aus",
+            "move_window_left_hint": "",
+            "move_window_right_hint": ""
+        }
+    }
 }

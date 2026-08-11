@@ -1,4 +1,4 @@
-﻿{
+{
     "about": {
         "about": "Artemis Switch streams games from an Apollo or Sunshine PC. It is based on the original Moonlight-Switch codebase by XITRIX and Moonlight-Common-C. Apollo and Artemis (Moonlight Noir) by ClassicOldSong inspired host and client UX. Upstream licenses still apply — see LICENSE.",
         "link_gbatemp": "GbaTemp Page",
@@ -123,8 +123,8 @@
             "move_window_help": "Move focused game:",
             "move_window_left": "Move window left",
             "move_window_right": "Move window right",
-            "move_window_left_hint": "Win+Shift+Left",
-            "move_window_right_hint": "Win+Shift+Right",
+            "move_window_left_hint": "",
+            "move_window_right_hint": "",
             "left_display": "Left",
             "right_display": "Right",
             "target_display": "PC display",
@@ -149,7 +149,7 @@
             "pc_slot": "PC slot",
             "rumble_motion": "Rumble + motion",
             "mouse_controls": "Mouse",
-            "touch_controls": "Touch",
+            "touch_controls": "Touch screen control",
             "pointer_mode": "Pointer mode",
             "clipboard": "Clipboard",
             "fetch_edit_paste": "Fetch · Edit · Paste",
@@ -198,7 +198,32 @@
             "quit_host_app": "Quit PC app",
             "start": "Start",
             "stop": "Stop",
-            "requires_benchmark": "Requires benchmark core"
+            "requires_benchmark": "Requires benchmark core",
+            "shortcut": {
+                "escape": "Escape",
+                "fullscreen": "Fullscreen",
+                "close_window": "Close window",
+                "toggle_fullscreen": "Toggle fullscreen",
+                "paste": "Paste",
+                "meta_windows": "Start menu",
+                "meta_macos": "Command menu",
+                "meta_linux": "Super key",
+                "desktop": "Show desktop",
+                "game_bar": "Game Bar",
+                "task_switcher": "Task switcher",
+                "reverse_tab": "Previous focus",
+                "task_manager": "Task manager",
+                "task_manager_macos": "Force quit",
+                "switch_host_ime": "Switch keyboard language",
+                "move_window_left": "Move window left",
+                "move_window_right": "Move window right"
+            },
+            "touch_trackpad": "Natural trackpad",
+            "touch_trackpad_gaming": "Gaming trackpad",
+            "touch_multitouch": "Multi-touch",
+            "touch_absolute": "Absolute pointer",
+            "touch_absolute_swapped": "Absolute (swapped)",
+            "touch_disabled": "Touch disabled"
         },
         "performance": {
             "title": "Performance",
@@ -420,7 +445,13 @@
         "video_bitrate": "Video bitrate",
         "video_codec": "Video codec",
         "volume_amplification": "Allow volume amplification",
-        "zero_threads": "0 (No use threads)"
+        "zero_threads": "0 (No use threads)",
+        "host_device": "Host device",
+        "host_device_windows": "Windows",
+        "host_device_macos": "macOS",
+        "host_device_linux": "Linux",
+        "swap_ui_ab": "Swap / (A/B) for UI",
+        "swap_ui_xy": "Swap / (X/Y) for UI"
     },
     "streaming": {
         "connection": "Connection",

@@ -1,4 +1,4 @@
-﻿{
+{
     "about": {
         "about": "Moonlight-Switch è un client di gioco in streaming di terze parti per Nintendo Switch basato su Moonlight-Common-C",
         "link_gbatemp": "Pagina GbaTemp",
@@ -83,7 +83,29 @@
         "wait": "Attendi...",
         "wake_up": "Risveglia",
         "wake_up_error": "Impossibile risvegliare l'host",
-        "wake_up_message": "Inviando messaggio di risveglio"
+        "wake_up_message": "Inviando messaggio di risveglio",
+        "web_config": "Config web host",
+        "web_config_hint": "Mostra QR",
+        "web_config_message": "Apri questo URL su PC o telefono per aggiungere app in Sunshine/Apollo:",
+        "web_config_no_address": "Nessun indirizzo host disponibile",
+        "web_config_scan_hint": "Scansiona con il telefono",
+        "web_config_qr_unavailable": "QR non disponibile. Usa l'URL sotto.",
+        "web_config_copy": "Copia URL",
+        "stream_profile": "Profilo stream",
+        "stream_profile_global": "Impostazioni globali",
+        "tab_applications": "Applicazioni",
+        "tab_host": "Host",
+        "new_profile": "Nuovo profilo",
+        "new_profile_title": "Nome profilo",
+        "edit_profile": "Modifica profilo",
+        "delete_profile": "Elimina profilo",
+        "manage_profile": "Gestisci profilo",
+        "manage_profile_none": "Nessun profilo assegnato a questo host",
+        "rename_profile": "Rinomina profilo",
+        "rename_profile_title": "Rinomina profilo",
+        "edit_profile_resolution": "Risoluzione",
+        "snapshot_profile": "Aggiorna dalle impostazioni attuali",
+        "delete_profile_message": "Eliminare questo profilo stream?"
     },
     "mapping_layout_editor": {
         "remove": "Rimuovi layout",
@@ -171,7 +193,13 @@
         "video_bitrate": "Bitrate Video",
         "video_codec": "Codec Video",
         "volume_amplification": "Consenti l'amplificazione del volume",
-        "zero_threads": "0 (Non usare threads)"
+        "zero_threads": "0 (Non usare threads)",
+        "host_device": "Dispositivo host",
+        "host_device_windows": "Windows",
+        "host_device_macos": "macOS",
+        "host_device_linux": "Linux",
+        "swap_ui_ab": "Inverti / (A/B) per l'UI",
+        "swap_ui_xy": "Inverti / (X/Y) per l'UI"
     },
     "streaming": {
         "connection": "Connessione",
@@ -194,5 +222,37 @@
         "favorites": "Preferiti",
         "settings": "Impostazioni"
     },
-    "title": "Artemis Switch"
+    "title": "Artemis Switch",
+    "artemis": {
+        "overlay": {
+            "shortcut": {
+                "escape": "Esc",
+                "fullscreen": "Schermo intero",
+                "close_window": "Chiudi finestra",
+                "toggle_fullscreen": "Attiva/disattiva schermo intero",
+                "paste": "Incolla",
+                "meta_windows": "Menu Start",
+                "meta_macos": "Menu Comando",
+                "meta_linux": "Tasto Super",
+                "desktop": "Mostra desktop",
+                "game_bar": "Game Bar",
+                "task_switcher": "Selettore attività",
+                "reverse_tab": "Focus precedente",
+                "task_manager": "Gestione attività",
+                "task_manager_macos": "Forza uscita",
+                "switch_host_ime": "Cambia lingua tastiera",
+                "move_window_left": "Sposta finestra a sinistra",
+                "move_window_right": "Sposta finestra a destra"
+            },
+            "touch_controls": "Controllo touch",
+            "touch_trackpad": "Trackpad naturale",
+            "touch_trackpad_gaming": "Trackpad di gioco",
+            "touch_multitouch": "Multi-touch",
+            "touch_absolute": "Puntatore assoluto",
+            "touch_absolute_swapped": "Assoluto (scambiato)",
+            "touch_disabled": "Touch disattivato",
+            "move_window_left_hint": "",
+            "move_window_right_hint": ""
+        }
+    }
 }

@@ -1,4 +1,4 @@
-﻿{
+{
     "about": {
         "about": "Moonlight-Switch é um aplicativo terceiro para streaming de jogos baseado no Moonlight-Common-C para Nintendo Switch",
         "link_gbatemp": "Página do GbaTemp",
@@ -83,7 +83,29 @@
         "wait": "Aguarde...",
         "wake_up": "Despertar",
         "wake_up_error": "Não foi possível despertar o host",
-        "wake_up_message": "Despertando"
+        "wake_up_message": "Despertando",
+        "web_config": "Config web do host",
+        "web_config_hint": "Mostrar QR",
+        "web_config_message": "Abra este URL no PC ou telefone para adicionar apps no Sunshine/Apollo:",
+        "web_config_no_address": "Nenhum endereço de host disponível",
+        "web_config_scan_hint": "Escaneie com o telefone",
+        "web_config_qr_unavailable": "QR indisponível. Use o URL abaixo.",
+        "web_config_copy": "Copiar URL",
+        "stream_profile": "Perfil de stream",
+        "stream_profile_global": "Configurações globais",
+        "tab_applications": "Aplicativos",
+        "tab_host": "Host",
+        "new_profile": "Novo perfil",
+        "new_profile_title": "Nome do perfil",
+        "edit_profile": "Editar perfil",
+        "delete_profile": "Excluir perfil",
+        "manage_profile": "Gerenciar perfil",
+        "manage_profile_none": "Nenhum perfil atribuído a este host",
+        "rename_profile": "Renomear perfil",
+        "rename_profile_title": "Renomear perfil",
+        "edit_profile_resolution": "Resolução",
+        "snapshot_profile": "Atualizar das configurações atuais",
+        "delete_profile_message": "Excluir este perfil de stream?"
     },
     "mapping_layout_editor": {
         "remove": "Remover layout",
@@ -162,7 +184,7 @@
         "swap_mouse_keys": "Mudar mouse  e   botões",
         "swap_mouse_scroll": "Mudar direção do scroll vertical do mouse",
         "swap_stick_to_dpad": "Use Stick as D-Pad",
-        "swap_ui": "Mudar / e / para UI",
+        "swap_ui": "Trocar / e / na UI",
         "system_button_duplication_error": "Another action already use this system button.",
         "touchscreen_mouse_mode": "Touchscreen mode",
         "use_hw_decoding": "Enable hardware acceleration",
@@ -171,7 +193,13 @@
         "video_bitrate": "Bitrate do vídeo",
         "video_codec": "Codec de vídeo",
         "volume_amplification": "Permitir amplificação de volume",
-        "zero_threads": "0 (Não usar threads)"
+        "zero_threads": "0 (Não usar threads)",
+        "host_device": "Dispositivo host",
+        "host_device_windows": "Windows",
+        "host_device_macos": "macOS",
+        "host_device_linux": "Linux",
+        "swap_ui_ab": "Trocar / (A/B) na UI",
+        "swap_ui_xy": "Trocar / (X/Y) na UI"
     },
     "streaming": {
         "connection": "Conexão",
@@ -194,5 +222,37 @@
         "favorites": "Favoritos",
         "settings": "Configurações"
     },
-    "title": "Artemis Switch"
+    "title": "Artemis Switch",
+    "artemis": {
+        "overlay": {
+            "shortcut": {
+                "escape": "Esc",
+                "fullscreen": "Tela cheia",
+                "close_window": "Fechar janela",
+                "toggle_fullscreen": "Alternar tela cheia",
+                "paste": "Colar",
+                "meta_windows": "Menu Iniciar",
+                "meta_macos": "Menu Comando",
+                "meta_linux": "Tecla Super",
+                "desktop": "Mostrar área de trabalho",
+                "game_bar": "Game Bar",
+                "task_switcher": "Alternador de tarefas",
+                "reverse_tab": "Foco anterior",
+                "task_manager": "Gerenciador de tarefas",
+                "task_manager_macos": "Forçar saída",
+                "switch_host_ime": "Trocar idioma do teclado",
+                "move_window_left": "Mover janela à esquerda",
+                "move_window_right": "Mover janela à direita"
+            },
+            "touch_controls": "Controle touch",
+            "touch_trackpad": "Trackpad natural",
+            "touch_trackpad_gaming": "Trackpad de jogo",
+            "touch_multitouch": "Multitoque",
+            "touch_absolute": "Ponteiro absoluto",
+            "touch_absolute_swapped": "Absoluto (trocado)",
+            "touch_disabled": "Touch desativado",
+            "move_window_left_hint": "",
+            "move_window_right_hint": ""
+        }
+    }
 }

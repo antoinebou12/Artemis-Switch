@@ -129,7 +129,8 @@ public:
         (void)scaleMode;
         (void)zoomPan;
         (void)forceFullRange;
-        return rotation != artemis::video::Rotation::Deg0;
+        (void)rotation;
+        return false;
     }
 
     void restoreLegacyCommands(int width, int height, AVFrame* frame) {

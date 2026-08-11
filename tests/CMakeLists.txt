@@ -88,10 +88,14 @@ add_artemis_test(controller_topology_test
     app/src/features/input/ControllerTopology.cpp
     app/src/features/input)
 
-add_artemis_test(host_keyboard_shortcuts_test
-    tests/host_keyboard_shortcuts_test.cpp
-    app/src/features/input/HostKeyboardShortcuts.cpp
-    app/src/features/input)
+add_executable(host_keyboard_shortcuts_test
+    "${REPO_ROOT}/tests/host_keyboard_shortcuts_test.cpp"
+    "${REPO_ROOT}/app/src/features/input/HostKeyboardShortcuts.cpp")
+target_include_directories(host_keyboard_shortcuts_test PRIVATE
+    "${REPO_ROOT}/app/src/features/input"
+    "${REPO_ROOT}/app/src/utils")
+target_compile_features(host_keyboard_shortcuts_test PRIVATE cxx_std_20)
+add_test(NAME host_keyboard_shortcuts_test COMMAND host_keyboard_shortcuts_test)
 
 add_artemis_test(pointer_settings_test
     tests/pointer_settings_test.cpp
