@@ -53,6 +53,8 @@ class QuickTab : public brls::Box {
     BRLS_BIND(brls::DetailCell, quickMoveRight, "quick_move_right");
     BRLS_BIND(brls::DetailCell, quickTouch, "quick_touch");
     BRLS_BIND(brls::DetailCell, quickHostShortcuts, "quick_host_shortcuts");
+    BRLS_BIND(brls::DetailCell, quickRestartServer, "quick_restart_server");
+    BRLS_BIND(brls::DetailCell, quickResetDisplay, "quick_reset_display");
     BRLS_BIND(brls::DetailCell, quickServerCommands, "quick_server_commands");
     BRLS_BIND(brls::DetailCell, quickMouse, "quick_mouse");
     BRLS_BIND(brls::Header, volumeHeader, "volume_header");
