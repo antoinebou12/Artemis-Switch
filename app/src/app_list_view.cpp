@@ -483,8 +483,10 @@ void AppListView::refreshVirtualDisplayRow() {
         server.isApollo() && server.virtualDisplayCapable;
     virtualDisplay->setVisibility(available ? Visibility::VISIBLE
                                             : Visibility::GONE);
-    if (!available)
+    if (!available) {
+        refreshApolloScaleFactorRow();
         return;
+    }
     if (!server.virtualDisplayDriverReady) {
         virtualDisplay->setDetailText(
             "artemis/overlay/virtual_display_driver_not_ready"_i18n);
