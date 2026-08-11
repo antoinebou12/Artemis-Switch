@@ -110,6 +110,32 @@ AppListView::AppListView(const Host& host) : Box(Axis::ROW), host(host) {
             return true;
         });
     streamProfile->registerAction(
+        "host/rename_profile"_i18n, BUTTON_START, [this](View*) {
+            auto& store =
+                artemis::streaming::StreamConfigProfileStore::instance();
+            const auto selected = store.selectedForHost(hostProfileKey);
+            if (selected.empty()) {
+                showError("host/manage_profile_none"_i18n);
+                return true;
+            }
+            auto profile = store.get(selected);
+            if (!profile) {
+                showError("host/manage_profile_none"_i18n);
+                return true;
+            }
+            const auto currentName = profile->name;
+            Application::getPlatform()->getImeManager()->openForText(
+                [this, selected](const std::string& text) {
+                    if (text.empty())
+                        return;
+                    if (artemis::streaming::StreamConfigProfileStore::instance()
+                            .rename(selected, text))
+                        refreshStreamProfileLabel();
+                },
+                "host/rename_profile_title"_i18n, "", 40, currentName, 0);
+            return true;
+        });
+    streamProfile->registerAction(
         "host/delete_profile"_i18n, BUTTON_X, [this](View*) {
             const auto selected =
                 artemis::streaming::StreamConfigProfileStore::instance()

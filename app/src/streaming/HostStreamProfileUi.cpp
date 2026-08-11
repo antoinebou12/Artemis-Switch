@@ -86,17 +86,43 @@ void confirmDeleteProfile(const std::string& profileId,
     confirm->open();
 }
 
+void promptRenameProfile(const std::string& profileId,
+                         const std::string& currentName,
+                         const std::string& hostKey, ProfileListKind kind,
+                         int popCount,
+                         const std::function<void()>& onChanged) {
+    brls::Application::getPlatform()->getImeManager()->openForText(
+        [profileId, hostKey, kind, popCount, onChanged](const std::string& text) {
+            if (text.empty())
+                return;
+            if (!StreamConfigProfileStore::instance().rename(profileId, text))
+                return;
+            reopenProfileList(kind, hostKey, onChanged, popCount);
+        },
+        "host/rename_profile_title"_i18n, "", 40, currentName, 0);
+}
+
 void open_profile_actions_page(const StreamConfigProfile& profile,
                                const std::string& hostKey,
                                const std::function<void()>& onChanged) {
     auto* column = makePageColumn();
     const auto profileId = profile.id;
+    const auto profileName = profile.name;
 
     addRow(column, "common/edit"_i18n)
         ->registerClickAction([profileId, hostKey, onChanged](brls::View*) {
             openProfileEditor(profileId, hostKey, onChanged);
             return true;
         });
+
+    addRow(column, "host/rename_profile"_i18n)
+        ->registerClickAction(
+            [profileId, profileName, hostKey, onChanged](brls::View*) {
+                // Pop actions + manage after rename so the list shows the new name.
+                promptRenameProfile(profileId, profileName, hostKey,
+                                    ProfileListKind::Manage, 2, onChanged);
+                return true;
+            });
 
     addRow(column, "artemis/settings/duplicate_profile"_i18n)
         ->registerClickAction([profileId, hostKey, onChanged](brls::View*) {
@@ -127,6 +153,17 @@ void wireQuickProfileActions(brls::DetailCell* cell, const std::string& profileI
         "host/edit_profile"_i18n, brls::BUTTON_Y,
         [profileId, hostKey, onChanged](brls::View*) {
             openProfileEditor(profileId, hostKey, onChanged);
+            return true;
+        });
+    cell->registerAction(
+        "host/rename_profile"_i18n, brls::BUTTON_START,
+        [profileId, hostKey, kind, onChanged](brls::View*) {
+            auto profile =
+                StreamConfigProfileStore::instance().get(profileId);
+            if (!profile)
+                return true;
+            promptRenameProfile(profileId, profile->name, hostKey, kind, 1,
+                                onChanged);
             return true;
         });
     cell->registerAction(

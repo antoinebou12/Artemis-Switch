@@ -59,79 +59,98 @@ float mouseSpeedScaleFromMultiplier(int multiplier) {
     return 0.1f + (std::clamp(multiplier, 0, 100) / 100.0f) * 1.9f;
 }
 
-void styleSliderHeader(brls::Header* header, float marginTop = 20.0f) {
-    header->setMarginTop(marginTop);
-    if (auto* label = dynamic_cast<brls::Label*>(
-            header->getView("brls/header/title")))
-        label->setSingleLine(true);
-    if (auto* label = dynamic_cast<brls::Label*>(
-            header->getView("brls/header/subtitle")))
-        label->setSingleLine(true);
+// Compact title + value + slider (no Header chrome). Nested Headers under a
+// section look like a blank "newline" on docked 1080 UI.
+brls::Label* addLabeledSlider(
+    brls::Box* content, const std::string& title, const std::string& valueText,
+    float progress, float marginTop,
+    const std::function<void(float, brls::Label*)>& onProgress) {
+    auto* block = new brls::Box(brls::Axis::COLUMN);
+    block->setAlignItems(brls::AlignItems::STRETCH);
+    block->setWidth(brls::View::AUTO);
+    if (marginTop > 0.0f)
+        block->setMarginTop(marginTop);
+
+    auto* row = new brls::Box(brls::Axis::ROW);
+    row->setAlignItems(brls::AlignItems::CENTER);
+    row->setWidth(brls::View::AUTO);
+    row->setHeight(brls::View::AUTO);
+    row->setPaddingTop(8.0f);
+    row->setPaddingBottom(4.0f);
+
+    auto style = brls::Application::getStyle();
+    auto theme = brls::Application::getTheme();
+
+    auto* titleLabel = new brls::Label();
+    titleLabel->setText(title);
+    titleLabel->setSingleLine(true);
+    titleLabel->setFontSize(style["brls/header/font_size"]);
+    row->addView(titleLabel);
+    row->addView(new brls::Padding());
+
+    auto* valueLabel = new brls::Label();
+    valueLabel->setText(valueText);
+    valueLabel->setSingleLine(true);
+    valueLabel->setHorizontalAlign(brls::HorizontalAlign::RIGHT);
+    valueLabel->setFontSize(style["brls/header/font_size"]);
+    valueLabel->setTextColor(theme["brls/header/subtitle"]);
+    row->addView(valueLabel);
+    block->addView(row);
+
+    auto* slider = new brls::Slider();
+    slider->setHeight(84.0f);
+    slider->setWidth(brls::View::AUTO);
+    slider->setGrow(1.0f);
+    slider->setProgress(std::clamp(progress, 0.0f, 1.0f));
+    slider->getProgressEvent()->subscribe(
+        [onProgress, valueLabel](float p) { onProgress(p, valueLabel); });
+    block->addView(slider);
+    content->addView(block);
+    return valueLabel;
 }
 
 void addBitrateSlider(brls::Box* content, StreamConfigProfile* draft) {
-    auto* header = new brls::Header();
-    header->setTitle("settings/video_bitrate"_i18n);
-    header->setSubtitle(
-        fmt::format("{:.1f} Mbps", draft->bitrateKbps / 1000.0));
-    styleSliderHeader(header);
-    content->addView(header);
-
-    auto* slider = new brls::Slider();
-    slider->setHeight(84.0f);
     // Settings maps ~0–1 to bitrate range; mirror common 0.5–50 Mbps feel.
     const float progress =
         std::clamp(draft->bitrateKbps / 50000.0f, 0.02f, 1.0f);
-    slider->setProgress(progress);
-    slider->getProgressEvent()->subscribe([draft, header](float p) {
-        const int kbps =
-            std::clamp(static_cast<int>(p * 50000.0f), 1000, 100000);
-        draft->bitrateKbps = kbps;
-        header->setSubtitle(fmt::format("{:.1f} Mbps", kbps / 1000.0));
-    });
-    content->addView(slider);
+    addLabeledSlider(
+        content, "settings/video_bitrate"_i18n,
+        fmt::format("{:.1f} Mbps", draft->bitrateKbps / 1000.0), progress, 12.0f,
+        [draft](float p, brls::Label* valueLabel) {
+            const int kbps =
+                std::clamp(static_cast<int>(p * 50000.0f), 1000, 100000);
+            draft->bitrateKbps = kbps;
+            valueLabel->setText(fmt::format("{:.1f} Mbps", kbps / 1000.0));
+        });
 }
 
 void addRumbleSlider(brls::Box* content, StreamConfigProfile* draft) {
-    auto* header = new brls::Header();
-    header->setTitle("settings/rumble_force"_i18n);
-    header->setSubtitle(fmt::format("{:.0f}%", draft->rumbleForce * 100.0f));
-    styleSliderHeader(header);
-    content->addView(header);
-
-    auto* slider = new brls::Slider();
-    slider->setHeight(84.0f);
-    slider->setProgress(std::clamp(draft->rumbleForce, 0.0f, 1.0f));
-    slider->getProgressEvent()->subscribe([draft, header](float p) {
-        draft->rumbleForce = std::clamp(p, 0.0f, 1.0f);
-        header->setSubtitle(
-            fmt::format("{:.0f}%", draft->rumbleForce * 100.0f));
-    });
-    content->addView(slider);
+    addLabeledSlider(
+        content, "settings/rumble_force"_i18n,
+        fmt::format("{:.0f}%", draft->rumbleForce * 100.0f),
+        std::clamp(draft->rumbleForce, 0.0f, 1.0f), 12.0f,
+        [draft](float p, brls::Label* valueLabel) {
+            draft->rumbleForce = std::clamp(p, 0.0f, 1.0f);
+            valueLabel->setText(
+                fmt::format("{:.0f}%", draft->rumbleForce * 100.0f));
+        });
 }
 
 void addMouseSpeedSlider(brls::Box* content, StreamConfigProfile* draft) {
-    auto* header = new brls::Header();
-    header->setTitle("settings/mouse_speed"_i18n);
-    header->setSubtitle(
+    // Nested under the Mouse section — keep a tight gap (docked UI exaggerates
+    // Header chrome / lineBottom into a blank "newline").
+    addLabeledSlider(
+        content, "settings/mouse_speed"_i18n,
         fmt::format("{:.1f}x",
-                    mouseSpeedScaleFromMultiplier(draft->mouseSpeedMultiplier)));
-    // Already under the Mouse section header — avoid a second 60px gap.
-    styleSliderHeader(header, 20.0f);
-    content->addView(header);
-
-    auto* slider = new brls::Slider();
-    slider->setHeight(84.0f);
-    slider->setProgress(
-        std::clamp(draft->mouseSpeedMultiplier / 100.0f, 0.0f, 1.0f));
-    slider->getProgressEvent()->subscribe([draft, header](float p) {
-        draft->mouseSpeedMultiplier =
-            std::clamp(static_cast<int>(p * 100.0f), 0, 100);
-        header->setSubtitle(fmt::format(
-            "{:.1f}x",
-            mouseSpeedScaleFromMultiplier(draft->mouseSpeedMultiplier)));
-    });
-    content->addView(slider);
+                    mouseSpeedScaleFromMultiplier(draft->mouseSpeedMultiplier)),
+        std::clamp(draft->mouseSpeedMultiplier / 100.0f, 0.0f, 1.0f), 8.0f,
+        [draft](float p, brls::Label* valueLabel) {
+            draft->mouseSpeedMultiplier =
+                std::clamp(static_cast<int>(p * 100.0f), 0, 100);
+            valueLabel->setText(fmt::format(
+                "{:.1f}x",
+                mouseSpeedScaleFromMultiplier(draft->mouseSpeedMultiplier)));
+        });
 }
 
 void addDitheringCell(brls::Box* content, StreamConfigProfile* draft) {
@@ -306,7 +325,10 @@ void openProfileEditor(const std::string& profileId,
     auto* scroll = new brls::ScrollingFrame();
     scroll->setGrow(1.0f);
     auto* content = new brls::Box(brls::Axis::COLUMN);
-    content->setWidth(10000);
+    // Match scroll viewport width (ScrollingFrame::onLayout). A fixed 10000px
+    // width makes docked sliders lay out as an off-screen-wide track.
+    content->setAlignItems(brls::AlignItems::STRETCH);
+    content->setWidth(brls::View::AUTO);
     content->setPadding(
         brls::Application::getStyle()["brls/tab_details/padding_top"],
         brls::Application::getStyle()["brls/tab_details/padding_right"],
