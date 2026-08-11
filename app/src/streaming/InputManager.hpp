@@ -65,9 +65,6 @@ class MoonlightInputManager : public Singleton<MoonlightInputManager> {
     static void rightMouseClick();
     static bool sendKeyboardShortcut(const std::vector<short>& keys);
     static bool moveActiveWindowToDisplay(bool moveRight);
-    // Sunshine/Apollo: Ctrl+Alt+Shift+F1..F12 switches the streamed display.
-    // displayNumber is 1-based (1 -> F1, 12 -> F12).
-    static void switchDisplay(int displayNumber);
 
   private:
     enum class DesktopScrollAxis {

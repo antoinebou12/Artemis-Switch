@@ -19,7 +19,7 @@
 
 using namespace brls;
 
-class AppListView : public TabFrame {
+class AppListView : public Box {
   public:
     AppListView(const Host& host);
 
@@ -27,13 +27,18 @@ class AppListView : public TabFrame {
     void willAppear(bool resetState) override;
 
   private:
+    enum class Pane { Applications, Host };
+
     Host host;
     std::string hostProfileKey;
     View* hintView = nullptr;
     DetailCell* webConfig = nullptr;
     DetailCell* streamProfile = nullptr;
+    Sidebar* sidebar = nullptr;
+    Box* contentColumn = nullptr;
     Box* appsContainer = nullptr;
     Box* hostContainer = nullptr;
+    Pane activePane = Pane::Applications;
     std::optional<AppInfo> currentApp;
     bool loading = false;
     bool inputBlocked = false;
@@ -42,6 +47,7 @@ class AppListView : public TabFrame {
 
     GridView* gridView = nullptr;
 
+    void showPane(Pane pane, bool focusContent);
     void setCurrentApp(const AppInfo& app);
     void terninateApp();
     void updateAppList();

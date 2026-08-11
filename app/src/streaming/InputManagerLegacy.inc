@@ -752,33 +752,6 @@ bool MoonlightInputManager::moveActiveWindowToDisplay(bool moveRight) {
                                  artemis::input::VirtualKeyLeftShift, arrow});
 }
 
-void MoonlightInputManager::switchDisplay(int displayNumber) {
-    if (displayNumber < 1 || displayNumber > 12) {
-        brls::Logger::warning(
-            "Ignoring out-of-range display switch request {}", displayNumber);
-        return;
-    }
-
-    constexpr short VK_LSHIFT = 0xA0;
-    constexpr short VK_LCONTROL = 0xA2;
-    constexpr short VK_LMENU = 0xA4; // Left Alt
-    const short vkFKey = static_cast<short>(0x70 + (displayNumber - 1));
-    const char modifiers =
-        static_cast<char>(MODIFIER_CTRL | MODIFIER_ALT | MODIFIER_SHIFT);
-
-    brls::Logger::info("Switching streamed display to {} (Ctrl+Alt+Shift+F{})",
-                       displayNumber, displayNumber);
-
-    LiSendKeyboardEvent(VK_LCONTROL, KEY_ACTION_DOWN, MODIFIER_CTRL);
-    LiSendKeyboardEvent(VK_LMENU, KEY_ACTION_DOWN, MODIFIER_CTRL | MODIFIER_ALT);
-    LiSendKeyboardEvent(VK_LSHIFT, KEY_ACTION_DOWN, modifiers);
-    LiSendKeyboardEvent(vkFKey, KEY_ACTION_DOWN, modifiers);
-    LiSendKeyboardEvent(vkFKey, KEY_ACTION_UP, modifiers);
-    LiSendKeyboardEvent(VK_LSHIFT, KEY_ACTION_UP, MODIFIER_CTRL | MODIFIER_ALT);
-    LiSendKeyboardEvent(VK_LMENU, KEY_ACTION_UP, MODIFIER_CTRL);
-    LiSendKeyboardEvent(VK_LCONTROL, KEY_ACTION_UP, 0);
-}
-
 bool MoonlightInputManager::sendKeyboardShortcut(const std::vector<short>& keys) {
     const auto events = artemis::input::shortcutEvents(keys);
     if (events.empty()) return false;

@@ -11,10 +11,10 @@
 #include "features/ui/QrCodeView.hpp"
 #include "streaming/HostProfileKey.hpp"
 #include "streaming/HostStreamProfileUi.hpp"
-#include "utils/UsableMac.hpp"
 
-AppListView::AppListView(const Host& host) : host(host) {
+AppListView::AppListView(const Host& host) : Box(Axis::ROW), host(host) {
     hostProfileKey = artemis::streaming::host_profile_key(host);
+    setAlignItems(AlignItems::STRETCH);
 
     auto* label = new brls::Label();
     label->setText(brls::Hint::getKeyIcon(ControllerButton::BUTTON_BACK) +
@@ -32,17 +32,40 @@ AppListView::AppListView(const Host& host) : host(host) {
     hintView = holder;
     getAppletFrameItem()->setHintView(hintView);
 
+    // Same width/style as Borealis TabFrame (previous Applications/Host menu).
+    sidebar = new Sidebar();
+    sidebar->setWidth(Application::getStyle()["brls/tab_frame/sidebar_width"]);
+    sidebar->addItem("host/tab_applications"_i18n, [this](View* view) {
+        if (!view->isFocused())
+            return;
+        showPane(Pane::Applications, false);
+    });
+    sidebar->addItem("host/tab_host"_i18n, [this](View* view) {
+        if (!view->isFocused())
+            return;
+        showPane(Pane::Host, false);
+    });
+    addView(sidebar);
+
+    contentColumn = new Box(Axis::COLUMN);
+    contentColumn->setGrow(1.0f);
+    contentColumn->setAlignItems(AlignItems::STRETCH);
+
     appsContainer = new Box(Axis::COLUMN);
     appsContainer->setAlignItems(AlignItems::STRETCH);
     appsContainer->setPadding(24, 24, 24, 24);
     appsContainer->setHideHighlight(true);
+    appsContainer->setGrow(1.0f);
     gridView = new GridView();
     appsContainer->addView(gridView);
+    contentColumn->addView(appsContainer);
 
     hostContainer = new Box(Axis::COLUMN);
     hostContainer->setAlignItems(AlignItems::STRETCH);
     hostContainer->setPadding(24, 24, 24, 24);
     hostContainer->setHideHighlight(true);
+    hostContainer->setGrow(1.0f);
+    hostContainer->setVisibility(Visibility::GONE);
 
     webConfig = new DetailCell();
     webConfig->setText("host/web_config"_i18n);
@@ -75,10 +98,21 @@ AppListView::AppListView(const Host& host) : host(host) {
         return true;
     });
     hostContainer->addView(streamProfile);
+    contentColumn->addView(hostContainer);
+    addView(contentColumn);
 
-    addTab("host/tab_applications"_i18n, [this] { return this->appsContainer; });
-    addTab("host/tab_host"_i18n, [this] { return this->hostContainer; });
-    focusTab(0);
+    // Match TabFrame: B from content returns focus to the side menu.
+    auto backToSidebar = [this](View*) {
+        if (Application::getInputType() == InputType::TOUCH)
+            this->dismiss();
+        else if (sidebar)
+            Application::giveFocus(sidebar);
+        return true;
+    };
+    appsContainer->registerAction("hints/back"_i18n, BUTTON_B, backToSidebar,
+                                  false, false, SOUND_BACK);
+    hostContainer->registerAction("hints/back"_i18n, BUTTON_B, backToSidebar,
+                                  false, false, SOUND_BACK);
 
     loader = new LoadingOverlay(this);
 
@@ -101,11 +135,38 @@ AppListView::AppListView(const Host& host) : host(host) {
                        return true;
                    });
     registerAction("host/new_profile"_i18n, BUTTON_RB, [this](View*) {
+        showPane(Pane::Host, true);
+        if (sidebar && sidebar->getItem(1))
+            Application::giveFocus(sidebar->getItem(1));
         artemis::streaming::open_create_host_profile(
             hostProfileKey, [this] { refreshStreamProfileLabel(); });
         return true;
     });
     blockInput(true);
+}
+
+void AppListView::showPane(Pane pane, bool focusContent) {
+    activePane = pane;
+    const bool apps = pane == Pane::Applications;
+    appsContainer->setVisibility(apps ? Visibility::VISIBLE : Visibility::GONE);
+    hostContainer->setVisibility(apps ? Visibility::GONE : Visibility::VISIBLE);
+
+    if (!focusContent)
+        return;
+
+    if (apps) {
+        if (gridView && !gridView->getChildren().empty())
+            Application::giveFocus(gridView);
+        else if (sidebar && sidebar->getItem(0))
+            Application::giveFocus(sidebar->getItem(0));
+    } else if (webConfig &&
+               webConfig->getVisibility() == Visibility::VISIBLE) {
+        Application::giveFocus(webConfig);
+    } else if (streamProfile) {
+        Application::giveFocus(streamProfile);
+    } else if (sidebar && sidebar->getItem(1)) {
+        Application::giveFocus(sidebar->getItem(1));
+    }
 }
 
 void AppListView::refreshStreamProfileLabel() {
@@ -237,7 +298,11 @@ void AppListView::updateAppList() {
                                 gridView->addView(cell);
                                 this->updateFavoriteAction(cell, host, app);
                             }
-                            Application::giveFocus(this);
+                            // Prefer the normal TabFrame focus: sidebar item 0.
+                            if (sidebar && sidebar->getItem(0))
+                                Application::giveFocus(sidebar->getItem(0));
+                            else
+                                showPane(activePane, true);
                         } else {
                             showError(result.error(),
                                       [this] { this->dismiss(); });
@@ -259,12 +324,12 @@ void AppListView::setCurrentApp(const AppInfo& app) {
 }
 
 void AppListView::willAppear(bool resetState) {
-    TabFrame::willAppear(resetState);
+    Box::willAppear(resetState);
     updateAppList();
 }
 
 void AppListView::onLayout() {
-    TabFrame::onLayout();
+    Box::onLayout();
 
     if (loader)
         loader->layout();

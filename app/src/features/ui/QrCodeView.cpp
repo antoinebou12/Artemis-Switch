@@ -10,7 +10,8 @@ using namespace brls::literals;
 namespace artemis::ui {
 
 QrCodeView::QrCodeView(const std::string& payload) {
-    setHeight(360.0f);
+    setWidth(300.0f);
+    setHeight(300.0f);
     try {
         const qrcodegen::QrCode code = qrcodegen::QrCode::encodeText(
             payload.c_str(), qrcodegen::QrCode::Ecc::MEDIUM);
@@ -65,15 +66,24 @@ void QrCodeView::draw(NVGcontext* vg, float x, float y, float width, float heigh
 }
 
 void showUrlQrDialog(const std::string& title, const std::string& url) {
+    // Dialog AppletFrame is 720px wide and left-aligns children by default.
+    // Content must fill that width; otherwise a narrower box (and the QR)
+    // sit left of center relative to the Close button.
+    constexpr float kDialogWidth = 720.0f;
+    constexpr float kContentPadX = 48.0f;
+    constexpr float kQrSize = 300.0f;
+    const float contentWidth = kDialogWidth - (kContentPadX * 2.0f);
+
     auto* container = new brls::Box(brls::Axis::COLUMN);
+    container->setWidth(kDialogWidth);
     container->setAlignItems(brls::AlignItems::CENTER);
     container->setJustifyContent(brls::JustifyContent::CENTER);
-    container->setWidth(500.0f);
-    container->setPadding(18.0f);
+    container->setPadding(28.0f, kContentPadX, 20.0f, kContentPadX);
 
     auto* heading = new brls::Label();
     heading->setText(title.empty() ? "host/web_config"_i18n : title);
-    heading->setFontSize(20.0f);
+    heading->setFontSize(22.0f);
+    heading->setWidth(contentWidth);
     heading->setHorizontalAlign(brls::HorizontalAlign::CENTER);
     heading->setMarginBottom(4.0f);
     container->addView(heading);
@@ -81,25 +91,21 @@ void showUrlQrDialog(const std::string& title, const std::string& url) {
     auto* hint = new brls::Label();
     hint->setText("host/web_config_scan_hint"_i18n);
     hint->setFontSize(16.0f);
+    hint->setWidth(contentWidth);
     hint->setHorizontalAlign(brls::HorizontalAlign::CENTER);
-    hint->setMarginBottom(12.0f);
+    hint->setMarginBottom(16.0f);
     container->addView(hint);
 
-    auto* qrWrap = new brls::Box(brls::Axis::COLUMN);
-    qrWrap->setAlignItems(brls::AlignItems::CENTER);
-    qrWrap->setJustifyContent(brls::JustifyContent::CENTER);
-    qrWrap->setWidth(360.0f);
-    qrWrap->setHeight(360.0f);
     auto* qr = new QrCodeView(url);
-    qr->setWidth(360.0f);
-    qr->setHeight(360.0f);
-    qrWrap->addView(qr);
-    container->addView(qrWrap);
+    qr->setWidth(kQrSize);
+    qr->setHeight(kQrSize);
+    container->addView(qr);
 
     if (!qr->valid()) {
         auto* fallback = new brls::Label();
         fallback->setText("host/web_config_qr_unavailable"_i18n);
         fallback->setFontSize(16.0f);
+        fallback->setWidth(contentWidth);
         fallback->setHorizontalAlign(brls::HorizontalAlign::CENTER);
         fallback->setMarginTop(8.0f);
         container->addView(fallback);
@@ -108,8 +114,9 @@ void showUrlQrDialog(const std::string& title, const std::string& url) {
     auto* urlLabel = new brls::Label();
     urlLabel->setText(url);
     urlLabel->setFontSize(16.0f);
+    urlLabel->setWidth(contentWidth);
     urlLabel->setHorizontalAlign(brls::HorizontalAlign::CENTER);
-    urlLabel->setMarginTop(12.0f);
+    urlLabel->setMarginTop(16.0f);
     container->addView(urlLabel);
 
     auto* dialog = new brls::Dialog(container);
