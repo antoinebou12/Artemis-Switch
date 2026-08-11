@@ -353,6 +353,11 @@ void StreamingView::onFocusLost() {
 
 void StreamingView::draw(NVGcontext* vg, float x, float y, float width,
                          float height, Style style, FrameContext* ctx) {
+    // Once terminate() starts, skip all GPU/input/overlay work so Host menu
+    // navigation cannot race deko3d teardown (Switch orange-screen crash).
+    if (terminated)
+        return;
+
 #if ARTEMIS_END_STREAM_ON_FOCUS_LOSS
     if (pendingSuspendTerminate) {
         // Focus callback only records intent; tear down here on the main loop.
@@ -551,10 +556,26 @@ void StreamingView::terminate(bool terminateApp) {
 
     clearControllerRumble();
 
-    bool hasOverlays =
-        Application::getActivitiesStack().back() != this->getParentActivity();
-    this->dismiss([this, hasOverlays] {
-        if (hasOverlays)
+    Activity* streamActivity = this->getParentActivity();
+    auto stack = Application::getActivitiesStack();
+    const bool streamIsTop =
+        !stack.empty() && stack.back() == streamActivity;
+
+    // View::dismiss → AppletFrame::popContentView → popActivity always pops
+    // the top activity. When overlays sit above the stream, the first dismiss
+    // clears one overlay; keep clearing until the stream is top, then exit.
+    if (streamIsTop) {
+        this->dismiss();
+        return;
+    }
+
+    this->dismiss([this, streamActivity] {
+        auto stack = Application::getActivitiesStack();
+        while (stack.size() > 1 && stack.back() != streamActivity) {
+            Application::popActivity(TransitionAnimation::NONE);
+            stack = Application::getActivitiesStack();
+        }
+        if (!stack.empty() && stack.back() == streamActivity)
             this->dismiss();
     });
 }
