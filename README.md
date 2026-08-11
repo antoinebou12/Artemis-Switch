@@ -12,6 +12,7 @@
 [![C++20](https://img.shields.io/badge/C%2B%2B-20-00599C)](CMakeLists.txt)
 [![Languages](https://img.shields.io/badge/UI-English%20%7C%20Fran%C3%A7ais-4c8bf5)](#localization)
 [![Status](https://img.shields.io/badge/status-experimental-orange)](#project-status)
+[![Docs](https://img.shields.io/badge/docs-GitHub%20Pages-E60012)](https://antoinebou12.github.io/Artemis-Switch/)
 
 **Native Moonlight-compatible game streaming for Nintendo Switch / Horizon OS.**
 
@@ -25,6 +26,20 @@ Artemis Switch is based on [Moonlight-Switch](https://github.com/XITRIX/Moonligh
 
 > [!IMPORTANT]
 > Artemis Switch is under active development. Portable tests, GitHub Actions jobs, and the Nintendo Switch release build run before release packages are published. Items marked **device validation** still need confirmation on real Sunshine/Apollo streams.
+
+---
+
+## Documentation
+
+Settings help is on GitHub Pages ([IPC Toolkit](https://ipctk.xyz)-style Material site): **[Settings reference](https://antoinebou12.github.io/Artemis-Switch/settings.html)** — every option with short help text.
+
+| Page | Contents |
+|---|---|
+| [Home](https://antoinebou12.github.io/Artemis-Switch/) | What Artemis Switch is |
+| [Install](https://antoinebou12.github.io/Artemis-Switch/install.html) | NRO path and title redirection |
+| [Settings](https://antoinebou12.github.io/Artemis-Switch/settings.html) | Full option reference |
+
+Source: [`docs/source/`](docs/source/).
 
 ---
 

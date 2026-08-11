@@ -5,3 +5,4 @@ build*
 dist/
 vcpkg_installed
 .psv-logs/
+docs/_build/
