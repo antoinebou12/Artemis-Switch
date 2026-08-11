@@ -11,6 +11,13 @@
 #define ARTEMIS_HAS_ADVANCED_STREAM 0
 #endif
 
+#if __has_include("features/stream/FrameRateOptions.hpp")
+#include "features/stream/FrameRateOptions.hpp"
+#define ARTEMIS_HAS_FRAME_RATE_PRESETS 1
+#else
+#define ARTEMIS_HAS_FRAME_RATE_PRESETS 0
+#endif
+
 #if __has_include("video/VideoScaleStore.hpp")
 #include "video/VideoScaleStore.hpp"
 #define ARTEMIS_HAS_VIDEO_SCALE 1
@@ -53,6 +60,14 @@
 using namespace brls;
 
 namespace {
+#if ARTEMIS_HAS_FRAME_RATE_PRESETS
+std::vector<std::string> activeFrameRateLabels() {
+    std::vector<std::string> labels;
+    for (const auto& preset : artemis::stream::availableFrameRatePresets())
+        labels.push_back(artemis::stream::frameRatePresetLabel(preset));
+    return labels;
+}
+#else
 std::vector<int> activeFrameRates() {
 #if ARTEMIS_HAS_ADVANCED_STREAM
     return artemis::stream::availableFrameRates(
@@ -86,6 +101,7 @@ int frameRateSelection(const std::vector<int>& values, int current) {
     }
     return best;
 }
+#endif
 
 int resolutionPresetIndex(int width, int height) {
     if (width == 1280 && height == 720)
@@ -419,6 +435,28 @@ ArtemisSettingsTab::~ArtemisSettingsTab() {
 View* ArtemisSettingsTab::create() { return new ArtemisSettingsTab(); }
 
 void ArtemisSettingsTab::refreshFrameRateSelector() {
+#if ARTEMIS_HAS_FRAME_RATE_PRESETS
+    const auto presets = artemis::stream::availableFrameRatePresets();
+    frameRate->setData(activeFrameRateLabels());
+    frameRate->setSelection(artemis::stream::frameRatePresetIndex(
+        Settings::instance().fps(),
+        Settings::instance().client_refresh_rate_x100()));
+
+    if (hasFrameRateSubscription)
+        frameRate->getEvent()->unsubscribe(frameRateSubscription);
+    frameRateSubscription = frameRate->getEvent()->subscribe([this](int selected) {
+        const auto current = artemis::stream::availableFrameRatePresets();
+        if (selected < 0 || selected >= static_cast<int>(current.size()))
+            return;
+        const auto& preset = current[static_cast<size_t>(selected)];
+        Settings::instance().set_fps(preset.fps);
+        Settings::instance().set_client_refresh_rate_x100(
+            preset.clientRefreshRateX100);
+        Settings::instance().save();
+        refreshValues();
+    });
+    hasFrameRateSubscription = true;
+#else
     const auto values = activeFrameRates();
     frameRate->setData(frameRateLabels(values));
     frameRate->setSelection(frameRateSelection(values, Settings::instance().fps()));
@@ -434,6 +472,7 @@ void ArtemisSettingsTab::refreshFrameRateSelector() {
         refreshValues();
     });
     hasFrameRateSubscription = true;
+#endif
 }
 
 void ArtemisSettingsTab::refreshValues() {

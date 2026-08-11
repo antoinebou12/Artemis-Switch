@@ -173,6 +173,15 @@ class Settings : public Singleton<Settings> {
     [[nodiscard]] int fps() const { return m_fps; }
     void set_fps(int fps) { m_fps = fps; }
 
+    // 0 = derive from fps * 100. Non-zero enables Sunshine/Apollo fractional
+    // NTSC pacing (e.g. 5994 for 59.94 Hz).
+    [[nodiscard]] int client_refresh_rate_x100() const {
+        return m_client_refresh_rate_x100;
+    }
+    void set_client_refresh_rate_x100(int value) {
+        m_client_refresh_rate_x100 = value < 0 ? 0 : value;
+    }
+
     [[nodiscard]] VideoCodec video_codec() const { return m_video_codec; }
     void set_video_codec(VideoCodec video_codec) { m_video_codec = video_codec; }
 
@@ -458,6 +467,7 @@ class Settings : public Singleton<Settings> {
         artemis::streaming::StreamAspectRatio::Ratio16x9;
     int m_native_resolution_scale = 100;
     int m_fps = 60;
+    int m_client_refresh_rate_x100 = 0;
 #ifdef __PSV__
     VideoCodec m_video_codec = H264;
 #else

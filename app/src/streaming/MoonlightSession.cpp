@@ -6,6 +6,7 @@
 #include "StreamProfileStore.hpp"
 #include "borealis.hpp"
 #include "../features/stream/AdvancedStreamOptionsStore.hpp"
+#include "../features/stream/FrameRateOptions.hpp"
 #include "../features/stream/VideoCodecFormats.hpp"
 #include <string.h>
 

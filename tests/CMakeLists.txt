@@ -73,6 +73,11 @@ add_artemis_test(advanced_stream_options_test
     app/src/features/stream/AdvancedStreamOptions.cpp
     app/src/features/stream)
 
+add_artemis_test(frame_rate_options_test
+    tests/frame_rate_options_test.cpp
+    app/src/features/stream/FrameRateOptions.cpp
+    app/src/features/stream)
+
 add_artemis_test(video_codec_formats_test
     tests/video_codec_formats_test.cpp
     app/src/features/stream/VideoCodecFormats.cpp

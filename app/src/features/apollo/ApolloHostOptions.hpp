@@ -20,6 +20,8 @@ struct ApolloHostOptions {
     int customWidth = 1280;
     int customHeight = 720;
     int refreshRate = 60;
+    // Apollo launch scaleFactor percent (50/75/100/125/150).
+    int scaleFactor = 100;
 };
 
 struct ResolvedVirtualDisplay {

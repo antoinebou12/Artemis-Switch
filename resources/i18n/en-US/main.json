@@ -194,6 +194,7 @@
             "rumble_test_all": "Rumble all pads",
             "rumble_test_all_hint": "Every connected controller",
             "virtual_display": "Apollo virtual display",
+            "apollo_scale_factor": "Apollo scale factor",
             "vd_off": "Virtual display off",
             "vd_current": "Current stream profile",
             "vd_handheld": "Handheld 1280×720",

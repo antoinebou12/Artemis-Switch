@@ -304,6 +304,9 @@ void MoonlightSession::start(ServerCallback<bool> callback, bool is_sunshine) {
         if (m_apollo_launch_options.refreshRate > 0)
             m_config.fps = m_apollo_launch_options.refreshRate;
     }
+    m_config.clientRefreshRateX100 =
+        artemis::stream::resolveClientRefreshRateX100(
+            m_config.fps, Settings::instance().client_refresh_rate_x100());
     m_config.audioConfiguration =
         Settings::instance().stream_audio_configuration() ==
                 STREAM_AUDIO_51_SURROUND

@@ -23,6 +23,7 @@
 #include "errors.h"
 #include "http.h"
 #include "../features/host/HostAddressParse.hpp"
+#include "../features/stream/FrameRateOptions.hpp"
 #include <Limelight.h>
 #include <borealis/core/logger.hpp>
 #include <errno.h>
@@ -545,12 +546,16 @@ int gs_start_app(PSERVER_DATA server, STREAM_CONFIGURATION* config, int appId,
             apolloQuery += "&virtualDisplay=1";
         }
         if (!apolloOptions->appUuid.empty())
-            apolloQuery += "&uuid=" + apolloOptions->appUuid;
+            apolloQuery += "&appuuid=" + apolloOptions->appUuid;
         if (apolloOptions->width > 0 && apolloOptions->height > 0)
             apolloQuery += "&resolution=" + std::to_string(apolloOptions->width) +
                            "x" + std::to_string(apolloOptions->height);
         if (apolloOptions->refreshRate > 0)
             apolloQuery += "&refreshRate=" + std::to_string(apolloOptions->refreshRate);
+        int scaleFactor = apolloOptions->scaleFactor;
+        if (scaleFactor <= 0)
+            scaleFactor = 100;
+        apolloQuery += "&scaleFactor=" + std::to_string(scaleFactor);
     }
 
     if (server->currentGame == 0) {
@@ -561,7 +566,12 @@ int gs_start_app(PSERVER_DATA server, STREAM_CONFIGURATION* config, int appId,
         int mask = config->audioConfiguration == AUDIO_CONFIGURATION_STEREO
                        ? CHANNEL_MASK_STEREO
                        : CHANNEL_MASK_51_SURROUND;
-        int fps = sops && config->fps > 60 ? 60 : config->fps;
+        const bool apolloHost = server->isApollo();
+        int fps = artemis::stream::launchModeFpsValue(
+            config->fps, config->clientRefreshRateX100, apolloHost);
+        // GFE SOPS path: keep integer fps <= 60. Apollo millihertz modes skip this.
+        if (!apolloHost && sops && config->fps > 60)
+            fps = 60;
         snprintf(url, sizeof(url),
                  "https://%s:%u/"
                  "launch?uniqueid=%s&appid=%d&mode=%dx%dx%d&additionalStates=1&"

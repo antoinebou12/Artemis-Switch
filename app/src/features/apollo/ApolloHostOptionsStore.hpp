@@ -9,7 +9,7 @@ namespace artemis::apollo {
 
 class ApolloHostOptionsStore {
 public:
-    static constexpr int SchemaVersion = 1;
+    static constexpr int SchemaVersion = 2;
     static ApolloHostOptionsStore& instance();
 
     ApolloHostOptions get(const std::string& hostKey);

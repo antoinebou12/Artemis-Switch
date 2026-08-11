@@ -18,6 +18,7 @@
 #include "streaming/StreamConfigProfileStore.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cctype>
 #include <fmt/format.h>
 
@@ -299,6 +300,51 @@ AppListView::AppListView(const Host& host) : Box(Axis::ROW), host(host) {
     hostContainer->addView(virtualDisplay);
     refreshVirtualDisplayRow();
 
+    apolloScaleFactor = new DetailCell();
+    apolloScaleFactor->setText("artemis/overlay/apollo_scale_factor"_i18n);
+    apolloScaleFactor->title->setSingleLine(true);
+    apolloScaleFactor->detail->setSingleLine(true);
+    apolloScaleFactor->registerClickAction([this](View*) {
+        const auto server =
+            GameStreamClient::instance().server_data(this->host);
+        if (!server.isApollo()) {
+            showError("artemis/overlay/apollo_only"_i18n);
+            return true;
+        }
+        constexpr std::array values = {50, 75, 100, 125, 150};
+        std::vector<std::string> labels;
+        labels.reserve(values.size());
+        for (int value : values)
+            labels.push_back(fmt::format("{}%", value));
+        auto current =
+            artemis::apollo::ApolloHostOptionsStore::instance().get(
+                hostProfileKey);
+        int selected = 2;
+        for (size_t i = 0; i < values.size(); ++i) {
+            if (values[i] == current.scaleFactor)
+                selected = static_cast<int>(i);
+        }
+        auto* dropdown = new Dropdown(
+            "artemis/overlay/apollo_scale_factor"_i18n, labels,
+            [this, values](int index) {
+                if (index < 0 ||
+                    static_cast<size_t>(index) >= values.size())
+                    return;
+                auto options =
+                    artemis::apollo::ApolloHostOptionsStore::instance().get(
+                        hostProfileKey);
+                options.scaleFactor = values[static_cast<size_t>(index)];
+                artemis::apollo::ApolloHostOptionsStore::instance().set(
+                    hostProfileKey, options);
+                refreshApolloScaleFactorRow();
+            },
+            selected);
+        Application::pushActivity(new Activity(dropdown));
+        return true;
+    });
+    hostContainer->addView(apolloScaleFactor);
+    refreshApolloScaleFactorRow();
+
     contentColumn->addView(hostContainer);
     addView(contentColumn);
 
@@ -448,8 +494,10 @@ void AppListView::refreshVirtualDisplayRow() {
         server.isApollo() && server.virtualDisplayCapable;
     virtualDisplay->setVisibility(available ? Visibility::VISIBLE
                                             : Visibility::GONE);
-    if (!available)
+    if (!available) {
+        refreshApolloScaleFactorRow();
         return;
+    }
     if (!server.virtualDisplayDriverReady) {
         virtualDisplay->setDetailText(
             "artemis/overlay/virtual_display_driver_not_ready"_i18n);
@@ -458,6 +506,22 @@ void AppListView::refreshVirtualDisplayRow() {
     const auto options =
         artemis::apollo::ApolloHostOptionsStore::instance().get(hostProfileKey);
     virtualDisplay->setDetailText(vdTargetLabel(options.target));
+    refreshApolloScaleFactorRow();
+}
+
+void AppListView::refreshApolloScaleFactorRow() {
+    if (!apolloScaleFactor)
+        return;
+    const auto server = GameStreamClient::instance().server_data(host);
+    const bool available = server.isApollo();
+    apolloScaleFactor->setVisibility(available ? Visibility::VISIBLE
+                                               : Visibility::GONE);
+    if (!available)
+        return;
+    const auto options =
+        artemis::apollo::ApolloHostOptionsStore::instance().get(hostProfileKey);
+    apolloScaleFactor->setDetailText(
+        fmt::format("{}%", options.scaleFactor > 0 ? options.scaleFactor : 100));
 }
 
 void AppListView::blockInput(bool block) {

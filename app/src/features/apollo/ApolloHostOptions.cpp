@@ -25,6 +25,16 @@ void fitDecodeBudget(int& width, int& height) {
 ApolloHostOptions validateApolloHostOptions(ApolloHostOptions options) {
     fitDecodeBudget(options.customWidth, options.customHeight);
     options.refreshRate = std::clamp(options.refreshRate, 30, 120);
+    static constexpr int kAllowedScale[] = {50, 75, 100, 125, 150};
+    bool scaleOk = false;
+    for (int allowed : kAllowedScale) {
+        if (options.scaleFactor == allowed) {
+            scaleOk = true;
+            break;
+        }
+    }
+    if (!scaleOk)
+        options.scaleFactor = 100;
     return options;
 }
 

@@ -6,6 +6,7 @@
 
 #include "StreamConfigProfileNormalize.hpp"
 #include "features/stream/AdvancedStreamOptions.hpp"
+#include "features/stream/FrameRateOptions.hpp"
 #include "keyboard_view.hpp"
 #include "views/boolean_slider_cell.hpp"
 
@@ -355,23 +356,30 @@ void openProfileEditor(const std::string& profileId,
 
     addHeader(content, "artemis/settings/profile_section_video"_i18n);
 
-    auto* fpsCell =
-        addDetail(content, "settings/fps"_i18n, fmt::format("{} FPS", draft->fps));
+    auto* fpsCell = addDetail(
+        content, "settings/fps"_i18n,
+        artemis::stream::frameRatePresetLabel(
+            artemis::stream::availableFrameRatePresets()[static_cast<size_t>(
+                artemis::stream::frameRatePresetIndex(
+                    draft->fps, draft->clientRefreshRateX100))]));
     fpsCell->registerClickAction([draft, fpsCell](brls::View*) {
-        const std::vector<int> values = {30, 40, 60, 90, 120};
+        const auto presets = artemis::stream::availableFrameRatePresets();
         std::vector<std::string> labels;
-        int selected = 2;
-        for (size_t i = 0; i < values.size(); ++i) {
-            labels.push_back(fmt::format("{} FPS", values[i]));
-            if (values[i] == draft->fps)
-                selected = static_cast<int>(i);
-        }
+        labels.reserve(presets.size());
+        for (const auto& preset : presets)
+            labels.push_back(artemis::stream::frameRatePresetLabel(preset));
+        const int selected = artemis::stream::frameRatePresetIndex(
+            draft->fps, draft->clientRefreshRateX100);
         auto* dropdown = new brls::Dropdown(
             "settings/fps"_i18n, labels,
-            [draft, fpsCell, values](int index) {
-                if (index >= 0 && index < static_cast<int>(values.size()))
-                    draft->fps = values[static_cast<size_t>(index)];
-                fpsCell->setDetailText(fmt::format("{} FPS", draft->fps));
+            [draft, fpsCell, presets](int index) {
+                if (index < 0 || index >= static_cast<int>(presets.size()))
+                    return;
+                const auto& preset = presets[static_cast<size_t>(index)];
+                draft->fps = preset.fps;
+                draft->clientRefreshRateX100 = preset.clientRefreshRateX100;
+                fpsCell->setDetailText(
+                    artemis::stream::frameRatePresetLabel(preset));
             },
             selected);
         brls::Application::pushActivity(new brls::Activity(dropdown));
