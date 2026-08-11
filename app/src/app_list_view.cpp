@@ -99,6 +99,38 @@ AppListView::AppListView(const Host& host) : Box(Axis::ROW), host(host) {
             hostProfileKey, [this] { refreshStreamProfileLabel(); });
         return true;
     });
+    streamProfile->registerAction(
+        "host/edit_profile"_i18n, BUTTON_Y, [this](View*) {
+            const auto selected =
+                artemis::streaming::StreamConfigProfileStore::instance()
+                    .selectedForHost(hostProfileKey);
+            artemis::streaming::openProfileEditor(
+                selected, hostProfileKey,
+                [this] { refreshStreamProfileLabel(); });
+            return true;
+        });
+    streamProfile->registerAction(
+        "host/delete_profile"_i18n, BUTTON_X, [this](View*) {
+            const auto selected =
+                artemis::streaming::StreamConfigProfileStore::instance()
+                    .selectedForHost(hostProfileKey);
+            if (selected.empty()) {
+                showError("host/manage_profile_none"_i18n);
+                return true;
+            }
+            auto* confirm =
+                new brls::Dialog("host/delete_profile_message"_i18n);
+            confirm->addButton("common/cancel"_i18n, [] {});
+            confirm->addButton("common/remove"_i18n, [this, selected] {
+                auto& store =
+                    artemis::streaming::StreamConfigProfileStore::instance();
+                store.remove(selected);
+                store.clearSelectedForHost(hostProfileKey);
+                refreshStreamProfileLabel();
+            });
+            confirm->open();
+            return true;
+        });
     hostContainer->addView(streamProfile);
     contentColumn->addView(hostContainer);
     addView(contentColumn);
