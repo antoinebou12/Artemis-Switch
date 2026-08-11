@@ -459,9 +459,9 @@ QuickTab::QuickTab(StreamingView* streamView) : streamView(streamView) {
     this->inflateFromXMLRes("xml/views/ingame_overlay/quick_tab.xml");
 
     const std::array<DetailCell*, 9> quickRows = {
-        quickKeyboard,      quickMoveLeft,       quickMoveRight, quickTouch,
-        quickHostShortcuts, quickRestartServer,  quickResetDisplay,
-        quickServerCommands, quickMouse};
+        quickKeyboard,      quickMouse,          quickMoveLeft, quickMoveRight,
+        quickTouch,         quickHostShortcuts,  quickRestartServer,
+        quickResetDisplay,  quickServerCommands};
     for (auto* row : quickRows) {
         row->title->setSingleLine(true);
         row->detail->setSingleLine(true);
