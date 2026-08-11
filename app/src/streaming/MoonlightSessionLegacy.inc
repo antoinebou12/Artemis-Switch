@@ -309,7 +309,12 @@ void MoonlightSession::start(ServerCallback<bool> callback, bool is_sunshine) {
                 STREAM_AUDIO_51_SURROUND
             ? AUDIO_CONFIGURATION_51_SURROUND
             : AUDIO_CONFIGURATION_STEREO;
-    m_config.packetSize = 1392;
+    {
+        const auto advanced =
+            artemis::stream::AdvancedStreamOptionsStore::instance().get();
+        m_config.packetSize =
+            artemis::stream::resolveStreamPacketSize(advanced);
+    }
     m_config.streamingRemotely = STREAM_CFG_AUTO;
     m_config.bitrate = Settings::instance().bitrate();
     m_config.encryptionFlags = m_is_sunshine ? ENCFLG_ALL : ENCFLG_VIDEO;
