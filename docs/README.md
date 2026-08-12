@@ -1,14 +1,17 @@
 # Docs site
 
-GitHub Pages site for Artemis Switch, in the same shape as [IPC Toolkit](https://ipctk.xyz): Material theme, top tabs, search, and a GitHub link.
+GitHub Pages site for Artemis Switch, in the same shape as [IPC Toolkit](https://ipctk.xyz): **blue** Material theme, top tabs, search, and a GitHub link.
 
 **Live:** <https://antoinebou12.github.io/Artemis-Switch/>
 
 | Page | File |
 |---|---|
 | Home | `source/index.md` |
+| What's new | `source/whats-new.md` |
 | Install | `source/install.md` |
 | Settings (every option) | `source/settings.md` |
+| Stream profiles | `source/profiles.md` |
+| Performance & telemetry | `source/performance.md` |
 
 ## Build locally
 

@@ -1,9 +1,28 @@
-/* Keep the Material layout close to ipc-toolkit: readable body, quiet code. */
+/* Material blue docs (IPC Toolkit–style readability). */
 .md-typeset h1,
-.md-typeset h2 {
+.md-typeset h2,
+.md-typeset h3 {
     font-weight: 600;
 }
 
 .md-typeset dl dt {
     font-weight: 600;
+}
+
+.md-typeset table:not([class]) {
+    font-size: 0.9rem;
+}
+
+.md-typeset table:not([class]) th {
+    background-color: rgba(33, 150, 243, 0.12);
+    font-weight: 600;
+}
+
+[data-md-color-scheme="slate"] .md-typeset table:not([class]) th {
+    background-color: rgba(33, 150, 243, 0.22);
+}
+
+.md-typeset .admonition.note,
+.md-typeset details.note {
+    border-color: #2196f3;
 }

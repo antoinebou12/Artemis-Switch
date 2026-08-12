@@ -4,6 +4,10 @@ Every option in Artemis Switch, with the same labels as the app. Stream profiles
 
 Bitrate, codec, resolution, and most stream fields apply on the **next** connection. Overlay Options can change a few presentation and input values while a stream is running.
 
+```{seealso}
+Guided explanations with tables: [What's new](whats-new.md) · [Stream profiles](profiles.md) · [Performance & telemetry](performance.md)
+```
+
 ## Where settings live
 
 | Place | What it is |
@@ -12,6 +16,16 @@ Bitrate, codec, resolution, and most stream fields apply on the **next** connect
 | **Stream profiles** | Named copy of those stream fields (`profile.json`); assign per host |
 | **Host** tab (connected) | Web config QR and which profile this host uses |
 | **In-stream overlay** | Quick actions, Options, Performance, Debug |
+
+## Recent controls (quick table)
+
+| Control | Default | Applies | Notes |
+|---|---|---|---|
+| Low latency pacing | Off | Next stream / Options live | Adaptive deadline + latest-frame-wins |
+| Frame queue size | 3 | Next stream | 1–5; LL targets 0–1 buffered |
+| Full-range video | Off | Next stream / Options live | Honored on NVTEGRA when forced |
+| FSR preset | Off | Profile only | Performance / Balanced / Quality |
+| Video bitrate (overlay) | — | Live read | Shows **actual / configured** Mbps |
 
 ---
 
@@ -290,9 +304,11 @@ Tunnel status
 
 ## Stream profiles
 
+See **[Stream profiles](profiles.md)** for preset tables and what is stored in schema 13.
+
 Named stream snapshots that match the Settings stream fields 1:1: quality (including **Native** resolution, **aspect ratio**, and resolution scale), bitrate, image adjustments, stream/audio, controller, keyboard, mouse (**Touchscreen mode** plus pointer mode), plus Artemis extras (custom resolution, full-range, packet size, **frame queue size**, **low latency pacing**, scale mode, **Remember Zoom & Pan**, controller/console motion). Stored as `profile.json` (schema 13). Launch width is derived from profile height plus that profile’s 16:9 / 4:3 setting. **FSR preset** (Off / Performance / Balanced / Quality) is profile-only and default Off; named presets write existing FSR1 (EASU) plus RCAS strength and are greyed out while upscaling is Off. Built-in seeds include **720p 60 Low Latency**. Language, host OS, overlay chords, VPN, and Debug stay in Settings only. Editing or assigning a profile does not change global Settings.
 
-On first launch (empty `profile.json`), Artemis seeds thirteen 30/60 FPS presets: `360p 30 0.5M`, `360p 30 1M`, `480p 30 5M`, `480p 60 10M`, `540p 30 5M`, `540p 60 10M`, `720p 30 10M`, `720p 60 10M` (active), `720p 60 20M`, `1080p 30 20M`, `1080p 60 20M`, `1080p 60 50M`, `1080p 60 100M`. Existing custom profiles are not replaced. Deleting every profile does not auto-reseed. Virtual display and scale stay on the Sunshine/Apollo host web UI.
+On first launch (empty `profile.json`), Artemis seeds fourteen 30/60 FPS presets (see the [profiles table](profiles.md)). Existing custom profiles are not replaced. Deleting every profile does not auto-reseed. Virtual display and scale stay on the Sunshine/Apollo host web UI.
 
 Default profile
 : Global fallback when a host has no assigned profile.
@@ -436,19 +452,20 @@ Image Adjustments
 
 ## In-stream overlay — Performance
 
-Live telemetry for the current stream. Hidden when Settings → Debug → **Show Performance tab** is off (default on). Not persistent settings except Debug at the bottom. Stop summary shows score, drop%, FPS p50/p99, decode p99, GPU p99, and queue skips. Save writes the full `BenchmarkSummary` (JSON `stats` plus CSV columns).
+Live telemetry for the current stream. Hidden when Settings → Debug → **Show Performance tab** is off (default on). Full explanation: **[Performance & telemetry](performance.md)**.
 
 | Row | Meaning |
 |---|---|
-| Bitrate | Configured stream bitrate |
+| Video bitrate | **Actual / configured** Mbps (measured payload vs Settings) |
 | Switch Wi-Fi | Client Wi-Fi signal; graph under the row |
-| Receive / Decode / Render / GPU render | Stage latencies |
-| Packet loss | Reported loss |
+| Receive latency | Pipeline text: **R · D · Q · G · C** ms |
+| Decode / Render / GPU render | Stage latencies |
+| Packet loss | Recent network drop % |
 | Host / Network / Decoder / Rendered FPS | Pipeline frame rates (graphs on network and decoder) |
-| Frame queue | Queued decoded frames |
-| Presentation | Current scale / presentation path |
-| Mode, CPU / GPU / Memory clock, Battery | Switch runtime |
-| Benchmark | Start / stop / save / clear a timing capture |
+| Frame queue | `depth / target` (+ jitter ms in low-latency mode) |
+| Presentation | Scale mode · Full or Limited |
+| Mode, CPU / GPU / Memory clock, Battery | Switch runtime (read-only) |
+| Benchmark | Start / stop / save / clear; exports queue, bitrate, startup fields |
 | Show debugging view | On-stream debug overlay |
 | On-screen log | Overlay log lines |
 

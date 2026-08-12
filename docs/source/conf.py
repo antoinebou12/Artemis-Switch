@@ -33,8 +33,8 @@ html_theme_options = {
         {
             "media": "(prefers-color-scheme: light)",
             "scheme": "default",
-            "primary": "red",
-            "accent": "red",
+            "primary": "blue",
+            "accent": "light-blue",
             "toggle": {
                 "icon": "material/brightness-7",
                 "name": "Switch to dark mode",
@@ -43,8 +43,8 @@ html_theme_options = {
         {
             "media": "(prefers-color-scheme: dark)",
             "scheme": "slate",
-            "primary": "red",
-            "accent": "red",
+            "primary": "blue",
+            "accent": "light-blue",
             "toggle": {
                 "icon": "material/brightness-4",
                 "name": "Switch to light mode",
