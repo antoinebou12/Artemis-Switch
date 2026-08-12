@@ -26,6 +26,7 @@
             <brls:DetailCell id="receive_latency"/>
             <brls:DetailCell id="decode_latency"/>
             <brls:DetailCell id="render_latency"/>
+            <brls:DetailCell id="gpu_render"/>
             <brls:DetailCell id="packet_loss"/>
             <brls:DetailCell id="host_fps"/>
             <brls:DetailCell id="received_fps"/>

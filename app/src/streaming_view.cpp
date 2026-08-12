@@ -19,14 +19,21 @@
 #include "two_finger_scroll_recognizer.hpp"
 #include "features/input/InputSettingsStore.hpp"
 #include "features/apollo/ApolloHostOptionsStore.hpp"
+#include "features/stream/AdvancedStreamOptionsStore.hpp"
+#include "features/input/SwitchMotionPolicyStore.hpp"
+#include "features/video/ZoomPanStore.hpp"
+#include "video/VideoScaleStore.hpp"
 #include "features/ui/StatsOverlayLayout.hpp"
 #include "streaming/StreamConfigProfileStore.hpp"
 #include "streaming/StreamProfileStore.hpp"
+#include "streaming/StreamUiLifecycle.hpp"
 #include "utils/ArtemisPlatformFeatures.hpp"
 #include "utils/UsableMac.hpp"
 #include <Limelight.h>
 #include <chrono>
+#include <filesystem>
 #include <nanovg.h>
+#include <vector>
 
 #if defined(__SDL3__)
 #include <SDL3/SDL.h>
@@ -35,6 +42,49 @@
 #endif
 
 using namespace brls;
+
+namespace {
+const char* kProfileSessionBackupSuffix = ".profile-session.bak";
+
+std::vector<std::filesystem::path> globalSettingsFiles() {
+    const auto dir =
+        std::filesystem::path(Settings::instance().working_dir());
+    return {
+        dir / "settings.json",
+        dir / "artemis_advanced_stream.json",
+        dir / "artemis_video_scale.json",
+        dir / "artemis_stream.json",
+        dir / "artemis_input.json",
+        dir / "artemis_zoom_pan.json",
+        dir / "artemis_motion.json",
+    };
+}
+
+void backupGlobalSettingsFiles() {
+    std::error_code ec;
+    for (const auto& path : globalSettingsFiles()) {
+        const auto bak = path.string() + kProfileSessionBackupSuffix;
+        std::filesystem::remove(bak, ec);
+        if (std::filesystem::exists(path, ec))
+            std::filesystem::copy_file(
+                path, bak, std::filesystem::copy_options::overwrite_existing,
+                ec);
+    }
+}
+
+void restoreGlobalSettingsFiles() {
+    std::error_code ec;
+    for (const auto& path : globalSettingsFiles()) {
+        const auto bak = path.string() + kProfileSessionBackupSuffix;
+        if (std::filesystem::exists(bak, ec)) {
+            std::filesystem::copy_file(
+                bak, path, std::filesystem::copy_options::overwrite_existing,
+                ec);
+            std::filesystem::remove(bak, ec);
+        }
+    }
+}
+} // namespace
 
 #ifdef PLATFORM_TVOS
 extern void updatePreferredDisplayMode(bool streamActive);
@@ -126,20 +176,20 @@ StreamingView::StreamingView(const Host& host, const AppInfo& app) : host(host),
                 artemis::streaming::StreamConfigProfileStore::instance();
             const auto selectedProfileId =
                 profileStore.selectedForHost(hostKey);
-            if (!selectedProfileId.empty())
-                profileStore.applyToSettings(selectedProfileId);
+            if (!selectedProfileId.empty()) {
+                backupGlobalSettingsFiles();
+                profileStore.applyToSettings(selectedProfileId, false);
+                appliedProfileToRuntime = true;
+            }
 
             artemis::apollo::ApolloHostOptions stored =
                 artemis::apollo::ApolloHostOptionsStore::instance().get(hostKey);
             int profileWidth = Application::windowWidth;
             int profileHeight = Application::windowHeight;
-            if (auto named = profileStore.get(selectedProfileId)) {
+            if (auto named = profileStore.get(selectedProfileId);
+                named && named->resolutionHeight > 0) {
                 profileWidth = named->resolutionWidth();
                 profileHeight = named->resolutionHeight;
-                stored = named->apolloOptions();
-                artemis::apollo::ApolloHostOptionsStore::instance().set(
-                    hostKey,
-                    artemis::apollo::validateApolloHostOptions(stored));
             } else {
                 const auto customProfile =
                     artemis::streaming::StreamProfileStore::instance().get();
@@ -150,12 +200,6 @@ StreamingView::StreamingView(const Host& host, const AppInfo& app) : host(host),
                     profileHeight = Settings::instance().resolution();
                     profileWidth = artemis::streaming::streamWidthFromHeight(
                         profileHeight, Settings::instance().aspect_ratio());
-                }
-                // Fall back to Artemis Settings Apollo defaults.
-                if (stored.target == artemis::apollo::VirtualDisplayTarget::Off &&
-                    stored.scaleFactor == 100) {
-                    stored = artemis::apollo::ApolloHostOptionsStore::instance()
-                                 .get("default");
                 }
             }
             stored = artemis::apollo::validateApolloHostOptions(stored);
@@ -321,6 +365,9 @@ StreamingView::StreamingView(const Host& host, const AppInfo& app) : host(host),
 void StreamingView::onFocusGained() {
     Box::onFocusGained();
 
+    if (terminated)
+        return;
+
     MoonlightInputManager::instance().setInputEnabled(true);
 
     if (!blocked) {
@@ -349,10 +396,7 @@ void StreamingView::onFocusLost() {
     MoonlightInputManager::instance().setInputEnabled(false);
     MoonlightInputManager::instance().dropInput();
 
-    if (blocked) {
-        blocked = false;
-        Application::unblockInputs();
-    }
+    releaseInputBlock();
 
     removeKeyboard();
     Application::getPlatform()->getInputManager()->setPointerLock(false);
@@ -560,14 +604,62 @@ void StreamingView::onWindowFocusChanged(bool focused) {
 #endif
 }
 
+void StreamingView::restoreGlobalSettingsIfNeeded() {
+    if (!appliedProfileToRuntime)
+        return;
+    appliedProfileToRuntime = false;
+    restoreGlobalSettingsFiles();
+    Settings::instance().load();
+    brls::Application::setSwapABInputKeys(Settings::instance().swap_ui_ab());
+    brls::Application::setSwapXYInputKeys(Settings::instance().swap_ui_xy());
+    artemis::stream::AdvancedStreamOptionsStore::instance().reload();
+    artemis::video::VideoScaleStore::instance().reload();
+    artemis::streaming::StreamProfileStore::instance().reload();
+    artemis::input::InputSettingsStore::instance().reload();
+    artemis::input::SwitchMotionPolicyStore::instance().reload();
+    artemis::video::ZoomPanStore::instance().reload();
+}
+
+void StreamingView::releaseInputBlock() {
+    if (!blocked)
+        return;
+    blocked = false;
+    Application::unblockInputs();
+}
+
 void StreamingView::terminate(bool terminateApp) {
     if (terminated)
         return;
     terminated = true;
+    pendingTeardownTerminateApp = terminateApp;
 
-    session->stop(terminateApp);
-
+    // Host deleted/closed the app: drop the stream input grab immediately so
+    // the Applications list is not left with a stuck blockInputs token.
+    MoonlightInputManager::instance().setInputEnabled(false);
+    MoonlightInputManager::instance().dropInput();
+    releaseInputBlock();
     clearControllerRumble();
+    if (loader)
+        loader->setHidden(true);
+
+    // Do not LiStopConnection / dismiss during this draw() — destroying deko3d
+    // mid-frame is the Switch orange-screen crash.
+    ASYNC_RETAIN
+    delay(1, [ASYNC_TOKEN] {
+        ASYNC_RELEASE
+        finishTeardown();
+    });
+}
+
+void StreamingView::finishTeardown() {
+    if (teardownStarted)
+        return;
+    teardownStarted = true;
+
+    if (session)
+        session->stop(pendingTeardownTerminateApp);
+    restoreGlobalSettingsIfNeeded();
+    releaseInputBlock();
 
     Activity* streamActivity = this->getParentActivity();
     auto stack = Application::getActivitiesStack();
@@ -621,7 +713,8 @@ void StreamingView::applyVirtualDisplay(
     auto& profileStore =
         artemis::streaming::StreamConfigProfileStore::instance();
     const auto selectedProfileId = profileStore.selectedForHost(hostKey);
-    if (auto named = profileStore.get(selectedProfileId)) {
+    if (auto named = profileStore.get(selectedProfileId);
+        named && named->resolutionHeight > 0) {
         profileWidth = named->resolutionWidth();
         profileHeight = named->resolutionHeight;
     } else {
@@ -847,6 +940,12 @@ StreamingView::~StreamingView() {
     Application::getWindowFocusChangedEvent()->unsubscribe(
         windowFocusSubscription);
 #endif
-    session->stop(Settings::instance().terminate_app_on_disconnect());
-    delete session;
+    releaseInputBlock();
+    restoreGlobalSettingsIfNeeded();
+    if (session) {
+        session->stop(Settings::instance().terminate_app_on_disconnect());
+        delete session;
+        session = nullptr;
+    }
+    artemis::streaming::markStreamUiClosed();
 }

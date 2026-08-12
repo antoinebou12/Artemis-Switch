@@ -28,12 +28,13 @@ const ZoomPanOptions& ZoomPanStore::get() {
     return m_options;
 }
 
-void ZoomPanStore::setRemember(bool remember) {
+void ZoomPanStore::setRemember(bool remember, bool persist) {
     ensureLoaded();
     m_options.rememberBetweenSessions = remember;
     if (!remember)
         m_options.state = {};
-    save();
+    if (persist)
+        save();
 }
 
 void ZoomPanStore::setState(ZoomPanState state) {

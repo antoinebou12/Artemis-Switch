@@ -14,7 +14,7 @@ public:
     static ZoomPanStore& instance();
 
     const ZoomPanOptions& get();
-    void setRemember(bool remember);
+    void setRemember(bool remember, bool persist = true);
     void setState(ZoomPanState state);
     void reset();
     void reload();

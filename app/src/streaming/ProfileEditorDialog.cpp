@@ -5,7 +5,8 @@
 #include "ProfileEditorDialog.hpp"
 
 #include "StreamConfigProfileNormalize.hpp"
-#include "features/apollo/ApolloHostOptions.hpp"
+#include "features/input/PointerSettings.hpp"
+#include "features/input/SwitchMotionPolicy.hpp"
 #include "features/stream/AdvancedStreamOptions.hpp"
 #include "features/stream/FrameRateOptions.hpp"
 #include "keyboard_view.hpp"
@@ -113,15 +114,24 @@ brls::Label* addLabeledSlider(
 }
 
 void addBitrateSlider(brls::Box* content, StreamConfigProfile* draft) {
-    // Settings maps ~0–1 to bitrate range; mirror common 0.5–50 Mbps feel.
-    const float progress =
-        std::clamp(draft->bitrateKbps / 50000.0f, 0.02f, 1.0f);
+#if defined(__PSV__)
+    const float mbpsMaxLimit = 20000.0f;
+#elif defined(PLATFORM_SWITCH)
+    const float mbpsMaxLimit = 100000.0f;
+#else
+    const float mbpsMaxLimit = 150000.0f;
+#endif
+    const float limitOffset = 500.0f;
+    const float limit = mbpsMaxLimit - limitOffset;
+    const float progress = std::clamp(
+        (static_cast<float>(draft->bitrateKbps) - limitOffset) / limit, 0.0f,
+        1.0f);
     addLabeledSlider(
         content, "settings/video_bitrate"_i18n,
         fmt::format("{:.1f} Mbps", draft->bitrateKbps / 1000.0), progress, 12.0f,
-        [draft](float p, brls::Label* valueLabel) {
-            const int kbps =
-                std::clamp(static_cast<int>(p * 50000.0f), 1000, 100000);
+        [draft, limitOffset, limit](float p, brls::Label* valueLabel) {
+            const int kbps = static_cast<int>(
+                std::clamp(p, 0.0f, 1.0f) * limit + limitOffset);
             draft->bitrateKbps = kbps;
             valueLabel->setText(fmt::format("{:.1f} Mbps", kbps / 1000.0));
         });
@@ -198,7 +208,15 @@ void addRcasCell(brls::Box* content, StreamConfigProfile* draft) {
 }
 
 std::string heightLabel(int height) {
+    if (height < 0)
+        return "settings/resolution_native"_i18n;
     return fmt::format("{}p", height);
+}
+
+std::string audioConfigLabel(StreamAudioConfiguration config) {
+    return config == STREAM_AUDIO_51_SURROUND
+               ? "settings/audio_51_surround"_i18n
+               : "settings/audio_stereo"_i18n;
 }
 
 std::string aspectLabel(StreamAspectRatio aspect) {
@@ -275,15 +293,6 @@ std::string nativeScaleLabel(int scale) {
     default:
         return "1.0x";
     }
-}
-
-std::string audioBackendLabel(AudioBackend backend) {
-#ifdef __SWITCH__
-    if (backend == AUDREN)
-        return "Audren";
-#endif
-    (void)backend;
-    return "SDL";
 }
 
 std::string pointerModeLabel(artemis::input::PointerMode mode) {
@@ -390,26 +399,6 @@ void openProfileEditor(const std::string& profileId,
     auto* resCell =
         addDetail(content, "settings/resolution"_i18n,
                   heightLabel(draft->resolutionHeight));
-    resCell->registerClickAction([draft, resCell](brls::View*) {
-        const std::vector<int> heights = {360, 480, 540, 720, 1080, 1440};
-        std::vector<std::string> options;
-        int selected = 3;
-        for (size_t i = 0; i < heights.size(); ++i) {
-            options.push_back(heightLabel(heights[i]));
-            if (heights[i] == draft->resolutionHeight)
-                selected = static_cast<int>(i);
-        }
-        auto* dropdown = new brls::Dropdown(
-            "settings/resolution"_i18n, options,
-            [draft, resCell, heights](int index) {
-                if (index >= 0 && index < static_cast<int>(heights.size()))
-                    draft->resolutionHeight = heights[static_cast<size_t>(index)];
-                resCell->setDetailText(heightLabel(draft->resolutionHeight));
-            },
-            selected);
-        brls::Application::pushActivity(new brls::Activity(dropdown));
-        return true;
-    });
 
     auto* aspectCell =
         addDetail(content, "settings/aspect_ratio"_i18n,
@@ -505,9 +494,47 @@ void openProfileEditor(const std::string& profileId,
         brls::Application::pushActivity(new brls::Activity(dropdown));
         return true;
     });
+    auto updateNativeScaleVisibility = [draft, nativeScaleCell]() {
+        nativeScaleCell->setVisibility(draft->resolutionHeight < 0
+                                           ? brls::Visibility::VISIBLE
+                                           : brls::Visibility::GONE);
+    };
+    updateNativeScaleVisibility();
+    resCell->registerClickAction(
+        [draft, resCell, updateNativeScaleVisibility](brls::View*) {
+            const std::vector<int> heights = {-1, 360, 480, 540, 720, 1080,
+                                              1440};
+            std::vector<std::string> options;
+            int selected = 4;
+            for (size_t i = 0; i < heights.size(); ++i) {
+                options.push_back(heightLabel(heights[i]));
+                if (heights[i] == draft->resolutionHeight)
+                    selected = static_cast<int>(i);
+            }
+            auto* dropdown = new brls::Dropdown(
+                "settings/resolution"_i18n, options,
+                [draft, resCell, heights,
+                 updateNativeScaleVisibility](int index) {
+                    if (index >= 0 && index < static_cast<int>(heights.size()))
+                        draft->resolutionHeight =
+                            heights[static_cast<size_t>(index)];
+                    resCell->setDetailText(
+                        heightLabel(draft->resolutionHeight));
+                    updateNativeScaleVisibility();
+                },
+                selected);
+            brls::Application::pushActivity(new brls::Activity(dropdown));
+            return true;
+        });
 
-    addBool(content, "settings/use_hw_decoding"_i18n, draft->useHwDecoding,
-            [draft](bool v) { draft->useHwDecoding = v; });
+    auto* hwCell =
+        addBool(content, "settings/use_hw_decoding"_i18n, draft->useHwDecoding,
+                [draft](bool v) { draft->useHwDecoding = v; });
+#if defined(__linux__) && defined(PLATFORM_DESKTOP)
+    hwCell->setEnabled(true);
+#else
+    hwCell->setEnabled(false);
+#endif
 
     auto* codecCell =
         addDetail(content, "settings/video_codec"_i18n, codecLabel(draft->videoCodec));
@@ -528,9 +555,13 @@ void openProfileEditor(const std::string& profileId,
         return true;
     });
 
-#ifdef SUPPORT_HDR
-    addBool(content, "settings/request_hdr"_i18n, draft->requestHdr,
-            [draft](bool v) { draft->requestHdr = v; });
+    auto* hdrCell =
+        addBool(content, "settings/request_hdr"_i18n, draft->requestHdr,
+                [draft](bool v) { draft->requestHdr = v; });
+#ifndef SUPPORT_HDR
+    hdrCell->setVisibility(brls::Visibility::GONE);
+#else
+    (void)hdrCell;
 #endif
 
     auto* decoderCell = addDetail(
@@ -625,6 +656,31 @@ void openProfileEditor(const std::string& profileId,
         return true;
     });
 
+    addBool(content, "artemis/settings/remember_zoom_pan"_i18n,
+            draft->rememberZoomPan,
+            [draft](bool v) { draft->rememberZoomPan = v; });
+
+    addHeader(content, "artemis/settings/switch_motion"_i18n);
+    addBool(content, "artemis/settings/forward_motion"_i18n, draft->forwardMotion,
+            [draft](bool v) { draft->forwardMotion = v; });
+    {
+        const auto capabilities =
+            artemis::input::detectSwitchMotionCapabilities();
+        const bool consoleFallbackSupported =
+            artemis::input::canEnableConsoleMotionFallback(capabilities);
+        if (!consoleFallbackSupported)
+            draft->consoleMotionFallback = false;
+        auto* consoleCell = addBool(
+            content, "artemis/settings/console_motion_fallback"_i18n,
+            consoleFallbackSupported && draft->consoleMotionFallback,
+            [draft, consoleFallbackSupported](bool v) {
+                if (!consoleFallbackSupported)
+                    return;
+                draft->consoleMotionFallback = v;
+            });
+        consoleCell->setEnabled(consoleFallbackSupported);
+    }
+
     addHeader(content, "artemis/settings/profile_section_stream"_i18n);
     addBool(content, "settings/usops"_i18n, draft->sops,
             [draft](bool v) { draft->sops = v; });
@@ -632,18 +688,18 @@ void openProfileEditor(const std::string& profileId,
             [draft](bool v) { draft->playAudioOnPc = v; });
     auto* audioCell =
         addDetail(content, "settings/stream_audio_configuration"_i18n,
-                  draft->streamAudioConfiguration == STREAM_AUDIO_51_SURROUND
-                      ? "5.1"
-                      : "Stereo");
+                  audioConfigLabel(draft->streamAudioConfiguration));
     audioCell->registerClickAction([draft, audioCell](brls::View*) {
-        const std::vector<std::string> options = {"Stereo", "5.1"};
+        const std::vector<std::string> options = {
+            "settings/audio_stereo"_i18n, "settings/audio_51_surround"_i18n};
         auto* dropdown = new brls::Dropdown(
             "settings/stream_audio_configuration"_i18n, options,
             [draft, audioCell](int index) {
                 draft->streamAudioConfiguration =
                     index == 1 ? STREAM_AUDIO_51_SURROUND
                                : STREAM_AUDIO_STEREO;
-                audioCell->setDetailText(index == 1 ? "5.1" : "Stereo");
+                audioCell->setDetailText(
+                    audioConfigLabel(draft->streamAudioConfiguration));
             },
             draft->streamAudioConfiguration == STREAM_AUDIO_51_SURROUND ? 1
                                                                         : 0);
@@ -662,103 +718,6 @@ void openProfileEditor(const std::string& profileId,
     addBool(content, "artemis/settings/low_latency_pacing"_i18n,
             draft->lowLatencyPacing,
             [draft](bool v) { draft->lowLatencyPacing = v; });
-
-    auto vdLabel = [](artemis::apollo::VirtualDisplayTarget target) {
-        using Target = artemis::apollo::VirtualDisplayTarget;
-        switch (target) {
-        case Target::Off:
-            return "artemis/overlay/vd_off"_i18n;
-        case Target::CurrentProfile:
-            return "artemis/overlay/vd_current"_i18n;
-        case Target::Handheld:
-            return "artemis/overlay/vd_handheld"_i18n;
-        case Target::Docked:
-            return "artemis/overlay/vd_docked"_i18n;
-        case Target::PortraitHandheld:
-            return "artemis/overlay/vd_portrait_handheld"_i18n;
-        case Target::PortraitDocked:
-            return "artemis/overlay/vd_portrait_docked"_i18n;
-        case Target::Custom:
-            return "artemis/overlay/vd_custom"_i18n;
-        }
-        return "artemis/overlay/vd_off"_i18n;
-    };
-
-    addHeader(content, "artemis/overlay/apollo_options"_i18n);
-    auto* vdCell = addDetail(content, "artemis/overlay/virtual_display"_i18n,
-                             vdLabel(draft->virtualDisplayTarget));
-    vdCell->registerClickAction([draft, vdCell, vdLabel](brls::View*) {
-        using Target = artemis::apollo::VirtualDisplayTarget;
-        const std::vector<Target> values = {
-            Target::Off,        Target::CurrentProfile, Target::Handheld,
-            Target::Docked,     Target::PortraitHandheld,
-            Target::PortraitDocked, Target::Custom};
-        std::vector<std::string> labels;
-        int selected = 0;
-        for (size_t i = 0; i < values.size(); ++i) {
-            labels.push_back(vdLabel(values[i]));
-            if (values[i] == draft->virtualDisplayTarget)
-                selected = static_cast<int>(i);
-        }
-        auto* dropdown = new brls::Dropdown(
-            "artemis/overlay/virtual_display"_i18n, labels,
-            [draft, vdCell, vdLabel, values](int index) {
-                if (index < 0 || index >= static_cast<int>(values.size()))
-                    return;
-                draft->virtualDisplayTarget = values[static_cast<size_t>(index)];
-                if (draft->virtualDisplayTarget == Target::Custom) {
-                    auto apollo = draft->apolloOptions();
-                    brls::Application::getImeManager()->openForText(
-                        [draft, vdCell, vdLabel](const std::string& text) {
-                            auto options = draft->apolloOptions();
-                            if (!artemis::apollo::parseVirtualDisplaySpec(
-                                    text, options, nullptr))
-                                return;
-                            options.target = Target::Custom;
-                            draft->setApolloOptions(options);
-                            vdCell->setDetailText(
-                                vdLabel(draft->virtualDisplayTarget));
-                        },
-                        "artemis/overlay/vd_custom"_i18n,
-                        "artemis/overlay/vd_custom_prompt"_i18n, 32,
-                        fmt::format("{}x{}@{}", apollo.customWidth,
-                                    apollo.customHeight, apollo.refreshRate),
-                        0);
-                    return;
-                }
-                vdCell->setDetailText(vdLabel(draft->virtualDisplayTarget));
-            },
-            selected);
-        brls::Application::pushActivity(new brls::Activity(dropdown));
-        return true;
-    });
-
-    auto* apolloScaleCell = addDetail(
-        content, "artemis/overlay/apollo_scale_factor"_i18n,
-        fmt::format("{}%", draft->apolloScaleFactor > 0 ? draft->apolloScaleFactor
-                                                         : 100));
-    apolloScaleCell->registerClickAction([draft, apolloScaleCell](brls::View*) {
-        const std::vector<int> values = {50, 75, 100, 125, 150};
-        std::vector<std::string> labels;
-        int selected = 2;
-        for (size_t i = 0; i < values.size(); ++i) {
-            labels.push_back(fmt::format("{}%", values[i]));
-            if (values[i] == draft->apolloScaleFactor)
-                selected = static_cast<int>(i);
-        }
-        auto* dropdown = new brls::Dropdown(
-            "artemis/overlay/apollo_scale_factor"_i18n, labels,
-            [draft, apolloScaleCell, values](int index) {
-                if (index < 0 || index >= static_cast<int>(values.size()))
-                    return;
-                draft->apolloScaleFactor = values[static_cast<size_t>(index)];
-                apolloScaleCell->setDetailText(
-                    fmt::format("{}%", draft->apolloScaleFactor));
-            },
-            selected);
-        brls::Application::pushActivity(new brls::Activity(dropdown));
-        return true;
-    });
 
     auto packetSizeLabel = [](int size) -> std::string {
         if (size <= 0)
@@ -817,26 +776,11 @@ void openProfileEditor(const std::string& profileId,
         });
 
 #ifdef __SWITCH__
-    {
-        const std::vector<std::string> backends = {"SDL", "Audren"};
-        auto* audioBackendCell = addDetail(
-            content, "settings/audio_backend"_i18n,
-            audioBackendLabel(draft->audioBackend));
-        audioBackendCell->registerClickAction(
-            [draft, audioBackendCell, backends](brls::View*) {
-                auto* dropdown = new brls::Dropdown(
-                    "settings/audio_backend"_i18n, backends,
-                    [draft, audioBackendCell](int index) {
-                        draft->audioBackend = index == 1 ? AUDREN : SDL;
-                        audioBackendCell->setDetailText(
-                            audioBackendLabel(draft->audioBackend));
-                    },
-                    draft->audioBackend == AUDREN ? 1 : 0);
-                brls::Application::pushActivity(new brls::Activity(dropdown));
-                return true;
-            });
-    }
+    draft->audioBackend = AUDREN;
+    addDetail(content, "settings/audio_backend"_i18n, "Audren")
+        ->setFocusable(false);
 #else
+    draft->audioBackend = SDL;
     addDetail(content, "settings/audio_backend"_i18n, "SDL")->setFocusable(false);
 #endif
 
@@ -1024,35 +968,51 @@ void openProfileEditor(const std::string& profileId,
     });
 
     addHeader(content, "artemis/settings/profile_section_mouse"_i18n);
-    auto* pointerCell =
-        addDetail(content, "artemis/overlay/pointer_mode"_i18n,
-                  pointerModeLabel(draft->pointerMode));
-    pointerCell->registerClickAction([draft, pointerCell](brls::View*) {
-        using Mode = artemis::input::PointerMode;
-        const std::vector<Mode> modes = {
-            Mode::TrackpadNatural, Mode::TrackpadGaming, Mode::MultiTouch,
-            Mode::Absolute,        Mode::AbsoluteSwapped, Mode::Disabled};
-        std::vector<std::string> labels;
-        int selected = 0;
-        for (size_t i = 0; i < modes.size(); ++i) {
-            labels.push_back(pointerModeLabel(modes[i]));
-            if (modes[i] == draft->pointerMode)
-                selected = static_cast<int>(i);
-        }
-        auto* dropdown = new brls::Dropdown(
-            "artemis/overlay/pointer_mode"_i18n, labels,
-            [draft, pointerCell, modes](int index) {
-                if (index >= 0 && index < static_cast<int>(modes.size())) {
-                    draft->pointerMode = modes[static_cast<size_t>(index)];
-                    draft->touchscreenMouseMode =
-                        draft->pointerMode == Mode::MultiTouch;
-                }
-                pointerCell->setDetailText(pointerModeLabel(draft->pointerMode));
-            },
-            selected);
-        brls::Application::pushActivity(new brls::Activity(dropdown));
-        return true;
-    });
+    auto* pointerCell = new brls::DetailCell();
+    pointerCell->setText("artemis/overlay/pointer_mode"_i18n);
+    pointerCell->setDetailText(pointerModeLabel(draft->pointerMode));
+    pointerCell->title->setSingleLine(true);
+    pointerCell->detail->setSingleLine(true);
+    auto* touchscreenCell = addBool(
+        content, "settings/touchscreen_mouse_mode"_i18n,
+        draft->touchscreenMouseMode, [draft, pointerCell](bool value) {
+            draft->touchscreenMouseMode = value;
+            draft->pointerMode =
+                artemis::input::pointerModeFromLegacyTouchscreen(value);
+            pointerCell->setDetailText(pointerModeLabel(draft->pointerMode));
+        });
+    content->addView(pointerCell);
+    pointerCell->registerClickAction(
+        [draft, pointerCell, touchscreenCell](brls::View*) {
+            using Mode = artemis::input::PointerMode;
+            const std::vector<Mode> modes = {
+                Mode::TrackpadNatural, Mode::TrackpadGaming, Mode::MultiTouch,
+                Mode::Absolute,        Mode::AbsoluteSwapped, Mode::Disabled};
+            std::vector<std::string> labels;
+            int selected = 0;
+            for (size_t i = 0; i < modes.size(); ++i) {
+                labels.push_back(pointerModeLabel(modes[i]));
+                if (modes[i] == draft->pointerMode)
+                    selected = static_cast<int>(i);
+            }
+            auto* dropdown = new brls::Dropdown(
+                "artemis/overlay/pointer_mode"_i18n, labels,
+                [draft, pointerCell, touchscreenCell, modes](int index) {
+                    if (index >= 0 &&
+                        index < static_cast<int>(modes.size())) {
+                        draft->pointerMode = modes[static_cast<size_t>(index)];
+                        draft->touchscreenMouseMode =
+                            draft->pointerMode == Mode::MultiTouch;
+                        touchscreenCell->setOn(draft->touchscreenMouseMode,
+                                               false);
+                    }
+                    pointerCell->setDetailText(
+                        pointerModeLabel(draft->pointerMode));
+                },
+                selected);
+            brls::Application::pushActivity(new brls::Activity(dropdown));
+            return true;
+        });
     addBool(content, "settings/swap_mouse_keys"_i18n, draft->swapMouseKeys,
             [draft](bool v) { draft->swapMouseKeys = v; });
     addBool(content, "settings/swap_mouse_scroll"_i18n, draft->swapMouseScroll,
@@ -1075,8 +1035,6 @@ void openProfileEditor(const std::string& profileId,
         store.update(*draft);
         if (!assignHostKey.empty())
             store.setSelectedForHost(assignHostKey, id);
-        // Keep live Settings in sync for every field the editor exposes.
-        store.applyProfile(*draft);
         delete draft;
         // Pop first so list refresh callbacks see the correct stack.
         brls::Application::popActivity(brls::TransitionAnimation::FADE,

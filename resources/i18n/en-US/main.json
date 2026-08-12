@@ -39,7 +39,9 @@
         "try_connect": "Trying to connect to the host"
     },
     "app_list": {
-        "reload_app_list": "Reload",
+        "reload_app_list": "Refresh",
+        "refresh": "Refresh apps",
+        "refresh_hint": "Sunshine / Apollo list",
         "run_current": "Run current app",
         "running": "Running",
         "search": "Search apps",
@@ -103,6 +105,9 @@
             "manage_profiles": "Manage profiles",
             "manage_profiles_hint": "Create, rename, delete",
             "create_profile": "Create profile…",
+            "add_missing_defaults": "Add missing defaults",
+            "add_missing_defaults_done": "Default profiles added",
+            "add_missing_defaults_none": "All default profiles are already present",
             "duplicate_profile": "Duplicate",
             "export_profiles": "Export profiles",
             "export_profiles_hint": "Pick a folder and filename",
@@ -387,6 +392,7 @@
         "debug": "Debug",
         "debugging_view": "Show debugging view",
         "show_host_web_config": "Show host web config",
+        "show_performance_tab": "Show Performance tab",
         "debug_stats_corner": "Debug stats position",
         "corner_top_left": "Top left",
         "corner_top_right": "Top right",

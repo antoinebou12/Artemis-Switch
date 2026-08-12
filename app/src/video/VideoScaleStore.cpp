@@ -45,10 +45,11 @@ ScaleMode VideoScaleStore::get() {
     return m_mode;
 }
 
-void VideoScaleStore::set(ScaleMode mode) {
+void VideoScaleStore::set(ScaleMode mode, bool persist) {
     m_mode = mode;
     m_loaded = true;
-    save();
+    if (persist)
+        save();
 }
 
 void VideoScaleStore::reload() {

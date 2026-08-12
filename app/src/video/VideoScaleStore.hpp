@@ -9,7 +9,7 @@ public:
     static VideoScaleStore& instance();
 
     ScaleMode get();
-    void set(ScaleMode mode);
+    void set(ScaleMode mode, bool persist = true);
     void reload();
     bool save() const;
 

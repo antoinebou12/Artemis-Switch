@@ -99,40 +99,16 @@ void MoonlightSession::connection_terminated(int error_code) {
     if (!m_active_session)
         return;
 
-    if (m_active_session->m_stop_requested) {
-        brls::Logger::info("MoonlightSession: Termination acknowledged after stop request");
-        m_active_session->m_is_active = false;
-        m_active_session->m_is_terminated = true;
-        return;
-    }
+    const auto action = artemis::streaming::connectionTerminatedAction(
+        m_active_session->m_stop_requested,
+        m_active_session->m_restart_in_progress.load(), error_code);
 
-    if (m_active_session->m_restart_in_progress && error_code == 0) {
-        brls::Logger::info(
-            "MoonlightSession: Old connection stopped for restart");
-        m_active_session->m_is_active = false;
-        return;
-    }
-
-    if (error_code != 0) {
-        brls::Logger::info("MoonlightSession: Reconnection attempt");
-        LiStopConnection();
-
-        m_active_session->start([](const GSResult<bool>& result) {
-            if (result.isSuccess()) {
-                brls::Logger::info("MoonlightSession: Reconnected");
-            } else {
-                brls::Logger::info("MoonlightSession: Reconnection failed");
-                if (m_active_session) {
-                    m_active_session->m_is_active = false;
-                    m_active_session->m_is_terminated = true;
-                }
-            }
-        }, m_active_session->m_is_sunshine);
-        return;
-    }
-
+    // Never LiStopConnection / start() here. This callback runs on a Moonlight
+    // worker thread; tearing down deko3d there orange-screens the Switch when
+    // the host deletes or closes the current app.
     m_active_session->m_is_active = false;
-    m_active_session->m_is_terminated = true;
+    if (action == artemis::streaming::ConnectionTerminatedAction::MarkTerminated)
+        m_active_session->m_is_terminated = true;
 }
 
 void MoonlightSession::connection_log_message(const char* format, ...) {
@@ -385,17 +361,20 @@ void MoonlightSession::start(ServerCallback<bool> callback, bool is_sunshine) {
                         &m_data.serverInfo, &m_config, &m_connection_callbacks,
                         &m_video_callbacks, &m_audio_callbacks, NULL, 0, NULL, 0);
 
-                    if (result != 0) {
-                        LiStopConnection();
-                        if (Settings::instance().video_codec() == AV1) {
-                            callback(GSResult<bool>::failure(
-                                "error/av1_decoder_unavailable"_i18n));
+                    brls::sync([callback, result] {
+                        if (result != 0) {
+                            LiStopConnection();
+                            if (Settings::instance().video_codec() == AV1) {
+                                callback(GSResult<bool>::failure(
+                                    "error/av1_decoder_unavailable"_i18n));
+                            } else {
+                                callback(GSResult<bool>::failure(
+                                    "error/stream_start"_i18n));
+                            }
                         } else {
-                            callback(GSResult<bool>::failure("error/stream_start"_i18n));
+                            callback(GSResult<bool>::success(true));
                         }
-                    } else {
-                        callback(GSResult<bool>::success(true));
-                    }
+                    });
                 });
             } else {
                 brls::Logger::error(

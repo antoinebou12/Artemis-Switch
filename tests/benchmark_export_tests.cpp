@@ -27,11 +27,30 @@ int main() {
     summary.clientProcessingMsP99 = 6.3;
     summary.stabilityScore = 98.7;
 
+    summary.stats.sampleCount = 120;
+    summary.stats.durationSeconds = 60.0;
+    summary.stats.renderedFps.mean = 59.98;
+    summary.stats.renderedFps.median = 60.0;
+    summary.stats.renderedFps.p99 = 59.5;
+    summary.stats.decodeMs.p99 = 4.2;
+    summary.stats.gpuRenderMs.p99 = 1.25;
+    summary.stats.queueSkippedFrames = 3;
+    summary.stats.stabilityScore = 98.7;
+    summary.capturedAtIso = "2026-08-11T12:00:00Z";
+    summary.hostName = "Living Room PC";
+    summary.appName = "Desktop";
+
     const std::string json = BenchmarkExport::toJson(profile, summary);
     assert(json.find("\"width\": 1920") != std::string::npos);
     assert(json.find("\"codec\": \"HEVC\"") != std::string::npos);
     assert(json.find("\"stability_score\": 98.7000") != std::string::npos);
     assert(json.find("\"runtime\"") != std::string::npos);
+    assert(json.find("\"stats\"") != std::string::npos);
+    assert(json.find("\"gpu_render_ms\"") != std::string::npos);
+    assert(json.find("\"queue_skipped_frames\": 3") != std::string::npos);
+    assert(json.find("\"captured_at\": \"2026-08-11T12:00:00Z\"") != std::string::npos);
+    assert(json.find("\"host\": \"Living Room PC\"") != std::string::npos);
+    assert(json.find("\"app\": \"Desktop\"") != std::string::npos);
 
     SwitchRuntimeMetadata runtime;
     runtime.platform = "Nintendo Switch";
@@ -59,6 +78,9 @@ int main() {
     const std::string header = BenchmarkExport::csvHeader();
     assert(header.find("bitrate_kbps") != std::string::npos);
     assert(header.find("cpu_clock_hz") != std::string::npos);
+    assert(header.find("stats_gpu_render_ms_p99") != std::string::npos);
+    assert(header.find("queue_skipped_frames") != std::string::npos);
+    assert(header.find("captured_at") != std::string::npos);
     assert(header.back() == '\n');
 
     escapedProfile.codec = "HEVC,custom";

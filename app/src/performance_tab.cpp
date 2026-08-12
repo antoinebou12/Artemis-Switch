@@ -186,16 +186,13 @@ artemis::benchmark::ExportProfile exportProfile() {
 }
 
 artemis::benchmark::ExportSummary exportSummary(
-    const artemis::benchmark::BenchmarkSummary& summary) {
-    artemis::benchmark::ExportSummary result;
-    result.durationSeconds = summary.durationSeconds;
-    result.renderedFpsMean = summary.renderedFps.mean;
-    result.renderedFpsP99 = summary.renderedFps.p99;
-    result.networkDropPercent = summary.networkDropPercent;
-    result.receiveMsP99 = summary.receiveMs.p99;
-    result.decodeMsP99 = summary.decodeMs.p99;
-    result.clientProcessingMsP99 = summary.clientProcessingMs.p99;
-    result.stabilityScore = summary.stabilityScore;
+    const artemis::benchmark::BenchmarkSummary& summary,
+    StreamingView* streamView) {
+    auto result = artemis::benchmark::fromBenchmarkSummary(summary);
+    if (streamView) {
+        result.hostName = streamView->getHost().hostname;
+        result.appName = streamView->getApp().name;
+    }
     return result;
 }
 #endif
@@ -205,10 +202,10 @@ PerformanceTab::PerformanceTab(StreamingView* streamView)
     : streamView(streamView) {
     inflateFromXMLRes("xml/views/ingame_overlay/performance_tab.xml");
 
-    const std::array<DetailCell*, 21> compactRows = {
+    const std::array<DetailCell*, 22> compactRows = {
         network, wifiSignal, receiveLatency, decodeLatency, renderLatency,
-        packetLoss, hostFps, receivedFps, decodedFps, renderedFps, frameQueue,
-        presentation, operationMode, cpuClock, gpuClock, memoryClock,
+        gpuRender, packetLoss, hostFps, receivedFps, decodedFps, renderedFps,
+        frameQueue, presentation, operationMode, cpuClock, gpuClock, memoryClock,
         battery, benchmarkSummary, benchmarkAction, benchmarkSave, benchmarkReset};
     for (auto* row : compactRows) {
         row->title->setSingleLine(true);
@@ -221,6 +218,7 @@ PerformanceTab::PerformanceTab(StreamingView* streamView)
     receiveLatency->setText("artemis/performance/receive_latency"_i18n);
     decodeLatency->setText("artemis/performance/decode_latency"_i18n);
     renderLatency->setText("artemis/performance/render_latency"_i18n);
+    gpuRender->setText("artemis/performance/gpu_render"_i18n);
     packetLoss->setText("artemis/performance/packet_loss"_i18n);
     hostFps->setText("artemis/performance/host_fps"_i18n);
     receivedFps->setText("artemis/performance/received_fps"_i18n);
@@ -244,9 +242,11 @@ PerformanceTab::PerformanceTab(StreamingView* streamView)
         if (runtime.running()) {
             const auto result = runtime.stop();
             benchmarkSummary->setDetailText(fmt::format(
-                "{:.0f}/100 · {:.2f}% · {:.1f} ms",
+                "{:.0f}/100 · {:.2f}% · {:.1f}/{:.1f} FPS · d {:.1f} · gpu {:.1f} · q {}",
                 result.stabilityScore, result.networkDropPercent,
-                result.clientProcessingMs.p99));
+                result.renderedFps.median, result.renderedFps.p99,
+                result.decodeMs.p99, result.gpuRenderMs.p99,
+                result.queueSkippedFrames));
         } else {
             runtime.start(Settings::instance().fps());
         }
@@ -282,7 +282,7 @@ PerformanceTab::PerformanceTab(StreamingView* streamView)
                                "benchmarks";
         const auto paths = artemis::benchmark::BenchmarkFileStore::save(
             directory, fmt::format("benchmark_{}", epoch), exportProfile(),
-            exportSummary(summary));
+            exportSummary(summary, this->streamView));
         benchmarkSave->setDetailText(paths
             ? paths->json.filename().string()
             : "artemis/performance/save_failed"_i18n);
@@ -417,6 +417,7 @@ void PerformanceTab::refresh() {
         setDetailTextIfChanged(receiveLatency, "-");
         setDetailTextIfChanged(decodeLatency, "-");
         setDetailTextIfChanged(renderLatency, "-");
+        setDetailTextIfChanged(gpuRender, "-");
         setDetailTextIfChanged(packetLoss, "-");
         setDetailTextIfChanged(hostFps, "-");
         setDetailTextIfChanged(receivedFps, "-");
@@ -464,6 +465,7 @@ void PerformanceTab::refresh() {
     snapshot.receiveLatencyMs = decode.current_receive_time;
     snapshot.decodeLatencyMs = decode.current_decoding_time;
     snapshot.renderLatencyMs = render.rendering_time;
+    snapshot.gpuRenderMs = render.gpu_rendering_time;
     snapshot.packetLossPercent = lossPercent;
     snapshot.hostFps = decode.current_host_fps;
     snapshot.receivedFps = decode.current_received_fps;
@@ -481,6 +483,7 @@ void PerformanceTab::refresh() {
     setDetailTextIfChanged(receiveLatency, lite.latencyText);
     setDetailTextIfChanged(decodeLatency, lite.decodeText);
     setDetailTextIfChanged(renderLatency, lite.renderText);
+    setDetailTextIfChanged(gpuRender, lite.gpuText);
     setDetailTextIfChanged(packetLoss, lite.packetLossText);
     setDetailTextIfChanged(hostFps, lite.hostFpsText);
     setDetailTextIfChanged(receivedFps, lite.receivedFpsText);

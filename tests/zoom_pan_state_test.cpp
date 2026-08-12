@@ -5,6 +5,10 @@
 
 using artemis::video::ZoomPanState;
 using artemis::video::normalizeZoomPan;
+using artemis::video::panToSlider;
+using artemis::video::sliderToPan;
+using artemis::video::sliderToZoom;
+using artemis::video::zoomToSlider;
 
 int main() {
     auto state = normalizeZoomPan({0.5f, 1.0f, -1.0f});
@@ -20,5 +24,13 @@ int main() {
     assert(state.zoom == 4.0f);
     assert(std::fabs(state.panX - 0.75f) < 0.0001f);
     assert(std::fabs(state.panY + 0.75f) < 0.0001f);
+
+    assert(std::fabs(zoomToSlider(1.0f) - 0.0f) < 0.0001f);
+    assert(std::fabs(zoomToSlider(4.0f) - 1.0f) < 0.0001f);
+    assert(std::fabs(sliderToZoom(0.0f) - 1.0f) < 0.0001f);
+    assert(std::fabs(sliderToZoom(1.0f) - 4.0f) < 0.0001f);
+    assert(std::fabs(panToSlider(-1.0f) - 0.0f) < 0.0001f);
+    assert(std::fabs(panToSlider(1.0f) - 1.0f) < 0.0001f);
+    assert(std::fabs(sliderToPan(0.5f)) < 0.0001f);
     return 0;
 }

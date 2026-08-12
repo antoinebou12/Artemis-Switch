@@ -51,7 +51,7 @@ const StoredStreamProfile& StreamProfileStore::get(const std::string& hostKey) {
 
 void StreamProfileStore::setCustomResolution(const std::string& hostKey,
                                              bool enabled, int width,
-                                             int height) {
+                                             int height, bool persist) {
     ensureLoaded();
     StoredStreamProfile profile;
     profile.customResolutionEnabled = enabled;
@@ -63,7 +63,8 @@ void StreamProfileStore::setCustomResolution(const std::string& hostKey,
     } else {
         m_hosts[hostKey] = profile;
     }
-    save();
+    if (persist)
+        save();
 }
 
 void StreamProfileStore::reload() {

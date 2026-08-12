@@ -28,7 +28,9 @@
         "try_connect": "嘗試連接到目前主機"
     },
     "app_list": {
-        "reload_app_list": "重新載入",
+        "reload_app_list": "重新整理",
+        "refresh": "重新整理應用",
+        "refresh_hint": "Sunshine / Apollo 清單",
         "run_current": "啟動目前應用程式",
         "running": "啟動中",
         "star": "收藏",

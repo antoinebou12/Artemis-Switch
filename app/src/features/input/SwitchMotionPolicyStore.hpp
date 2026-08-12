@@ -9,7 +9,7 @@ public:
     static SwitchMotionPolicyStore& instance();
 
     const SwitchMotionOptions& get();
-    void set(const SwitchMotionOptions& options);
+    void set(const SwitchMotionOptions& options, bool persist = true);
     void reload();
     bool save() const;
 

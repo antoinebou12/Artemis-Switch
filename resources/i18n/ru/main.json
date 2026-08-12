@@ -28,7 +28,9 @@
         "try_connect": "Попытка подключения к хосту"
     },
     "app_list": {
-        "reload_app_list": "Перезагрузить",
+        "reload_app_list": "Обновить",
+        "refresh": "Обновить приложения",
+        "refresh_hint": "Список Sunshine / Apollo",
         "run_current": "Открыть запущенное приложение",
         "running": "Запущено",
         "star": "В избранное",

@@ -327,6 +327,13 @@ class Settings : public Singleton<Settings> {
         return m_show_host_web_config;
     }
 
+    void set_show_performance_tab(bool enabled) {
+        m_show_performance_tab = enabled;
+    }
+    [[nodiscard]] bool show_performance_tab() const {
+        return m_show_performance_tab;
+    }
+
     void set_host_device_os(HostDeviceOs os) { m_host_device_os = os; }
     [[nodiscard]] HostDeviceOs host_device_os() const { return m_host_device_os; }
 
@@ -497,6 +504,7 @@ class Settings : public Singleton<Settings> {
     bool m_wireguard_enabled = false;
     std::string m_wireguard_config_path;
     bool m_show_host_web_config = true;
+    bool m_show_performance_tab = true;
     HostDeviceOs m_host_device_os = HostDeviceOs::Windows;
     StreamAudioConfiguration m_stream_audio_configuration = STREAM_AUDIO_STEREO;
     bool m_terminate_app_on_disconnect = false;

@@ -3,7 +3,6 @@
 #include "Settings.hpp"
 #include "StreamAspectRatio.hpp"
 #include "StreamConfigProfileNormalize.hpp"
-#include "features/apollo/ApolloHostOptions.hpp"
 #include "features/input/PointerSettings.hpp"
 #include "video/VideoScale.hpp"
 
@@ -19,7 +18,7 @@ struct StreamConfigProfile {
     std::string name;
 
     // Video
-    int resolutionHeight = 720; // 360, 480, 720, or 1080
+    int resolutionHeight = 720; // -1 native, or 360 / 480 / 540 / 720 / 1080 / 1440
     StreamAspectRatio aspectRatio = StreamAspectRatio::Ratio16x9;
     int fps = 60;
     // 0 = fps * 100. NTSC presets store 5994 / 11988 / etc.
@@ -41,11 +40,16 @@ struct StreamConfigProfile {
 
     // Presentation
     artemis::video::ScaleMode scaleMode = artemis::video::ScaleMode::Fill;
+    bool rememberZoomPan = false;
     UpscalingMode upscalingMode = UPSCALING_OFF;
     bool dithering = false;
     float ditheringStrength = 3.0f;
     bool rcas = true;
     float rcasStrength = 0.2f;
+
+    // Motion (Artemis Settings)
+    bool forwardMotion = true;
+    bool consoleMotionFallback = false;
 
     // Audio / stream
     StreamAudioConfiguration streamAudioConfiguration = STREAM_AUDIO_STEREO;
@@ -83,40 +87,14 @@ struct StreamConfigProfile {
     // Empty = leave current Settings layout unchanged on apply.
     std::string mappingLayoutTitle;
 
-    // Apollo virtual display + scale (owned by profile/settings, not Host tab).
-    artemis::apollo::VirtualDisplayTarget virtualDisplayTarget =
-        artemis::apollo::VirtualDisplayTarget::Off;
-    int virtualDisplayCustomWidth = 1280;
-    int virtualDisplayCustomHeight = 720;
-    int virtualDisplayRefreshRate = 60;
-    int apolloScaleFactor = 100;
-
     [[nodiscard]] int resolutionWidth() const {
         return streamWidthFromHeight(resolutionHeight, aspectRatio);
-    }
-
-    [[nodiscard]] artemis::apollo::ApolloHostOptions apolloOptions() const {
-        artemis::apollo::ApolloHostOptions options;
-        options.target = virtualDisplayTarget;
-        options.customWidth = virtualDisplayCustomWidth;
-        options.customHeight = virtualDisplayCustomHeight;
-        options.refreshRate = virtualDisplayRefreshRate;
-        options.scaleFactor = apolloScaleFactor > 0 ? apolloScaleFactor : 100;
-        return options;
-    }
-
-    void setApolloOptions(const artemis::apollo::ApolloHostOptions& options) {
-        virtualDisplayTarget = options.target;
-        virtualDisplayCustomWidth = options.customWidth;
-        virtualDisplayCustomHeight = options.customHeight;
-        virtualDisplayRefreshRate = options.refreshRate;
-        apolloScaleFactor = options.scaleFactor > 0 ? options.scaleFactor : 100;
     }
 };
 
 class StreamConfigProfileStore {
 public:
-    static constexpr int SchemaVersion = 9;
+    static constexpr int SchemaVersion = 11;
     static StreamConfigProfileStore& instance();
 
     const std::vector<StreamConfigProfile>& list();
@@ -138,12 +116,16 @@ public:
     void setActiveProfileId(const std::string& profileId);
 
     static StreamConfigProfile snapshotFromSettings(const std::string& name);
-    bool applyToSettings(const std::string& id);
-    bool applyProfile(const StreamConfigProfile& profile);
+    // persist=false applies in memory for the current stream only.
+    bool applyToSettings(const std::string& id, bool persist = true);
+    bool applyProfile(const StreamConfigProfile& profile, bool persist = true);
 
     bool exportJson(const std::string& path) const;
     bool importJson(const std::string& path, bool renameOnConflict = true,
                     std::string* errorOut = nullptr);
+
+    // Insert built-in presets whose names are not already present.
+    int addMissingDefaults();
 
     void reload();
     bool save() const;

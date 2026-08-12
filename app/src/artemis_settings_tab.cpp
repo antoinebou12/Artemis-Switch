@@ -11,13 +11,6 @@
 #define ARTEMIS_HAS_ADVANCED_STREAM 0
 #endif
 
-#if __has_include("features/stream/FrameRateOptions.hpp")
-#include "features/stream/FrameRateOptions.hpp"
-#define ARTEMIS_HAS_FRAME_RATE_PRESETS 1
-#else
-#define ARTEMIS_HAS_FRAME_RATE_PRESETS 0
-#endif
-
 #if __has_include("video/VideoScaleStore.hpp")
 #include "video/VideoScaleStore.hpp"
 #define ARTEMIS_HAS_VIDEO_SCALE 1
@@ -43,136 +36,23 @@
 #include "vpn/WireGuardManager.hpp"
 #endif
 
-#if __has_include("features/apollo/ApolloHostOptions.hpp")
-#include "features/apollo/ApolloHostOptions.hpp"
-#include "features/apollo/ApolloHostOptionsStore.hpp"
-#define ARTEMIS_HAS_APOLLO_HOST_OPTIONS 1
-#else
-#define ARTEMIS_HAS_APOLLO_HOST_OPTIONS 0
-#endif
-
 #include <algorithm>
-#include <array>
-#include <cstdlib>
 #include <fmt/format.h>
+#include <iomanip>
+#include <sstream>
 #include <vector>
 
 using namespace brls;
 
-namespace {
-#if ARTEMIS_HAS_FRAME_RATE_PRESETS
-std::vector<std::string> activeFrameRateLabels() {
-    std::vector<std::string> labels;
-    for (const auto& preset : artemis::stream::availableFrameRatePresets())
-        labels.push_back(artemis::stream::frameRatePresetLabel(preset));
-    return labels;
-}
-#else
-std::vector<int> activeFrameRates() {
-#if ARTEMIS_HAS_ADVANCED_STREAM
-    return artemis::stream::availableFrameRates(
-        artemis::stream::AdvancedStreamOptionsStore::instance().get());
-#else
-    return {30, 40, 60, 90, 120};
-#endif
-}
-
-std::vector<std::string> frameRateLabels(const std::vector<int>& values) {
-    std::vector<std::string> labels;
-    labels.reserve(values.size());
-    for (const int value : values)
-        labels.push_back(fmt::format("{} FPS", value));
-    return labels;
-}
-
-int frameRateSelection(const std::vector<int>& values, int current) {
-    const auto it = std::find(values.begin(), values.end(), current);
-    if (it != values.end())
-        return static_cast<int>(std::distance(values.begin(), it));
-
-    int best = 0;
-    int bestDistance = std::abs(values.front() - current);
-    for (size_t i = 1; i < values.size(); ++i) {
-        const int distance = std::abs(values[i] - current);
-        if (distance < bestDistance) {
-            best = static_cast<int>(i);
-            bestDistance = distance;
-        }
-    }
-    return best;
-}
-#endif
-
-int resolutionPresetIndex(int width, int height) {
-    if (width == 1280 && height == 720)
-        return 1; // Handheld 16:9
-    if (width == 1920 && height == 1080)
-        return 2; // Docked 16:9
-    if (width == 960 && height == 720)
-        return 3; // Handheld 4:3
-    if (width == 1440 && height == 1080)
-        return 4; // Docked 4:3
-    return 0; // Custom
-}
-
-void applyResolutionPreset(int selected) {
-    auto stored = artemis::streaming::StreamProfileStore::instance().get();
-    int width = stored.width;
-    int height = stored.height;
-    if (selected == 1) {
-        width = 1280;
-        height = 720;
-    } else if (selected == 2) {
-        width = 1920;
-        height = 1080;
-    } else if (selected == 3) {
-        width = 960;
-        height = 720;
-    } else if (selected == 4) {
-        width = 1440;
-        height = 1080;
-    }
-    artemis::streaming::StreamProfileStore::instance().setCustomResolution(
-        true, width, height);
-
-    if (selected == 1 || selected == 2) {
-        Settings::instance().set_aspect_ratio(
-            artemis::streaming::StreamAspectRatio::Ratio16x9);
-        Settings::instance().save();
-    } else if (selected == 3 || selected == 4) {
-        Settings::instance().set_aspect_ratio(
-            artemis::streaming::StreamAspectRatio::Ratio4x3);
-        Settings::instance().save();
-    }
-
-#if ARTEMIS_HAS_APOLLO_HOST_OPTIONS
-    // Persist preferred Apollo virtual-display target for the next connection.
-    auto options = artemis::apollo::ApolloHostOptions{};
-    if (selected == 1 || selected == 3)
-        options.target = artemis::apollo::VirtualDisplayTarget::Handheld;
-    else if (selected == 2 || selected == 4)
-        options.target = artemis::apollo::VirtualDisplayTarget::Docked;
-    else
-        options.target = artemis::apollo::VirtualDisplayTarget::Custom;
-    options.customWidth = width;
-    options.customHeight = height;
-    options.refreshRate = Settings::instance().fps();
-    // Use a shared default key until a host is selected for streaming.
-    artemis::apollo::ApolloHostOptionsStore::instance().set("default", options);
-#endif
-}
-}
-
 ArtemisSettingsTab::ArtemisSettingsTab() {
     inflateFromXMLRes("xml/tabs/artemis_settings.xml");
 
-    const std::array<DetailCell*, 15> compactRows = {
-        customResolution, width, height, exactBitrate,
-        frameRate, forceFullRange, preventPacketLoss, packetSize,
-        apolloVirtualDisplay, apolloScaleFactor,
-        scaleMode, rememberZoomPan, resetZoomPan, forwardMotion,
-        consoleMotionFallback};
-    for (auto* row : compactRows) {
+    for (brls::DetailCell* row :
+         {static_cast<brls::DetailCell*>(width),
+          static_cast<brls::DetailCell*>(height),
+          static_cast<brls::DetailCell*>(resetZoomPan),
+          static_cast<brls::DetailCell*>(wireguardConfigPath),
+          static_cast<brls::DetailCell*>(wireguardStatus)}) {
         row->title->setSingleLine(true);
         row->detail->setSingleLine(true);
     }
@@ -181,7 +61,8 @@ ArtemisSettingsTab::ArtemisSettingsTab() {
     customResolution->init("artemis/settings/use_custom_resolution"_i18n,
                            stored.customResolutionEnabled,
                            [this](bool enabled) {
-        const auto value = artemis::streaming::StreamProfileStore::instance().get();
+        const auto value =
+            artemis::streaming::StreamProfileStore::instance().get();
         artemis::streaming::StreamProfileStore::instance().setCustomResolution(
             enabled, value.width, value.height);
         refreshValues();
@@ -189,7 +70,6 @@ ArtemisSettingsTab::ArtemisSettingsTab() {
 
     width->setText("artemis/settings/custom_width"_i18n);
     height->setText("artemis/settings/custom_height"_i18n);
-    exactBitrate->setText("artemis/settings/exact_bitrate"_i18n);
     width->registerClickAction([this](View*) {
         editWidth();
         return true;
@@ -198,170 +78,29 @@ ArtemisSettingsTab::ArtemisSettingsTab() {
         editHeight();
         return true;
     });
-    exactBitrate->registerClickAction([this](View*) {
-        editBitrate();
-        return true;
-    });
-
-    frameRate->setText("artemis/settings/stream_frame_rate"_i18n);
-    refreshFrameRateSelector();
-
-    resolutionPreset->init(
-        "artemis/settings/resolution_preset"_i18n,
-        {"artemis/settings/preset_custom"_i18n,
-         "artemis/settings/preset_handheld"_i18n,
-         "artemis/settings/preset_docked"_i18n,
-         "artemis/settings/preset_handheld_4_3"_i18n,
-         "artemis/settings/preset_docked_4_3"_i18n},
-        resolutionPresetIndex(stored.width, stored.height),
-        [this](int selected) {
-            applyResolutionPreset(selected);
-            customResolution->setOn(true);
-            refreshValues();
-        });
-
-#if ARTEMIS_HAS_APOLLO_HOST_OPTIONS
-    auto apolloVdLabel = [](artemis::apollo::VirtualDisplayTarget target) {
-        using Target = artemis::apollo::VirtualDisplayTarget;
-        switch (target) {
-        case Target::Off:
-            return "artemis/overlay/vd_off"_i18n;
-        case Target::CurrentProfile:
-            return "artemis/overlay/vd_current"_i18n;
-        case Target::Handheld:
-            return "artemis/overlay/vd_handheld"_i18n;
-        case Target::Docked:
-            return "artemis/overlay/vd_docked"_i18n;
-        case Target::PortraitHandheld:
-            return "artemis/overlay/vd_portrait_handheld"_i18n;
-        case Target::PortraitDocked:
-            return "artemis/overlay/vd_portrait_docked"_i18n;
-        case Target::Custom:
-            return "artemis/overlay/vd_custom"_i18n;
-        }
-        return "artemis/overlay/vd_off"_i18n;
-    };
-    auto refreshApolloRows = [this, apolloVdLabel] {
-        const auto options =
-            artemis::apollo::validateApolloHostOptions(
-                artemis::apollo::ApolloHostOptionsStore::instance().get(
-                    "default"));
-        apolloVirtualDisplay->setText("artemis/overlay/virtual_display"_i18n);
-        apolloVirtualDisplay->setDetailText(apolloVdLabel(options.target));
-        apolloScaleFactor->setText("artemis/overlay/apollo_scale_factor"_i18n);
-        apolloScaleFactor->setDetailText(
-            fmt::format("{}%", options.scaleFactor > 0 ? options.scaleFactor
-                                                       : 100));
-    };
-    refreshApolloRows();
-    apolloVirtualDisplay->registerClickAction(
-        [this, apolloVdLabel, refreshApolloRows](View*) {
-            using Target = artemis::apollo::VirtualDisplayTarget;
-            const std::vector<Target> values = {
-                Target::Off,        Target::CurrentProfile, Target::Handheld,
-                Target::Docked,     Target::PortraitHandheld,
-                Target::PortraitDocked, Target::Custom};
-            std::vector<std::string> labels;
-            int selected = 0;
-            auto current =
-                artemis::apollo::ApolloHostOptionsStore::instance().get(
-                    "default");
-            for (size_t i = 0; i < values.size(); ++i) {
-                labels.push_back(apolloVdLabel(values[i]));
-                if (values[i] == current.target)
-                    selected = static_cast<int>(i);
-            }
-            auto* dropdown = new Dropdown(
-                "artemis/overlay/virtual_display"_i18n, labels,
-                [refreshApolloRows, values](int index) {
-                    if (index < 0 ||
-                        index >= static_cast<int>(values.size()))
-                        return;
-                    auto options =
-                        artemis::apollo::ApolloHostOptionsStore::instance()
-                            .get("default");
-                    options.target = values[static_cast<size_t>(index)];
-                    if (options.target == Target::Custom) {
-                        Application::getImeManager()->openForText(
-                            [refreshApolloRows,
-                             options](const std::string& text) mutable {
-                                if (!artemis::apollo::parseVirtualDisplaySpec(
-                                        text, options, nullptr))
-                                    return;
-                                options.target = Target::Custom;
-                                artemis::apollo::ApolloHostOptionsStore::
-                                    instance()
-                                        .set("default", options);
-                                refreshApolloRows();
-                            },
-                            "artemis/overlay/vd_custom"_i18n,
-                            "artemis/overlay/vd_custom_prompt"_i18n, 32,
-                            fmt::format("{}x{}@{}", options.customWidth,
-                                        options.customHeight,
-                                        options.refreshRate),
-                            0);
-                        return;
-                    }
-                    artemis::apollo::ApolloHostOptionsStore::instance().set(
-                        "default", options);
-                    refreshApolloRows();
-                },
-                selected);
-            Application::pushActivity(new Activity(dropdown));
-            return true;
-        });
-    apolloScaleFactor->registerClickAction([refreshApolloRows](View*) {
-        constexpr std::array values = {50, 75, 100, 125, 150};
-        std::vector<std::string> labels;
-        int selected = 2;
-        auto current =
-            artemis::apollo::ApolloHostOptionsStore::instance().get("default");
-        for (size_t i = 0; i < values.size(); ++i) {
-            labels.push_back(fmt::format("{}%", values[i]));
-            if (values[i] == current.scaleFactor)
-                selected = static_cast<int>(i);
-        }
-        auto* dropdown = new Dropdown(
-            "artemis/overlay/apollo_scale_factor"_i18n, labels,
-            [refreshApolloRows, values](int index) {
-                if (index < 0 ||
-                    index >= static_cast<int>(values.size()))
-                    return;
-                auto options =
-                    artemis::apollo::ApolloHostOptionsStore::instance().get(
-                        "default");
-                options.scaleFactor = values[static_cast<size_t>(index)];
-                artemis::apollo::ApolloHostOptionsStore::instance().set(
-                    "default", options);
-                refreshApolloRows();
-            },
-            selected);
-        Application::pushActivity(new Activity(dropdown));
-        return true;
-    });
-#else
-    apolloVirtualDisplay->setVisibility(Visibility::GONE);
-    apolloScaleFactor->setVisibility(Visibility::GONE);
-#endif
 
 #if ARTEMIS_HAS_ADVANCED_STREAM
-    const auto advanced = artemis::stream::AdvancedStreamOptionsStore::instance().get();
+    const auto advanced =
+        artemis::stream::AdvancedStreamOptionsStore::instance().get();
     forceFullRange->init("artemis/settings/force_full_range"_i18n,
                          advanced.forceFullRangeVideo, [](bool enabled) {
-        auto options = artemis::stream::AdvancedStreamOptionsStore::instance().get();
+        auto options =
+            artemis::stream::AdvancedStreamOptionsStore::instance().get();
         options.forceFullRangeVideo = enabled;
         artemis::stream::AdvancedStreamOptionsStore::instance().set(options);
     });
     preventPacketLoss->init("artemis/settings/prevent_packet_loss"_i18n,
                             advanced.preventPacketLoss, [](bool enabled) {
-        auto options = artemis::stream::AdvancedStreamOptionsStore::instance().get();
+        auto options =
+            artemis::stream::AdvancedStreamOptionsStore::instance().get();
         options.preventPacketLoss = enabled;
         artemis::stream::AdvancedStreamOptionsStore::instance().set(options);
     });
     lowLatencyPacing->init("artemis/settings/low_latency_pacing"_i18n,
                            Settings::instance().low_latency_pacing(),
                            [](bool enabled) {
-                               Settings::instance().set_low_latency_pacing(enabled);
+                               Settings::instance().set_low_latency_pacing(
+                                   enabled);
                                Settings::instance().save();
                            });
 
@@ -375,7 +114,7 @@ ArtemisSettingsTab::ArtemisSettingsTab() {
             break;
         }
         if (i + 1 == packetPresets.size() && advanced.packetSize > 0)
-            packetSelection = static_cast<int>(packetPresets.size()); // Custom
+            packetSelection = static_cast<int>(packetPresets.size());
     }
     packetSize->init(
         "artemis/settings/packet_size"_i18n,
@@ -387,12 +126,12 @@ ArtemisSettingsTab::ArtemisSettingsTab() {
                 artemis::stream::AdvancedStreamOptionsStore::instance().get();
             if (selected >= 0 &&
                 selected < static_cast<int>(packetPresets.size())) {
-                options.packetSize = packetPresets[static_cast<size_t>(selected)];
+                options.packetSize =
+                    packetPresets[static_cast<size_t>(selected)];
                 artemis::stream::AdvancedStreamOptionsStore::instance().set(
                     options);
                 return;
             }
-            // Custom: ask for an explicit byte size.
             const int current =
                 options.packetSize > 0
                     ? options.packetSize
@@ -400,8 +139,8 @@ ArtemisSettingsTab::ArtemisSettingsTab() {
             Application::getImeManager()->openForNumber(
                 [](long number) {
                     auto opts = artemis::stream::AdvancedStreamOptionsStore::
-                        instance()
-                            .get();
+                                    instance()
+                                        .get();
                     opts.packetSize = artemis::stream::clampPacketSize(
                         static_cast<int>(number));
                     artemis::stream::AdvancedStreamOptionsStore::instance().set(
@@ -412,12 +151,15 @@ ArtemisSettingsTab::ArtemisSettingsTab() {
                 std::to_string(current), "", "", 0);
         });
 #else
-    forceFullRange->init("artemis/settings/force_full_range"_i18n, false, [](bool) {});
-    preventPacketLoss->init("artemis/settings/prevent_packet_loss"_i18n, false, [](bool) {});
+    forceFullRange->init("artemis/settings/force_full_range"_i18n, false,
+                         [](bool) {});
+    preventPacketLoss->init("artemis/settings/prevent_packet_loss"_i18n, false,
+                            [](bool) {});
     lowLatencyPacing->init("artemis/settings/low_latency_pacing"_i18n,
                            Settings::instance().low_latency_pacing(),
                            [](bool enabled) {
-                               Settings::instance().set_low_latency_pacing(enabled);
+                               Settings::instance().set_low_latency_pacing(
+                                   enabled);
                                Settings::instance().save();
                            });
     packetSize->init("artemis/settings/packet_size"_i18n,
@@ -429,14 +171,14 @@ ArtemisSettingsTab::ArtemisSettingsTab() {
 
 #if ARTEMIS_HAS_VIDEO_SCALE
     const auto currentScale = artemis::video::VideoScaleStore::instance().get();
-    const int scaleSelection = currentScale == artemis::video::ScaleMode::Fit ? 0
-                             : currentScale == artemis::video::ScaleMode::Fill ? 1 : 2;
+    const int scaleSelection =
+        currentScale == artemis::video::ScaleMode::Fit      ? 0
+        : currentScale == artemis::video::ScaleMode::Fill   ? 1
+                                                            : 2;
     scaleMode->init("artemis/settings/video_scale_mode"_i18n,
-                    {"artemis/settings/fit"_i18n,
-                     "artemis/settings/fill"_i18n,
+                    {"artemis/settings/fit"_i18n, "artemis/settings/fill"_i18n,
                      "artemis/settings/stretch"_i18n},
-                    scaleSelection,
-                    [](int selected) {
+                    scaleSelection, [](int selected) {
         const auto mode = selected == 0 ? artemis::video::ScaleMode::Fit
                         : selected == 2 ? artemis::video::ScaleMode::Stretch
                                         : artemis::video::ScaleMode::Fill;
@@ -452,7 +194,8 @@ ArtemisSettingsTab::ArtemisSettingsTab() {
     auto motion = artemis::input::SwitchMotionPolicyStore::instance().get();
     forwardMotion->init("artemis/settings/forward_motion"_i18n,
                         motion.allowGamepadMotionSensors, [](bool enabled) {
-        auto options = artemis::input::SwitchMotionPolicyStore::instance().get();
+        auto options =
+            artemis::input::SwitchMotionPolicyStore::instance().get();
         options.allowGamepadMotionSensors = enabled;
         artemis::input::SwitchMotionPolicyStore::instance().set(options);
     });
@@ -466,44 +209,105 @@ ArtemisSettingsTab::ArtemisSettingsTab() {
         artemis::input::SwitchMotionPolicyStore::instance().set(motion);
     }
 
-    consoleMotionFallback->init("artemis/settings/console_motion_fallback"_i18n,
-                                consoleFallbackSupported &&
-                                    motion.allowConsoleMotionFallback,
-                                [consoleFallbackSupported](bool enabled) {
-        if (!consoleFallbackSupported)
-            return;
-        auto options = artemis::input::SwitchMotionPolicyStore::instance().get();
-        options.allowConsoleMotionFallback = enabled;
-        artemis::input::SwitchMotionPolicyStore::instance().set(options);
-    });
+    consoleMotionFallback->init(
+        "artemis/settings/console_motion_fallback"_i18n,
+        consoleFallbackSupported && motion.allowConsoleMotionFallback,
+        [consoleFallbackSupported](bool enabled) {
+            if (!consoleFallbackSupported)
+                return;
+            auto options =
+                artemis::input::SwitchMotionPolicyStore::instance().get();
+            options.allowConsoleMotionFallback = enabled;
+            artemis::input::SwitchMotionPolicyStore::instance().set(options);
+        });
     consoleMotionFallback->setEnabled(consoleFallbackSupported);
 #else
-    forwardMotion->init("artemis/settings/forward_motion"_i18n, true, [](bool) {});
+    forwardMotion->init("artemis/settings/forward_motion"_i18n, true,
+                        [](bool) {});
     consoleMotionFallback->init("artemis/settings/console_motion_fallback"_i18n,
                                 false, [](bool) {});
     forwardMotion->setEnabled(false);
     consoleMotionFallback->setEnabled(false);
 #endif
 
+    {
+        float mouseProgress =
+            static_cast<float>(Settings::instance().get_mouse_speed_multiplier()) /
+            100.0f;
+        mouseSpeedSlider->getProgressEvent()->subscribe([this](float value) {
+            Settings::instance().set_mouse_speed_multiplier(int(value * 100));
+            std::stringstream stream;
+            stream << std::fixed << std::setprecision(1)
+                   << Settings::instance().mouse_speed_scale();
+            mouseSpeedHeader->setSubtitle(stream.str() + "x");
+        });
+        mouseSpeedSlider->setProgress(mouseProgress);
+        std::stringstream stream;
+        stream << std::fixed << std::setprecision(1)
+               << Settings::instance().mouse_speed_scale();
+        mouseSpeedHeader->setSubtitle(stream.str() + "x");
+    }
+
 #if ARTEMIS_HAS_ZOOM_PAN
     const auto zoom = artemis::video::ZoomPanStore::instance().get();
     rememberZoomPan->init("artemis/settings/remember_zoom_pan"_i18n,
-                          zoom.rememberBetweenSessions,
-                          [](bool enabled) {
+                          zoom.rememberBetweenSessions, [](bool enabled) {
         artemis::video::ZoomPanStore::instance().setRemember(enabled);
     });
+
+    auto refreshZoomPanSliders = [this] {
+        const auto state = artemis::video::normalizeZoomPan(
+            artemis::video::ZoomPanStore::instance().get().state);
+        zoomHeader->setSubtitle(fmt::format("{:.1f}x", state.zoom));
+        panXHeader->setSubtitle(fmt::format("{:.2f}", state.panX));
+        panYHeader->setSubtitle(fmt::format("{:.2f}", state.panY));
+        zoomSlider->setProgress(artemis::video::zoomToSlider(state.zoom));
+        panXSlider->setProgress(artemis::video::panToSlider(state.panX));
+        panYSlider->setProgress(artemis::video::panToSlider(state.panY));
+    };
+    refreshZoomPanSliders();
+
+    zoomSlider->getProgressEvent()->subscribe([this](float progress) {
+        auto& store = artemis::video::ZoomPanStore::instance();
+        auto state = store.get().state;
+        state.zoom = artemis::video::sliderToZoom(progress);
+        store.setState(state);
+        zoomHeader->setSubtitle(fmt::format(
+            "{:.1f}x", artemis::video::normalizeZoomPan(store.get().state).zoom));
+    });
+    panXSlider->getProgressEvent()->subscribe([this](float progress) {
+        auto& store = artemis::video::ZoomPanStore::instance();
+        auto state = store.get().state;
+        state.panX = artemis::video::sliderToPan(progress);
+        store.setState(state);
+        panXHeader->setSubtitle(fmt::format(
+            "{:.2f}", artemis::video::normalizeZoomPan(store.get().state).panX));
+    });
+    panYSlider->getProgressEvent()->subscribe([this](float progress) {
+        auto& store = artemis::video::ZoomPanStore::instance();
+        auto state = store.get().state;
+        state.panY = artemis::video::sliderToPan(progress);
+        store.setState(state);
+        panYHeader->setSubtitle(fmt::format(
+            "{:.2f}", artemis::video::normalizeZoomPan(store.get().state).panY));
+    });
+
     resetZoomPan->setText("artemis/settings/reset_zoom_pan"_i18n);
-    resetZoomPan->registerClickAction([this](View*) {
+    resetZoomPan->registerClickAction([this, refreshZoomPanSliders](View*) {
         artemis::video::ZoomPanStore::instance().reset();
+        refreshZoomPanSliders();
         resetZoomPan->setDetailText("artemis/settings/reset_zoom_pan_done"_i18n);
         return true;
     });
 #else
-    rememberZoomPan->init("artemis/settings/remember_zoom_pan"_i18n,
-                          false, [](bool) {});
+    rememberZoomPan->init("artemis/settings/remember_zoom_pan"_i18n, false,
+                          [](bool) {});
     rememberZoomPan->setEnabled(false);
     resetZoomPan->setText("artemis/settings/reset_zoom_pan"_i18n);
     resetZoomPan->setFocusable(false);
+    zoomSlider->setFocusable(false);
+    panXSlider->setFocusable(false);
+    panYSlider->setFocusable(false);
 #endif
 
 #if defined(__SWITCH__) && defined(ENABLE_WIREGUARD)
@@ -511,11 +315,10 @@ ArtemisSettingsTab::ArtemisSettingsTab() {
         "settings/wireguard_enabled"_i18n,
         Settings::instance().wireguard_enabled(), [this](bool value) {
             Settings::instance().set_wireguard_enabled(value);
-            if (value) {
+            if (value)
                 WireGuardManager::instance().enable_from_settings();
-            } else {
+            else
                 WireGuardManager::instance().disable();
-            }
             wireguardStatus->setDetailText(
                 WireGuardManager::instance().status_text());
         });
@@ -563,75 +366,29 @@ ArtemisSettingsTab::ArtemisSettingsTab() {
 }
 
 ArtemisSettingsTab::~ArtemisSettingsTab() {
-    if (hasFrameRateSubscription)
-        frameRate->getEvent()->unsubscribe(frameRateSubscription);
     Settings::instance().save();
     artemis::streaming::StreamProfileStore::instance().save();
 }
 
 View* ArtemisSettingsTab::create() { return new ArtemisSettingsTab(); }
 
-void ArtemisSettingsTab::refreshFrameRateSelector() {
-#if ARTEMIS_HAS_FRAME_RATE_PRESETS
-    const auto presets = artemis::stream::availableFrameRatePresets();
-    frameRate->setData(activeFrameRateLabels());
-    frameRate->setSelection(artemis::stream::frameRatePresetIndex(
-        Settings::instance().fps(),
-        Settings::instance().client_refresh_rate_x100()));
-
-    if (hasFrameRateSubscription)
-        frameRate->getEvent()->unsubscribe(frameRateSubscription);
-    frameRateSubscription = frameRate->getEvent()->subscribe([this](int selected) {
-        const auto current = artemis::stream::availableFrameRatePresets();
-        if (selected < 0 || selected >= static_cast<int>(current.size()))
-            return;
-        const auto& preset = current[static_cast<size_t>(selected)];
-        Settings::instance().set_fps(preset.fps);
-        Settings::instance().set_client_refresh_rate_x100(
-            preset.clientRefreshRateX100);
-        Settings::instance().save();
-        refreshValues();
-    });
-    hasFrameRateSubscription = true;
-#else
-    const auto values = activeFrameRates();
-    frameRate->setData(frameRateLabels(values));
-    frameRate->setSelection(frameRateSelection(values, Settings::instance().fps()));
-
-    if (hasFrameRateSubscription)
-        frameRate->getEvent()->unsubscribe(frameRateSubscription);
-    frameRateSubscription = frameRate->getEvent()->subscribe([this](int selected) {
-        const auto currentValues = activeFrameRates();
-        if (selected < 0 || selected >= static_cast<int>(currentValues.size()))
-            return;
-        Settings::instance().set_fps(currentValues[selected]);
-        Settings::instance().save();
-        refreshValues();
-    });
-    hasFrameRateSubscription = true;
-#endif
-}
-
 void ArtemisSettingsTab::refreshValues() {
     const auto stored = artemis::streaming::StreamProfileStore::instance().get();
     width->setDetailText(std::to_string(stored.width));
     height->setDetailText(std::to_string(stored.height));
-    exactBitrate->setDetailText(fmt::format("{:.1f} Mbps",
-        static_cast<double>(Settings::instance().bitrate()) / 1000.0));
-    resolutionPreset->setSelection(
-        resolutionPresetIndex(stored.width, stored.height), true);
-
     width->setFocusable(stored.customResolutionEnabled);
     height->setFocusable(stored.customResolutionEnabled);
 }
 
 void ArtemisSettingsTab::editWidth() {
-    const auto current = artemis::streaming::StreamProfileStore::instance().get();
+    const auto current =
+        artemis::streaming::StreamProfileStore::instance().get();
     Application::getImeManager()->openForNumber(
         [this, current](long number) {
             const int value = std::clamp(static_cast<int>(number), 640, 1920);
-            artemis::streaming::StreamProfileStore::instance().setCustomResolution(
-                current.customResolutionEnabled, value, current.height);
+            artemis::streaming::StreamProfileStore::instance()
+                .setCustomResolution(current.customResolutionEnabled, value,
+                                     current.height);
             refreshValues();
         },
         "artemis/settings/custom_width_title"_i18n,
@@ -640,29 +397,17 @@ void ArtemisSettingsTab::editWidth() {
 }
 
 void ArtemisSettingsTab::editHeight() {
-    const auto current = artemis::streaming::StreamProfileStore::instance().get();
+    const auto current =
+        artemis::streaming::StreamProfileStore::instance().get();
     Application::getImeManager()->openForNumber(
         [this, current](long number) {
             const int value = std::clamp(static_cast<int>(number), 360, 1080);
-            artemis::streaming::StreamProfileStore::instance().setCustomResolution(
-                current.customResolutionEnabled, current.width, value);
+            artemis::streaming::StreamProfileStore::instance()
+                .setCustomResolution(current.customResolutionEnabled,
+                                     current.width, value);
             refreshValues();
         },
         "artemis/settings/custom_height_title"_i18n,
         "artemis/settings/custom_height_hint"_i18n, 4,
         std::to_string(current.height), "", "", 0);
-}
-
-void ArtemisSettingsTab::editBitrate() {
-    const int currentMbps = std::max(1, Settings::instance().bitrate() / 1000);
-    Application::getImeManager()->openForNumber(
-        [this](long number) {
-            const int mbps = std::clamp(static_cast<int>(number), 1, 100);
-            Settings::instance().set_bitrate(mbps * 1000);
-            Settings::instance().save();
-            refreshValues();
-        },
-        "artemis/settings/exact_bitrate_title"_i18n,
-        "artemis/settings/exact_bitrate_hint"_i18n, 3,
-        std::to_string(currentMbps), "", "", 0);
 }

@@ -3,6 +3,7 @@
 #include "GameStreamClient.hpp"
 #include "InputManager.hpp"
 #include "Settings.hpp"
+#include "StreamDisconnectPolicy.hpp"
 #include "StreamProfileStore.hpp"
 #include "borealis.hpp"
 #include "../features/stream/AdvancedStreamOptionsStore.hpp"

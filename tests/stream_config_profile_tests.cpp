@@ -1,8 +1,13 @@
+#include "DefaultStreamProfiles.hpp"
 #include "StreamAspectRatio.hpp"
 #include "StreamConfigProfileNormalize.hpp"
 
+#include <algorithm>
 #include <cassert>
 #include <cstring>
+#include <set>
+#include <string>
+#include <vector>
 
 using namespace artemis::streaming;
 
@@ -28,6 +33,7 @@ int main() {
     assert(normalizeProfileHeight(400) == 360);
     assert(normalizeProfileHeight(900) == 720);
     assert(normalizeProfileHeight(0) == 360);
+    assert(normalizeProfileHeight(-1) == -1);
     assert(normalizeProfileHeight(-10) == 360);
 
     assert(normalizeNativeResolutionScale(50) == 50);
@@ -55,6 +61,44 @@ int main() {
     assert(profile.deadzoneLeft <= 1.0f + 1e-6f);
     assert(profile.rumbleForce <= 1.0f + 1e-6f);
     assert(profile.name == "Profile");
+
+    assert(kDefaultStreamProfiles.size() == 8);
+    assert(std::strcmp(kDefaultActiveProfileName, "720p 60 10M") == 0);
+    assert(isDefaultProfileName(kDefaultActiveProfileName));
+
+    std::set<std::string> names;
+    std::set<int> bitrates;
+    for (const auto& spec : kDefaultStreamProfiles) {
+        assert(spec.fps == 30 || spec.fps == 60);
+        assert(spec.height == 360 || spec.height == 720 || spec.height == 1080);
+        names.insert(spec.name);
+        bitrates.insert(spec.bitrateKbps);
+    }
+    assert(names.size() == 8);
+    assert(names.count("360p 30 0.5M") == 1);
+    assert(names.count("360p 30 1M") == 1);
+    assert(names.count("720p 30 10M") == 1);
+    assert(names.count("720p 60 10M") == 1);
+    assert(names.count("1080p 30 20M") == 1);
+    assert(names.count("1080p 60 20M") == 1);
+    assert(names.count("1080p 60 50M") == 1);
+    assert(names.count("1080p 60 100M") == 1);
+    assert(names.count("720p 4:3") == 0);
+    assert(names.count("360p remote") == 0);
+    const std::set<int> expectedBitrates{500, 1000, 10000, 20000, 50000, 100000};
+    assert(bitrates == expectedBitrates);
+
+    std::vector<std::string> existing;
+    for (const auto& spec : kDefaultStreamProfiles)
+        existing.emplace_back(spec.name);
+    assert(missingDefaultProfiles(existing).empty());
+
+    existing.erase(
+        std::remove(existing.begin(), existing.end(), std::string("720p 60 10M")),
+        existing.end());
+    const auto missing = missingDefaultProfiles(existing);
+    assert(missing.size() == 1);
+    assert(std::strcmp(missing.front().name, "720p 60 10M") == 0);
 
     return 0;
 }

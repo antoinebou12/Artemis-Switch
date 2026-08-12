@@ -24,8 +24,10 @@
 #include "features/input/HostKeyboardShortcuts.hpp"
 #include "features/apollo/ApolloHostOptionsStore.hpp"
 #include "features/apollo/ServerCommandShortcuts.hpp"
+#include "features/stream/AdvancedStreamOptionsStore.hpp"
 #include "features/video/DisplayTransformStore.hpp"
 #include "features/video/ZoomPanStore.hpp"
+#include "features/video/ZoomPanState.hpp"
 #include "streaming/InputManager.hpp"
 #include "Limelight.h"
 #include "libgamestream/client.h"
@@ -379,6 +381,15 @@ IngameOverlay::IngameOverlay(StreamingView* streamView)
 
     this->inflateFromXMLRes("xml/views/ingame_overlay/overlay.xml");
 
+    if (auto* tabs = dynamic_cast<TabFrame*>(applet->getContentView())) {
+        if (Settings::instance().show_performance_tab()) {
+            tabs->addTab("artemis/overlay/performance"_i18n,
+                         [streamView]() { return new PerformanceTab(streamView); });
+        }
+        tabs->addTab("artemis/overlay/disconnect"_i18n,
+                     [streamView]() { return new LogoutTab(streamView); });
+    }
+
     addGestureRecognizer(
         new TapGestureRecognizer([this](TapGestureStatus status, Sound* sound) {
             if (status.state == GestureState::END)
@@ -650,6 +661,24 @@ QuickTab::QuickTab(StreamingView* streamView) : streamView(streamView) {
         return true;
     });
 
+    float mouseProgress =
+        static_cast<float>(Settings::instance().get_mouse_speed_multiplier()) /
+        100.0f;
+    mouseSpeedSlider->getProgressEvent()->subscribe([this](float value) {
+        Settings::instance().set_mouse_speed_multiplier(int(value * 100));
+        std::stringstream stream;
+        stream << std::fixed << std::setprecision(1)
+               << Settings::instance().mouse_speed_scale();
+        mouseSpeedHeader->setSubtitle(stream.str() + "x");
+    });
+    mouseSpeedSlider->setProgress(mouseProgress);
+    {
+        std::stringstream stream;
+        stream << std::fixed << std::setprecision(1)
+               << Settings::instance().mouse_speed_scale();
+        mouseSpeedHeader->setSubtitle(stream.str() + "x");
+    }
+
     volumeHeader->setSubtitle(
         std::to_string(Settings::instance().get_volume()) + "%");
     float amplification =
@@ -763,55 +792,80 @@ OptionsTab::OptionsTab(StreamingView* streamView) : streamView(streamView) {
             Settings::instance().save();
         });
 
-    auto refreshZoomPanLabels = [this] {
+    {
+        auto options =
+            artemis::stream::AdvancedStreamOptionsStore::instance().get();
+        optionsFullRange->init(
+            "artemis/settings/force_full_range"_i18n,
+            options.forceFullRangeVideo, [](bool enabled) {
+                auto current =
+                    artemis::stream::AdvancedStreamOptionsStore::instance()
+                        .get();
+                current.forceFullRangeVideo = enabled;
+                artemis::stream::AdvancedStreamOptionsStore::instance().set(
+                    current);
+            });
+    }
+
+    optionsVolumeAmp->init(
+        "settings/volume_amplification"_i18n,
+        Settings::instance().get_volume_amplification(), [](bool enabled) {
+            Settings::instance().set_volume_amplification(enabled);
+            if (!enabled && Settings::instance().get_volume() > 100)
+                Settings::instance().set_volume(100);
+            Settings::instance().save();
+        });
+
+    optionsRememberZoomPan->init(
+        "artemis/settings/remember_zoom_pan"_i18n,
+        artemis::video::ZoomPanStore::instance().get().rememberBetweenSessions,
+        [](bool enabled) {
+            artemis::video::ZoomPanStore::instance().setRemember(enabled);
+        });
+
+    auto refreshZoomPanSliders = [this] {
         const auto state = artemis::video::normalizeZoomPan(
             artemis::video::ZoomPanStore::instance().get().state);
-        optionsZoom->setText("artemis/overlay/zoom"_i18n);
-        optionsZoom->setDetailText(fmt::format("{:.1f}x", state.zoom));
-        optionsPanX->setText("artemis/overlay/pan_x"_i18n);
-        optionsPanX->setDetailText(fmt::format("{:.2f}", state.panX));
-        optionsPanY->setText("artemis/overlay/pan_y"_i18n);
-        optionsPanY->setDetailText(fmt::format("{:.2f}", state.panY));
+        zoomHeader->setSubtitle(fmt::format("{:.1f}x", state.zoom));
+        panXHeader->setSubtitle(fmt::format("{:.2f}", state.panX));
+        panYHeader->setSubtitle(fmt::format("{:.2f}", state.panY));
+        zoomSlider->setProgress(artemis::video::zoomToSlider(state.zoom));
+        panXSlider->setProgress(artemis::video::panToSlider(state.panX));
+        panYSlider->setProgress(artemis::video::panToSlider(state.panY));
         optionsResetZoomPan->setText("artemis/settings/reset_zoom_pan"_i18n);
-        optionsResetZoomPan->setDetailText(
-            "artemis/settings/reset_zoom_pan_done"_i18n);
     };
-    refreshZoomPanLabels();
+    refreshZoomPanSliders();
 
-    optionsZoom->registerClickAction([this, refreshZoomPanLabels](View*) {
+    zoomSlider->getProgressEvent()->subscribe([this](float progress) {
         auto& store = artemis::video::ZoomPanStore::instance();
         auto state = store.get().state;
-        state.zoom += 0.25f;
-        if (state.zoom > 4.0f + 0.001f)
-            state.zoom = 1.0f;
+        state.zoom = artemis::video::sliderToZoom(progress);
         store.setState(state);
-        refreshZoomPanLabels();
-        return true;
+        const auto normalized = artemis::video::normalizeZoomPan(store.get().state);
+        zoomHeader->setSubtitle(fmt::format("{:.1f}x", normalized.zoom));
     });
-    optionsPanX->registerClickAction([this, refreshZoomPanLabels](View*) {
+    panXSlider->getProgressEvent()->subscribe([this](float progress) {
         auto& store = artemis::video::ZoomPanStore::instance();
         auto state = store.get().state;
-        state.panX += 0.1f;
-        if (state.panX > 1.0f)
-            state.panX = -1.0f;
+        state.panX = artemis::video::sliderToPan(progress);
         store.setState(state);
-        refreshZoomPanLabels();
-        return true;
+        const auto normalized = artemis::video::normalizeZoomPan(store.get().state);
+        panXHeader->setSubtitle(fmt::format("{:.2f}", normalized.panX));
     });
-    optionsPanY->registerClickAction([this, refreshZoomPanLabels](View*) {
+    panYSlider->getProgressEvent()->subscribe([this](float progress) {
         auto& store = artemis::video::ZoomPanStore::instance();
         auto state = store.get().state;
-        state.panY += 0.1f;
-        if (state.panY > 1.0f)
-            state.panY = -1.0f;
+        state.panY = artemis::video::sliderToPan(progress);
         store.setState(state);
-        refreshZoomPanLabels();
-        return true;
+        const auto normalized = artemis::video::normalizeZoomPan(store.get().state);
+        panYHeader->setSubtitle(fmt::format("{:.2f}", normalized.panY));
     });
     optionsResetZoomPan->registerClickAction(
-        [this, refreshZoomPanLabels](View*) {
+        [this, refreshZoomPanSliders](View*) {
             artemis::video::ZoomPanStore::instance().reset();
-            refreshZoomPanLabels();
+            refreshZoomPanSliders();
+            optionsResetZoomPan->setDetailText(
+                "artemis/settings/reset_zoom_pan_done"_i18n);
             return true;
         });
 
@@ -856,23 +910,6 @@ OptionsTab::OptionsTab(StreamingView* streamView) : streamView(streamView) {
          Application::getTheme()["brls/text_disabled"] : Application::getTheme()["brls/accent"];
     guideBySystemButton->setDetailTextColor(color);
 #endif
-
-    float mouseProgress =
-        ((float) Settings::instance().get_mouse_speed_multiplier() / 100.0f);
-    mouseSlider->getProgressEvent()->subscribe([this](float value) {
-        Settings::instance().set_mouse_speed_multiplier(int(value * 100));
-        std::stringstream stream;
-        stream << std::fixed << std::setprecision(1)
-               << Settings::instance().mouse_speed_scale();
-        mouseHeader->setSubtitle(stream.str() + "x");
-    });
-    mouseSlider->setProgress(mouseProgress);
-    {
-        std::stringstream stream;
-        stream << std::fixed << std::setprecision(1)
-               << Settings::instance().mouse_speed_scale();
-        mouseHeader->setSubtitle(stream.str() + "x");
-    }
 
     inputOverlayButton->setText("streaming/mouse_input"_i18n);
     inputOverlayButton->registerClickAction([this](View* view) {

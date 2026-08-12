@@ -21,10 +21,11 @@ public:
     // Empty hostKey keeps the global Artemis settings default profile.
     const StoredStreamProfile& get(const std::string& hostKey = {});
     void setCustomResolution(const std::string& hostKey, bool enabled,
-                             int width, int height);
+                             int width, int height, bool persist = true);
     // Backward-compatible global setter used by Artemis settings.
-    void setCustomResolution(bool enabled, int width, int height) {
-        setCustomResolution({}, enabled, width, height);
+    void setCustomResolution(bool enabled, int width, int height,
+                             bool persist = true) {
+        setCustomResolution({}, enabled, width, height, persist);
     }
     void reload();
     bool save() const;

@@ -7,12 +7,6 @@
             <brls:Tab label="@i18n/artemis/overlay/options">
                 <OptionsTab />
             </brls:Tab>
-            <brls:Tab label="@i18n/artemis/overlay/performance">
-                <PerformanceTab />
-            </brls:Tab>
-            <brls:Tab label="@i18n/artemis/overlay/disconnect">
-                <LogoutTab />
-            </brls:Tab>
         </brls:TabFrame>
     </brls:AppletFrame>
 </brls:Box>

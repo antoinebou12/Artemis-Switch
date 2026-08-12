@@ -10,14 +10,19 @@
 #include "main_tabs_view.hpp"
 #include "MoonlightSession.hpp"
 #include "features/ui/QrCodeView.hpp"
+#include "features/apollo/ApolloHostOptions.hpp"
+#include "features/apollo/ApolloHostOptionsStore.hpp"
 #include "streaming/HostProfileKey.hpp"
 #include "streaming/HostStreamProfileUi.hpp"
 #include "streaming/ProfileEditorDialog.hpp"
 #include "streaming/StreamConfigProfileStore.hpp"
+#include "streaming/StreamDisconnectPolicy.hpp"
+#include "streaming/StreamUiLifecycle.hpp"
 
 #include <algorithm>
 #include <cctype>
 #include <fmt/format.h>
+#include <vector>
 
 namespace {
 std::string lowercaseCopy(std::string value) {
@@ -29,6 +34,27 @@ std::string lowercaseCopy(std::string value) {
 
 bool hostActionsBlockedByActiveSession() {
     return MoonlightSession::activeSession() != nullptr;
+}
+
+std::string apolloVdLabel(artemis::apollo::VirtualDisplayTarget target) {
+    using Target = artemis::apollo::VirtualDisplayTarget;
+    switch (target) {
+    case Target::Off:
+        return "artemis/overlay/vd_off"_i18n;
+    case Target::CurrentProfile:
+        return "artemis/overlay/vd_current"_i18n;
+    case Target::Handheld:
+        return "artemis/overlay/vd_handheld"_i18n;
+    case Target::Docked:
+        return "artemis/overlay/vd_docked"_i18n;
+    case Target::PortraitHandheld:
+        return "artemis/overlay/vd_portrait_handheld"_i18n;
+    case Target::PortraitDocked:
+        return "artemis/overlay/vd_portrait_docked"_i18n;
+    case Target::Custom:
+        return "artemis/overlay/vd_custom"_i18n;
+    }
+    return "artemis/overlay/vd_off"_i18n;
 }
 } // namespace
 
@@ -86,6 +112,18 @@ AppListView::AppListView(const Host& host) : Box(Axis::ROW), host(host) {
         return true;
     });
     appsContainer->addView(appSearch);
+
+    appRefresh = new DetailCell();
+    appRefresh->setText("app_list/refresh"_i18n);
+    appRefresh->setDetailText("app_list/refresh_hint"_i18n);
+    appRefresh->title->setSingleLine(true);
+    appRefresh->detail->setSingleLine(true);
+    appRefresh->registerClickAction([this](View*) {
+        updateAppList();
+        return true;
+    });
+    appsContainer->addView(appRefresh);
+
     gridView = new GridView();
     appsContainer->addView(gridView);
     contentColumn->addView(appsContainer);
@@ -191,6 +229,95 @@ AppListView::AppListView(const Host& host) : Box(Axis::ROW), host(host) {
         });
     hostContainer->addView(streamProfile);
 
+    apolloVirtualDisplay = new DetailCell();
+    apolloVirtualDisplay->title->setSingleLine(true);
+    apolloVirtualDisplay->detail->setSingleLine(true);
+    apolloVirtualDisplay->registerClickAction([this](View*) {
+        using Target = artemis::apollo::VirtualDisplayTarget;
+        const std::vector<Target> values = {
+            Target::Off,        Target::CurrentProfile, Target::Handheld,
+            Target::Docked,     Target::PortraitHandheld,
+            Target::PortraitDocked, Target::Custom};
+        std::vector<std::string> labels;
+        int selected = 0;
+        auto current = artemis::apollo::ApolloHostOptionsStore::instance().get(
+            hostProfileKey);
+        for (size_t i = 0; i < values.size(); ++i) {
+            labels.push_back(apolloVdLabel(values[i]));
+            if (values[i] == current.target)
+                selected = static_cast<int>(i);
+        }
+        auto* dropdown = new Dropdown(
+            "artemis/overlay/virtual_display"_i18n, labels,
+            [this, values](int index) {
+                if (index < 0 || index >= static_cast<int>(values.size()))
+                    return;
+                auto options =
+                    artemis::apollo::ApolloHostOptionsStore::instance().get(
+                        hostProfileKey);
+                options.target = values[static_cast<size_t>(index)];
+                if (options.target == Target::Custom) {
+                    Application::getImeManager()->openForText(
+                        [this, options](const std::string& text) mutable {
+                            if (!artemis::apollo::parseVirtualDisplaySpec(
+                                    text, options, nullptr))
+                                return;
+                            options.target = Target::Custom;
+                            artemis::apollo::ApolloHostOptionsStore::instance()
+                                .set(hostProfileKey, options);
+                            refreshApolloHostOptions();
+                        },
+                        "artemis/overlay/vd_custom"_i18n,
+                        "artemis/overlay/vd_custom_prompt"_i18n, 32,
+                        fmt::format("{}x{}@{}", options.customWidth,
+                                    options.customHeight, options.refreshRate),
+                        0);
+                    return;
+                }
+                artemis::apollo::ApolloHostOptionsStore::instance().set(
+                    hostProfileKey, options);
+                refreshApolloHostOptions();
+            },
+            selected);
+        Application::pushActivity(new Activity(dropdown));
+        return true;
+    });
+    hostContainer->addView(apolloVirtualDisplay);
+
+    apolloScaleFactor = new DetailCell();
+    apolloScaleFactor->title->setSingleLine(true);
+    apolloScaleFactor->detail->setSingleLine(true);
+    apolloScaleFactor->registerClickAction([this](View*) {
+        const std::vector<int> values = {50, 75, 100, 125, 150};
+        std::vector<std::string> labels;
+        int selected = 2;
+        auto current = artemis::apollo::ApolloHostOptionsStore::instance().get(
+            hostProfileKey);
+        for (size_t i = 0; i < values.size(); ++i) {
+            labels.push_back(fmt::format("{}%", values[i]));
+            if (values[i] == current.scaleFactor)
+                selected = static_cast<int>(i);
+        }
+        auto* dropdown = new Dropdown(
+            "artemis/overlay/apollo_scale_factor"_i18n, labels,
+            [this, values](int index) {
+                if (index < 0 || index >= static_cast<int>(values.size()))
+                    return;
+                auto options =
+                    artemis::apollo::ApolloHostOptionsStore::instance().get(
+                        hostProfileKey);
+                options.scaleFactor = values[static_cast<size_t>(index)];
+                artemis::apollo::ApolloHostOptionsStore::instance().set(
+                    hostProfileKey, options);
+                refreshApolloHostOptions();
+            },
+            selected);
+        Application::pushActivity(new Activity(dropdown));
+        return true;
+    });
+    hostContainer->addView(apolloScaleFactor);
+    refreshApolloHostOptions();
+
     contentColumn->addView(hostContainer);
     addView(contentColumn);
 
@@ -228,6 +355,8 @@ AppListView::AppListView(const Host& host) : Box(Axis::ROW), host(host) {
         promptAppSearch();
         return true;
     });
+    bindAppListRefresh(appSearch);
+    bindAppListRefresh(appRefresh);
     registerAction("app_list/reload_app_list"_i18n, BUTTON_Y, [this](View*) {
         if (activePane == Pane::Host) {
             const auto selected =
@@ -246,7 +375,7 @@ AppListView::AppListView(const Host& host) : Box(Axis::ROW), host(host) {
             });
             return true;
         }
-        this->updateAppList();
+        updateAppList();
         return true;
     });
     registerAction("host/delete_profile"_i18n, BUTTON_X, [this](View*) {
@@ -329,6 +458,20 @@ void AppListView::refreshStreamProfileLabel() {
         artemis::streaming::profile_detail_label(hostProfileKey));
 }
 
+void AppListView::refreshApolloHostOptions() {
+    const auto options = artemis::apollo::validateApolloHostOptions(
+        artemis::apollo::ApolloHostOptionsStore::instance().get(hostProfileKey));
+    if (apolloVirtualDisplay) {
+        apolloVirtualDisplay->setText("artemis/overlay/virtual_display"_i18n);
+        apolloVirtualDisplay->setDetailText(apolloVdLabel(options.target));
+    }
+    if (apolloScaleFactor) {
+        apolloScaleFactor->setText("artemis/overlay/apollo_scale_factor"_i18n);
+        apolloScaleFactor->setDetailText(fmt::format(
+            "{}%", options.scaleFactor > 0 ? options.scaleFactor : 100));
+    }
+}
+
 void AppListView::refreshWebConfigVisibility() {
     if (!webConfig)
         return;
@@ -374,11 +517,13 @@ void AppListView::terninateApp() {
 
                 loading = false;
                 loader->setHidden(true);
+                blockInput(false);
 
-                if (!result.isSuccess())
-                    showError(result.error(), [this] {});
-
-                updateAppList();
+                // Host may already have deleted/closed the app; quit then
+                // fails but the grid still has to reload and accept input.
+                if (artemis::streaming::shouldReloadAppsAfterHostQuit(
+                        result.isSuccess()))
+                    updateAppList();
             });
     });
 
@@ -411,6 +556,7 @@ void AppListView::updateAppList() {
                 hostProfileKey = artemis::streaming::host_profile_key(
                     this->host, result.value().mac);
                 refreshStreamProfileLabel();
+                refreshApolloHostOptions();
 
                 int currentGame = result.value().currentGame;
 
@@ -450,8 +596,9 @@ void AppListView::updateAppList() {
                                     });
                             }
                             rebuildAppGrid();
-                            // Prefer the normal TabFrame focus: sidebar item 0.
-                            if (sidebar && sidebar->getItem(0))
+                            if (activePane == Pane::Applications)
+                                showPane(Pane::Applications, true);
+                            else if (sidebar && sidebar->getItem(0))
                                 Application::giveFocus(sidebar->getItem(0));
                             else
                                 showPane(activePane, true);
@@ -461,10 +608,24 @@ void AppListView::updateAppList() {
                         }
                     });
             } else {
+                loading = false;
+                loader->setHidden(true);
                 blockInput(false);
                 showError(result.error(), [this] { this->dismiss(); });
             }
         });
+}
+
+void AppListView::bindAppListRefresh(View* view) {
+    if (!view)
+        return;
+    view->registerAction("app_list/reload_app_list"_i18n, BUTTON_Y,
+                         [this](View*) {
+                             if (activePane != Pane::Applications)
+                                 return false;
+                             updateAppList();
+                             return true;
+                         });
 }
 
 void AppListView::refreshAppSearchLabel() {
@@ -525,6 +686,7 @@ void AppListView::rebuildAppGrid() {
         auto* cell = new AppCell(host, app, cachedCurrentGame);
         cell->setFavorite(
             Settings::instance().is_favorite(host, app.app_id));
+        bindAppListRefresh(cell);
         gridView->addView(cell);
         updateFavoriteAction(cell, host, app);
     }
@@ -543,6 +705,12 @@ void AppListView::setCurrentApp(const AppInfo& app) {
 
 void AppListView::willAppear(bool resetState) {
     Box::willAppear(resetState);
+    if (artemis::streaming::consumeStreamUiClosed()) {
+        pendingPostStreamRefresh = false;
+        streamWasActive = false;
+        updateAppList();
+        return;
+    }
     // Avoid a full network reload when the IME dismisses after search — that
     // was wiping the filtered grid before the async applist returned.
     if (!cachedApps.empty()) {

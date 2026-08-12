@@ -39,7 +39,9 @@
         "try_connect": "Connexion à l'hôte en cours..."
     },
     "app_list": {
-        "reload_app_list": "Recharger",
+        "reload_app_list": "Actualiser",
+        "refresh": "Actualiser les apps",
+        "refresh_hint": "Liste Sunshine / Apollo",
         "run_current": "Exécuter l'application",
         "running": "En cours d'exécution",
         "search": "Rechercher des apps",
@@ -103,6 +105,9 @@
             "manage_profiles": "Gérer les profils",
             "manage_profiles_hint": "Créer, renommer, supprimer",
             "create_profile": "Créer un profil…",
+            "add_missing_defaults": "Ajouter les préréglages manquants",
+            "add_missing_defaults_done": "Préréglages ajoutés",
+            "add_missing_defaults_none": "Tous les préréglages sont déjà présents",
             "duplicate_profile": "Dupliquer",
             "export_profiles": "Exporter les profils",
             "export_profiles_hint": "Choisir un dossier et un nom",
@@ -387,6 +392,7 @@
         "debug": "Debug",
         "debugging_view": "Afficher la vue Debug",
         "show_host_web_config": "Afficher la config web de l’hôte",
+        "show_performance_tab": "Afficher l’onglet Performance",
         "debug_stats_corner": "Position des stats debug",
         "corner_top_left": "Haut gauche",
         "corner_top_right": "Haut droite",

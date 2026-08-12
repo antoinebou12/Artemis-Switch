@@ -9,7 +9,7 @@ public:
     static AdvancedStreamOptionsStore& instance();
 
     const AdvancedStreamOptions& get();
-    void set(const AdvancedStreamOptions& options);
+    void set(const AdvancedStreamOptions& options, bool persist = true);
     void reload();
     bool save() const;
 

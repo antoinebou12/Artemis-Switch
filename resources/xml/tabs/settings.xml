@@ -242,6 +242,9 @@
 
             <brls:BooleanCell
                 id="show_host_web_config"/>
+
+            <brls:BooleanCell
+                id="show_performance_tab"/>
                 
             <brls:BooleanCell
                 id="writeLog"/>

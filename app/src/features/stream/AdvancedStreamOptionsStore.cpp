@@ -28,10 +28,12 @@ const AdvancedStreamOptions& AdvancedStreamOptionsStore::get() {
     return m_options;
 }
 
-void AdvancedStreamOptionsStore::set(const AdvancedStreamOptions& options) {
+void AdvancedStreamOptionsStore::set(const AdvancedStreamOptions& options,
+                                     bool persist) {
     m_options = options;
     m_loaded = true;
-    save();
+    if (persist)
+        save();
 }
 
 void AdvancedStreamOptionsStore::reload() {

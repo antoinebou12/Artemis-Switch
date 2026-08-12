@@ -28,7 +28,9 @@
         "try_connect": "ホストに接続しようとしています"
     },
     "app_list": {
-        "reload_app_list": "リロード",
+        "reload_app_list": "更新",
+        "refresh": "アプリを更新",
+        "refresh_hint": "Sunshine / Apollo の一覧",
         "run_current": "現在のアプリを実行する",
         "running": "実行中",
         "star": "Star",

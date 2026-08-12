@@ -13,6 +13,7 @@ int main() {
         snapshot.receiveLatencyMs = 1.25;
         snapshot.decodeLatencyMs = 3.5;
         snapshot.renderLatencyMs = 2.0;
+        snapshot.gpuRenderMs = 1.5;
         snapshot.packetLossPercent = 0.02;
         snapshot.hostFps = 60.0;
         snapshot.receivedFps = 59.9;
@@ -28,6 +29,7 @@ int main() {
         assert(status.latencyText == "1.25 ms");
         assert(status.decodeText == "3.50 ms");
         assert(status.renderText == "2.00 ms");
+        assert(status.gpuText == "1.50 ms");
         assert(status.packetLossText == "0.02%");
         assert(status.fpsText == "59.98 FPS");
         assert(status.frameQueueText == "2 / 3 / 8");

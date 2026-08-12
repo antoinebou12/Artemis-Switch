@@ -26,6 +26,7 @@ private:
     BRLS_BIND(brls::DetailCell, receiveLatency, "receive_latency");
     BRLS_BIND(brls::DetailCell, decodeLatency, "decode_latency");
     BRLS_BIND(brls::DetailCell, renderLatency, "render_latency");
+    BRLS_BIND(brls::DetailCell, gpuRender, "gpu_render");
     BRLS_BIND(brls::DetailCell, packetLoss, "packet_loss");
     BRLS_BIND(brls::DetailCell, hostFps, "host_fps");
     BRLS_BIND(brls::DetailCell, receivedFps, "received_fps");

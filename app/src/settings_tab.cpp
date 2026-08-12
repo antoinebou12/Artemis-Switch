@@ -952,6 +952,13 @@ SettingsTab::SettingsTab() {
             Settings::instance().set_show_host_web_config(value);
             Settings::instance().save();
         });
+
+    showPerformanceTab->init(
+        "settings/show_performance_tab"_i18n,
+        Settings::instance().show_performance_tab(), [](bool value) {
+            Settings::instance().set_show_performance_tab(value);
+            Settings::instance().save();
+        });
 }
 
 void SettingsTab::updateDeadZoneItems() {

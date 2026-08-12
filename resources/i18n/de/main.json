@@ -28,7 +28,9 @@
         "try_connect": "Verbindung mit Host wird hergestellt"
     },
     "app_list": {
-        "reload_app_list": "Neu laden",
+        "reload_app_list": "Aktualisieren",
+        "refresh": "Apps aktualisieren",
+        "refresh_hint": "Sunshine- / Apollo-Liste",
         "run_current": "Aktuelles Programm fortsetzen",
         "running": "Läuft",
         "star": "Favorit",

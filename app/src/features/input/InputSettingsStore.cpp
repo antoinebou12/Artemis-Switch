@@ -71,10 +71,12 @@ const std::vector<KeyboardShortcut>& InputSettingsStore::shortcuts() {
     return m_shortcuts;
 }
 
-void InputSettingsStore::setPointer(const PointerSettings& settings) {
+void InputSettingsStore::setPointer(const PointerSettings& settings,
+                                    bool persist) {
     m_pointer = validatePointerSettings(settings);
     m_loaded = true;
-    save();
+    if (persist)
+        save();
 }
 
 bool InputSettingsStore::setShortcuts(std::vector<KeyboardShortcut> shortcuts,

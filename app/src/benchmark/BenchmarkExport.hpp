@@ -1,5 +1,6 @@
 #pragma once
 
+#include "BenchmarkTypes.hpp"
 #include "SwitchRuntimeMetadata.hpp"
 #include <string>
 
@@ -23,7 +24,25 @@ struct ExportSummary {
     double decodeMsP99 = 0.0;
     double clientProcessingMsP99 = 0.0;
     double stabilityScore = 0.0;
+    BenchmarkSummary stats;
+    std::string capturedAtIso;
+    std::string hostName;
+    std::string appName;
 };
+
+inline ExportSummary fromBenchmarkSummary(const BenchmarkSummary& summary) {
+    ExportSummary result;
+    result.durationSeconds = summary.durationSeconds;
+    result.renderedFpsMean = summary.renderedFps.mean;
+    result.renderedFpsP99 = summary.renderedFps.p99;
+    result.networkDropPercent = summary.networkDropPercent;
+    result.receiveMsP99 = summary.receiveMs.p99;
+    result.decodeMsP99 = summary.decodeMs.p99;
+    result.clientProcessingMsP99 = summary.clientProcessingMs.p99;
+    result.stabilityScore = summary.stabilityScore;
+    result.stats = summary;
+    return result;
+}
 
 class BenchmarkExport {
 public:

@@ -1,10 +1,12 @@
 #include "StreamConfigProfileStore.hpp"
 
 #include "StreamConfigProfileNormalize.hpp"
+#include "DefaultStreamProfiles.hpp"
 #include "StreamProfileStore.hpp"
-#include "features/apollo/ApolloHostOptionsStore.hpp"
 #include "features/input/InputSettingsStore.hpp"
+#include "features/input/SwitchMotionPolicyStore.hpp"
 #include "features/stream/AdvancedStreamOptionsStore.hpp"
+#include "features/video/ZoomPanStore.hpp"
 #include "video/VideoScaleStore.hpp"
 
 #include <algorithm>
@@ -15,6 +17,8 @@
 #include <filesystem>
 #include <jansson.h>
 #include <random>
+#include <string>
+#include <vector>
 
 namespace artemis::streaming {
 
@@ -123,9 +127,8 @@ json_t* profileToJson(const StreamConfigProfile& profile) {
 
     json_object_set_new(item, "resolution_height",
                         json_integer(profile.resolutionHeight));
-    json_object_set_new(
-        item, "aspect_ratio",
-        json_string(aspectRatioToString(profile.aspectRatio)));
+    json_object_set_new(item, "aspect_ratio",
+                        json_string(aspectRatioToString(profile.aspectRatio)));
     json_object_set_new(item, "fps", json_integer(profile.fps));
     json_object_set_new(item, "client_refresh_rate_x100",
                         json_integer(profile.clientRefreshRateX100));
@@ -148,18 +151,6 @@ json_t* profileToJson(const StreamConfigProfile& profile) {
                         profile.preventPacketLoss ? json_true() : json_false());
     json_object_set_new(item, "low_latency_pacing",
                         profile.lowLatencyPacing ? json_true() : json_false());
-    json_object_set_new(
-        item, "virtual_display_target",
-        json_string(artemis::apollo::virtualDisplayTargetName(
-            profile.virtualDisplayTarget)));
-    json_object_set_new(item, "virtual_display_custom_width",
-                        json_integer(profile.virtualDisplayCustomWidth));
-    json_object_set_new(item, "virtual_display_custom_height",
-                        json_integer(profile.virtualDisplayCustomHeight));
-    json_object_set_new(item, "virtual_display_refresh_rate",
-                        json_integer(profile.virtualDisplayRefreshRate));
-    json_object_set_new(item, "apollo_scale_factor",
-                        json_integer(profile.apolloScaleFactor));
     json_object_set_new(item, "packet_size",
                         json_integer(artemis::stream::clampPacketSize(
                             profile.packetSize)));
@@ -173,6 +164,13 @@ json_t* profileToJson(const StreamConfigProfile& profile) {
 
     json_object_set_new(item, "scale_mode",
                         json_string(scaleModeToString(profile.scaleMode)));
+    json_object_set_new(item, "remember_zoom_pan",
+                        profile.rememberZoomPan ? json_true() : json_false());
+    json_object_set_new(item, "forward_motion",
+                        profile.forwardMotion ? json_true() : json_false());
+    json_object_set_new(
+        item, "console_motion_fallback",
+        profile.consoleMotionFallback ? json_true() : json_false());
     json_object_set_new(item, "upscaling_mode",
                         json_integer(static_cast<int>(profile.upscalingMode)));
     json_object_set_new(item, "dithering",
@@ -260,8 +258,8 @@ StreamConfigProfile profileFromJson(json_t* object) {
             profile.aspectRatio =
                 aspectRatioFromString(json_string_value(aspect));
         else if (json_is_integer(aspect))
-            profile.aspectRatio =
-                aspectRatioFromInt(static_cast<int>(json_integer_value(aspect)));
+            profile.aspectRatio = aspectRatioFromInt(
+                static_cast<int>(json_integer_value(aspect)));
     }
     if (json_t* fps = json_object_get(object, "fps"); json_is_integer(fps))
         profile.fps = static_cast<int>(json_integer_value(fps));
@@ -293,29 +291,6 @@ StreamConfigProfile profileFromJson(json_t* object) {
         profile.preventPacketLoss = jsonToBool(loss);
     if (json_t* lowLatency = json_object_get(object, "low_latency_pacing"))
         profile.lowLatencyPacing = jsonToBool(lowLatency);
-    if (json_t* vdTarget = json_object_get(object, "virtual_display_target");
-        json_is_string(vdTarget)) {
-        artemis::apollo::VirtualDisplayTarget target{};
-        if (artemis::apollo::virtualDisplayTargetFromName(
-                json_string_value(vdTarget), target))
-            profile.virtualDisplayTarget = target;
-    }
-    if (json_t* vdW = json_object_get(object, "virtual_display_custom_width");
-        json_is_integer(vdW))
-        profile.virtualDisplayCustomWidth =
-            static_cast<int>(json_integer_value(vdW));
-    if (json_t* vdH = json_object_get(object, "virtual_display_custom_height");
-        json_is_integer(vdH))
-        profile.virtualDisplayCustomHeight =
-            static_cast<int>(json_integer_value(vdH));
-    if (json_t* vdHz = json_object_get(object, "virtual_display_refresh_rate");
-        json_is_integer(vdHz))
-        profile.virtualDisplayRefreshRate =
-            static_cast<int>(json_integer_value(vdHz));
-    if (json_t* scale = json_object_get(object, "apollo_scale_factor");
-        json_is_integer(scale))
-        profile.apolloScaleFactor =
-            static_cast<int>(json_integer_value(scale));
     if (json_t* packetSize = json_object_get(object, "packet_size");
         json_is_integer(packetSize))
         profile.packetSize = artemis::stream::clampPacketSize(
@@ -332,6 +307,12 @@ StreamConfigProfile profileFromJson(json_t* object) {
     if (json_t* scale = json_object_get(object, "scale_mode");
         json_is_string(scale))
         profile.scaleMode = scaleModeFromString(json_string_value(scale));
+    if (json_t* remember = json_object_get(object, "remember_zoom_pan"))
+        profile.rememberZoomPan = jsonToBool(remember);
+    if (json_t* motion = json_object_get(object, "forward_motion"))
+        profile.forwardMotion = jsonToBool(motion);
+    if (json_t* console = json_object_get(object, "console_motion_fallback"))
+        profile.consoleMotionFallback = jsonToBool(console);
     if (json_t* upscaling = json_object_get(object, "upscaling_mode");
         json_is_integer(upscaling))
         profile.upscalingMode =
@@ -437,7 +418,7 @@ StreamConfigProfile profileFromJson(json_t* object) {
     return normalizeProfile(profile);
 }
 
-void applyProfileToSettings(const StreamConfigProfile& profile) {
+void applyProfileToSettings(const StreamConfigProfile& profile, bool persist) {
     auto& settings = Settings::instance();
     settings.set_resolution(profile.resolutionHeight);
     settings.set_aspect_ratio(profile.aspectRatio);
@@ -486,7 +467,8 @@ void applyProfileToSettings(const StreamConfigProfile& profile) {
             }
         }
     }
-    settings.save();
+    if (persist)
+        settings.save();
 
     auto advanced =
         artemis::stream::AdvancedStreamOptionsStore::instance().get();
@@ -494,9 +476,17 @@ void applyProfileToSettings(const StreamConfigProfile& profile) {
     advanced.preventPacketLoss = profile.preventPacketLoss;
     advanced.packetSize =
         artemis::stream::clampPacketSize(profile.packetSize);
-    artemis::stream::AdvancedStreamOptionsStore::instance().set(advanced);
+    artemis::stream::AdvancedStreamOptionsStore::instance().set(advanced,
+                                                                persist);
 
-    artemis::video::VideoScaleStore::instance().set(profile.scaleMode);
+    artemis::video::VideoScaleStore::instance().set(profile.scaleMode, persist);
+    artemis::video::ZoomPanStore::instance().setRemember(profile.rememberZoomPan,
+                                                        persist);
+
+    auto motion = artemis::input::SwitchMotionPolicyStore::instance().get();
+    motion.allowGamepadMotionSensors = profile.forwardMotion;
+    motion.allowConsoleMotionFallback = profile.consoleMotionFallback;
+    artemis::input::SwitchMotionPolicyStore::instance().set(motion, persist);
 
     const int customW = profile.customResolutionEnabled
                             ? profile.customWidth
@@ -505,16 +495,11 @@ void applyProfileToSettings(const StreamConfigProfile& profile) {
                             ? profile.customHeight
                             : profile.resolutionHeight;
     StreamProfileStore::instance().setCustomResolution(
-        profile.customResolutionEnabled, customW, customH);
+        profile.customResolutionEnabled, customW, customH, persist);
 
     auto pointer = artemis::input::InputSettingsStore::instance().pointer();
     pointer.mode = profile.pointerMode;
-    artemis::input::InputSettingsStore::instance().setPointer(pointer);
-
-    // Keep shared Artemis Settings Apollo defaults aligned with the profile.
-    artemis::apollo::ApolloHostOptionsStore::instance().set(
-        "default",
-        artemis::apollo::validateApolloHostOptions(profile.apolloOptions()));
+    artemis::input::InputSettingsStore::instance().setPointer(pointer, persist);
 }
 
 } // namespace
@@ -556,17 +541,6 @@ StreamConfigProfile normalizeProfile(StreamConfigProfile profile) {
     profile.touchscreenMouseMode =
         legacyTouchscreenFromPointerMode(profile.pointerMode);
 
-    profile.virtualDisplayCustomWidth =
-        normalizeCustomDimension(profile.virtualDisplayCustomWidth, 1280);
-    profile.virtualDisplayCustomHeight =
-        normalizeCustomDimension(profile.virtualDisplayCustomHeight, 720);
-    if (profile.virtualDisplayRefreshRate <= 0)
-        profile.virtualDisplayRefreshRate = 60;
-    const int scale = profile.apolloScaleFactor;
-    if (scale != 50 && scale != 75 && scale != 100 && scale != 125 &&
-        scale != 150)
-        profile.apolloScaleFactor = 100;
-
     return profile;
 }
 
@@ -602,8 +576,7 @@ StreamConfigProfileStore::snapshotFromSettings(const std::string& name) {
     profile.name = name.empty() ? "Profile" : name;
 
     const auto& settings = Settings::instance();
-    profile.resolutionHeight =
-        normalizeHeight(settings.resolution() > 0 ? settings.resolution() : 720);
+    profile.resolutionHeight = normalizeHeight(settings.resolution());
     profile.aspectRatio = settings.aspect_ratio();
     profile.fps = settings.fps();
     profile.clientRefreshRateX100 = settings.client_refresh_rate_x100();
@@ -659,47 +632,63 @@ StreamConfigProfileStore::snapshotFromSettings(const std::string& name) {
     profile.packetSize =
         artemis::stream::clampPacketSize(advanced.packetSize);
     profile.scaleMode = artemis::video::VideoScaleStore::instance().get();
+    profile.rememberZoomPan =
+        artemis::video::ZoomPanStore::instance().get().rememberBetweenSessions;
+    {
+        const auto motion =
+            artemis::input::SwitchMotionPolicyStore::instance().get();
+        profile.forwardMotion = motion.allowGamepadMotionSensors;
+        profile.consoleMotionFallback = motion.allowConsoleMotionFallback;
+    }
 
     const auto custom = StreamProfileStore::instance().get();
     profile.customResolutionEnabled = custom.customResolutionEnabled;
     profile.customWidth = custom.width;
     profile.customHeight = custom.height;
 
-    profile.setApolloOptions(
-        artemis::apollo::validateApolloHostOptions(
-            artemis::apollo::ApolloHostOptionsStore::instance().get("default")));
-
     return normalizeProfile(profile);
+}
+
+int StreamConfigProfileStore::addMissingDefaults() {
+    ensureLoaded();
+    std::vector<std::string> names;
+    names.reserve(m_profiles.size());
+    for (const auto& profile : m_profiles)
+        names.push_back(profile.name);
+
+    int added = 0;
+    for (const auto& spec : missingDefaultProfiles(names)) {
+        StreamConfigProfile profile;
+        profile.id = makeId();
+        profile.name = spec.name;
+        profile.resolutionHeight = spec.height;
+        profile.aspectRatio = StreamAspectRatio::Ratio16x9;
+        profile.fps = spec.fps;
+        profile.bitrateKbps = spec.bitrateKbps;
+        profile.videoCodec = H264;
+        profile.scaleMode = artemis::video::ScaleMode::Fill;
+        m_profiles.push_back(profile);
+        ++added;
+    }
+    if (m_activeProfileId.empty() && !m_profiles.empty()) {
+        for (const auto& profile : m_profiles) {
+            if (profile.name == kDefaultActiveProfileName) {
+                m_activeProfileId = profile.id;
+                break;
+            }
+        }
+        if (m_activeProfileId.empty())
+            m_activeProfileId = m_profiles.front().id;
+    }
+    if (added > 0)
+        save();
+    return added;
 }
 
 void StreamConfigProfileStore::seedDefaultsIfEmpty() {
     if (!m_profiles.empty())
         return;
-
-    auto makeSeed = [](const char* name, int height, int fps, int bitrate,
-                       StreamAspectRatio aspect =
-                           StreamAspectRatio::Ratio16x9,
-                       artemis::video::ScaleMode scale =
-                           artemis::video::ScaleMode::Fill) {
-        StreamConfigProfile profile;
-        profile.id = makeId();
-        profile.name = name;
-        profile.resolutionHeight = height;
-        profile.aspectRatio = aspect;
-        profile.fps = fps;
-        profile.bitrateKbps = bitrate;
-        profile.videoCodec = H264;
-        profile.scaleMode = scale;
-        return profile;
-    };
-
-    m_profiles.push_back(makeSeed("720p 60", 720, 60, 10000));
-    m_profiles.push_back(makeSeed("1080p 60", 1080, 60, 20000));
-    m_profiles.push_back(makeSeed("720p 4:3", 720, 60, 10000,
-                                  StreamAspectRatio::Ratio4x3,
-                                  artemis::video::ScaleMode::Fit));
-    m_profiles.push_back(makeSeed("360p remote", 360, 30, 2500));
-    m_activeProfileId = m_profiles.front().id;
+    addMissingDefaults();
 }
 
 const std::vector<StreamConfigProfile>& StreamConfigProfileStore::list() {
@@ -767,15 +756,6 @@ bool StreamConfigProfileStore::update(const StreamConfigProfile& profile) {
             continue;
         existing = normalizeProfile(profile);
         existing.id = profile.id;
-        const auto apollo =
-            artemis::apollo::validateApolloHostOptions(existing.apolloOptions());
-        artemis::apollo::ApolloHostOptionsStore::instance().set("default",
-                                                               apollo);
-        for (const auto& [hostKey, selectedId] : m_hostProfile) {
-            if (selectedId == existing.id)
-                artemis::apollo::ApolloHostOptionsStore::instance().set(
-                    hostKey, apollo);
-        }
         save();
         return true;
     }
@@ -844,12 +824,6 @@ void StreamConfigProfileStore::setSelectedForHost(
         m_hostProfile.erase(hostKey);
     } else {
         m_hostProfile[hostKey] = profileId;
-        if (auto profile = get(profileId)) {
-            artemis::apollo::ApolloHostOptionsStore::instance().set(
-                hostKey,
-                artemis::apollo::validateApolloHostOptions(
-                    profile->apolloOptions()));
-        }
     }
     save();
 }
@@ -877,16 +851,18 @@ void StreamConfigProfileStore::setActiveProfileId(
     save();
 }
 
-bool StreamConfigProfileStore::applyProfile(const StreamConfigProfile& profile) {
-    applyProfileToSettings(normalizeProfile(profile));
+bool StreamConfigProfileStore::applyProfile(const StreamConfigProfile& profile,
+                                            bool persist) {
+    applyProfileToSettings(normalizeProfile(profile), persist);
     return true;
 }
 
-bool StreamConfigProfileStore::applyToSettings(const std::string& id) {
+bool StreamConfigProfileStore::applyToSettings(const std::string& id,
+                                               bool persist) {
     auto profile = get(id);
     if (!profile)
         return false;
-    if (!applyProfile(*profile))
+    if (!applyProfile(*profile, persist))
         return false;
     m_activeProfileId = profile->id;
     save();
@@ -984,7 +960,6 @@ bool StreamConfigProfileStore::importJson(const std::string& path,
     }
 
     json_decref(root);
-    seedDefaultsIfEmpty();
     save();
     return true;
 }
@@ -1049,7 +1024,6 @@ void StreamConfigProfileStore::reload() {
         m_activeProfileId = json_string_value(active);
 
     json_decref(root);
-    seedDefaultsIfEmpty();
     if (m_activeProfileId.empty() || !get(m_activeProfileId))
         m_activeProfileId =
             m_profiles.empty() ? std::string{} : m_profiles.front().id;

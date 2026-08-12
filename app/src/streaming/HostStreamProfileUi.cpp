@@ -273,6 +273,22 @@ void open_manage_host_profile(const std::string& hostKey,
             });
             return true;
         });
+    addRow(column, "artemis/settings/add_missing_defaults"_i18n)
+        ->registerClickAction([hostKey, onChanged](brls::View*) {
+            const int added =
+                StreamConfigProfileStore::instance().addMissingDefaults();
+            if (added > 0) {
+                showAlert(
+                    fmt::format("{} ({})",
+                                "artemis/settings/add_missing_defaults_done"_i18n,
+                                added));
+                reopenProfileList(ProfileListKind::Manage, hostKey, onChanged,
+                                  1);
+            } else {
+                showAlert("artemis/settings/add_missing_defaults_none"_i18n);
+            }
+            return true;
+        });
     addRow(column, "artemis/settings/export_profiles"_i18n)
         ->registerClickAction([](brls::View*) {
             openJsonFileBrowser(

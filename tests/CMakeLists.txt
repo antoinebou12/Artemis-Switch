@@ -48,6 +48,14 @@ target_include_directories(stream_config_profile_tests PRIVATE
 target_compile_features(stream_config_profile_tests PRIVATE cxx_std_20)
 add_test(NAME stream_config_profile_tests COMMAND stream_config_profile_tests)
 
+add_executable(stream_disconnect_policy_tests
+    "${REPO_ROOT}/tests/stream_disconnect_policy_tests.cpp"
+)
+target_include_directories(stream_disconnect_policy_tests PRIVATE
+    "${REPO_ROOT}/app/src/streaming")
+target_compile_features(stream_disconnect_policy_tests PRIVATE cxx_std_20)
+add_test(NAME stream_disconnect_policy_tests COMMAND stream_disconnect_policy_tests)
+
 add_artemis_test(video_scale_tests
     tests/video_scale_tests.cpp
     app/src/video/VideoScale.cpp

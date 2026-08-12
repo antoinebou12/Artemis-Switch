@@ -28,7 +28,9 @@
         "try_connect": "호스트에 연결 시도 중"
     },
     "app_list": {
-        "reload_app_list": "다시 불러오기",
+        "reload_app_list": "새로고침",
+        "refresh": "앱 새로고침",
+        "refresh_hint": "Sunshine / Apollo 목록",
         "run_current": "현재 앱 실행",
         "running": "실행 중",
         "star": "별",

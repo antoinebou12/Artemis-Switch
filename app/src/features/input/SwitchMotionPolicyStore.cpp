@@ -28,10 +28,12 @@ const SwitchMotionOptions& SwitchMotionPolicyStore::get() {
     return m_options;
 }
 
-void SwitchMotionPolicyStore::set(const SwitchMotionOptions& options) {
+void SwitchMotionPolicyStore::set(const SwitchMotionOptions& options,
+                                  bool persist) {
     m_options = options;
     m_loaded = true;
-    save();
+    if (persist)
+        save();
 }
 
 void SwitchMotionPolicyStore::reload() {

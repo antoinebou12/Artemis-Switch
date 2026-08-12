@@ -1,6 +1,6 @@
 # Settings
 
-Every option in Artemis Switch, with the same labels as the app. Stream profiles use the same layout as Settings; assigned profiles override the global defaults for that host.
+Every option in Artemis Switch, with the same labels as the app. Stream profiles are a separate snapshot used at launch; they do not rewrite the Settings page.
 
 Bitrate, codec, resolution, and most stream fields apply on the **next** connection. Overlay Options can change a few presentation and input values while a stream is running.
 
@@ -95,7 +95,7 @@ Quit host app on disconnect
 : Terminate the streamed app on the PC when you disconnect. Off leaves the app running.
 
 Allow volume amplification
-: Let the overlay volume slider go above 100%.
+: Let the overlay volume slider go above 100%. Also on overlay **Options** (live; Quick volume max is 100 or 500).
 
 ---
 
@@ -204,7 +204,7 @@ Swap mouse sticks
 : Swap which stick moves the cursor vs which stick scrolls.
 
 Mouse speed
-: Cursor speed multiplier. Also on overlay Options.
+: Cursor speed multiplier. Also on overlay **Quick** (compact 84px slider after Mouse).
 
 ---
 
@@ -213,6 +213,9 @@ Mouse speed
 Show host web config
 : Show the Sunshine/Apollo web-config row and QR on the connected Host tab.
 
+Show Performance tab
+: When on (default), the stream overlay includes the Performance tab. Turn off to hide it.
+
 Write log
 : Write a log file for troubleshooting.
 
@@ -220,7 +223,7 @@ Write log
 
 ## Artemis Stream
 
-This block is at the bottom of Settings. Stream profiles edit the same fields.
+This block is at the bottom of Settings. It only has Switch/Artemis extras — FPS, bitrate, resolution, and codec stay in **Quality** above. Named stream profiles do **not** write these global Settings.
 
 ### Custom resolution
 
@@ -230,16 +233,10 @@ Use custom resolution
 Custom width / Custom height
 : Exact stream size (width 640–1920, height 360–1080).
 
-Exact bitrate
-: Bitrate in Mbps as a number instead of the Quality slider (1–100).
-
 ### Frame Rate & Video
 
-Frame rate
-: Same as Quality **FPS**.
-
 Full-range video
-: Request full-range (0–255) instead of limited (16–235). Match what the host encodes.
+: Request full-range (0–255) instead of limited (16–235). Match what the host encodes. Also on overlay **Options** (live).
 
 Packet-loss guard
 : When packet size is Auto/1392, use **1024** bytes for low-MTU or VPN links. Sunshine may still clamp packet size on the host.
@@ -250,28 +247,19 @@ Low latency pacing
 Packet size
 : RTP payload size: **Auto** (1392, or 1024 with packet-loss guard), a preset, or **Custom** (200–65535 bytes).
 
-### Resolution presets
-
-Preset
-: Quick sizes: Handheld 1280×720, Docked 1920×1080, 4:3 handheld/docked, or Custom. Applies resolution and aspect; does not replace a named stream profile.
-
-### Apollo & display
-
-These live in Settings and in the stream profile. They are **not** on the Host tab. Launch uses the selected profile.
-
-Apollo virtual display
-: Ask Apollo to create a virtual display for this stream: Off, current profile size, handheld, docked, portrait, or custom `WIDTHxHEIGHT@HZ`. Needs Apollo with the virtual-display driver installed. Sunshine hosts ignore this.
-
-Apollo scale factor
-: DPI / scale sent to Apollo for that virtual display.
-
 ### Presentation
 
 Video scale mode
 : How decoded video is drawn: **Fit** (letterbox), **Fill** (crop), **Stretch** (distort), plus Zoom/Pan from the overlay.
 
+Mouse speed
+: Compact 0.1×–2.0× slider (same 84px track as overlay volume). Also on overlay **Quick** after Mouse.
+
+Zoom / Pan X / Pan Y
+: Compact sliders (1.0–4.0× zoom, −1.0–1.0 pan). Same size as each other and as overlay volume. Overlay **Options** writes them live.
+
 Remember Zoom & Pan
-: Keep zoom and pan between sessions.
+: Keep zoom and pan between sessions. Also on overlay **Options**.
 
 Reset Zoom & Pan
 : Return to 1.0×, centered.
@@ -299,13 +287,15 @@ Tunnel status
 
 ## Stream profiles
 
-Named full settings snapshots with the same sections as Settings (video, presentation, stream, audio, keyboard, mouse, controller, Apollo virtual display / scale). Stored as `profile.json`.
+Named stream snapshots that match the Settings stream fields 1:1: quality (including **Native** resolution, **aspect ratio**, and resolution scale), bitrate, image adjustments, stream/audio, controller, keyboard, mouse (**Touchscreen mode** plus pointer mode), plus Artemis extras (custom resolution, full-range, packet size, scale mode, **Remember Zoom & Pan**, controller/console motion). Stored as `profile.json`. Launch width is derived from profile height plus that profile’s 16:9 / 4:3 setting. Apollo virtual display and scale live on the Host tab, not in the profile editor. Language, host OS, overlay chords, VPN, and Debug stay in Settings only. Editing or assigning a profile does not change global Settings.
+
+On first launch (empty `profile.json`), Artemis seeds eight 30/60 FPS presets: `360p 30 0.5M`, `360p 30 1M`, `720p 30 10M`, `720p 60 10M` (active), `1080p 30 20M`, `1080p 60 20M`, `1080p 60 50M`, `1080p 60 100M`. Existing custom profiles are not replaced. Deleting every profile does not auto-reseed.
 
 Default profile
 : Global fallback when a host has no assigned profile.
 
 Manage profiles
-: Create, rename, duplicate, delete.
+: Create, rename, duplicate, delete. **Add missing defaults** inserts any built-in preset whose name is not already present.
 
 Export / Import profiles
 : Write or read `profile.json`. App list can import/export the same file.
@@ -340,7 +330,13 @@ Search
 
 ### Applications
 
-Game grid plus the stream-profile row. Starting an app uses the selected profile.
+Game grid plus search and refresh. Starting an app uses the selected profile.
+
+Search apps
+: Filter the grid by name (**LB**, or the Search row). Does not hit the host.
+
+Refresh apps
+: **Y** (also the Refresh row). Reconnects, then `GET /applist?uniqueid=…` on the Sunshine/Apollo HTTPS port (usually 47984). Use this after adding or renaming apps in the host web UI. Apollo may also include UUID / input-only entries in that XML.
 
 ### Host
 
@@ -348,7 +344,13 @@ Host web config
 : QR and URL for the Sunshine/Apollo web UI (add apps, see PIN). If QR drawing fails, the URL is still shown.
 
 Stream profile
-: Profile assigned to this host, or **Global settings**. New / Edit / Delete / rename live here.
+: Profile assigned to this host, or **Global settings**. New / Edit / Delete / rename live here. Saving a profile does not change the Settings tab.
+
+Apollo virtual display
+: Per-host Apollo virtual display: Off, current stream size, handheld, docked, portrait, or custom `WIDTHxHEIGHT@HZ`. Not in Settings or stream profiles.
+
+Apollo scale factor
+: Per-host DPI / scale sent to Apollo for that virtual display.
 
 Wake up
 : Send Wake-on-LAN if the host was configured for it.
@@ -362,6 +364,9 @@ Keyboard
 
 Mouse
 : Enter mouse-input mode (next to Keyboard on purpose).
+
+Mouse speed
+: Compact 0.1×–2.0× slider (84px track), directly under Mouse.
 
 Move window left / right
 : Host shortcut to move the focused window to the left or right display. Labels follow **Host device**.
@@ -412,14 +417,20 @@ Scale mode
 Low latency pacing
 : Same as Settings, toggleable during a stream.
 
+Full-range video
+: Same as Settings, applied live by the renderer.
+
+Allow volume amplification
+: Same as Settings. Quick volume max is 100% or 500%.
+
+Remember Zoom & Pan
+: Same as Settings. Persist overlay zoom/pan between sessions.
+
 Zoom / Pan X / Pan Y
-: Manual framing. Reset returns to 1.0× centered.
+: Compact 84px sliders (1.0–4.0× and −1.0–1.0), same size as overlay volume. Reset returns to 1.0× centered.
 
 Guide key
 : Same chord / system-button options as Settings.
-
-Mouse speed
-: Same as Settings.
 
 Image Adjustments
 : Dithering, upscaling, upscaling mode, RCAS — same as Settings.
@@ -428,13 +439,13 @@ Image Adjustments
 
 ## In-stream overlay — Performance
 
-Live telemetry for the current stream. Not persistent settings except Debug at the bottom.
+Live telemetry for the current stream. Hidden when Settings → Debug → **Show Performance tab** is off (default on). Not persistent settings except Debug at the bottom. Stop summary shows score, drop%, FPS p50/p99, decode p99, GPU p99, and queue skips. Save writes the full `BenchmarkSummary` (JSON `stats` plus CSV columns).
 
 | Row | Meaning |
 |---|---|
 | Bitrate | Configured stream bitrate |
 | Switch Wi-Fi | Client Wi-Fi signal; graph under the row |
-| Receive / Decode / Render | Stage latencies |
+| Receive / Decode / Render / GPU render | Stage latencies |
 | Packet loss | Reported loss |
 | Host / Network / Decoder / Rendered FPS | Pipeline frame rates (graphs on network and decoder) |
 | Frame queue | Queued decoded frames |

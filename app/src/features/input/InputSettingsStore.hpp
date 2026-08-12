@@ -12,7 +12,7 @@ public:
 
     const PointerSettings& pointer();
     const std::vector<KeyboardShortcut>& shortcuts();
-    void setPointer(const PointerSettings& settings);
+    void setPointer(const PointerSettings& settings, bool persist = true);
     bool setShortcuts(std::vector<KeyboardShortcut> shortcuts,
                       std::string* error = nullptr);
     void reload();

@@ -13,6 +13,8 @@ inline const char* legacyProfileStoreFilename() {
 }
 
 inline int normalizeProfileHeight(int height) {
+    if (height == -1)
+        return -1;
     constexpr int allowed[] = {360, 480, 540, 720, 1080, 1440};
     int best = 720;
     int bestDistance = std::abs(height - best);

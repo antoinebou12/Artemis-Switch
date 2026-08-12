@@ -28,7 +28,9 @@
         "try_connect": "Tentativo di connessione all'host"
     },
     "app_list": {
-        "reload_app_list": "Ricarica",
+        "reload_app_list": "Aggiorna",
+        "refresh": "Aggiorna app",
+        "refresh_hint": "Elenco Sunshine / Apollo",
         "run_current": "Esegui app corrente",
         "running": "In Esecuzione",
         "star": "Star",
