@@ -5,7 +5,7 @@ Every option in Artemis Switch, with the same labels as the app. Stream profiles
 Bitrate, codec, resolution, and most stream fields apply on the **next** connection. Overlay Options can change a few presentation and input values while a stream is running.
 
 ```{seealso}
-Guided explanations with tables: [What's new](whats-new.md) · [Stream profiles](profiles.md) · [Performance & telemetry](performance.md)
+[What's new](whats-new.md) · [Stream profiles](profiles.md) · [In-stream overlay](overlay.md) · [Performance & telemetry](performance.md) · [Credits](credits.md)
 ```
 
 ## Where settings live
@@ -370,109 +370,16 @@ Wake up
 
 ---
 
-## In-stream overlay — Quick
+## In-stream overlay
 
-Keyboard
-: Open the on-screen keyboard.
+Detailed pages with diagrams (not duplicated here):
 
-Mouse
-: Enter mouse-input mode (next to Keyboard on purpose).
-
-Mouse speed
-: Compact 0.1×–2.0× slider (84px track), directly under Mouse.
-
-Move window left / right
-: Host shortcut to move the focused window to the left or right display. Labels follow **Host device**.
-
-Touch screen
-: **On** or **Off** for touch-as-mouse this session.
-
-Host shortcuts
-: Keyboard presets (Escape, fullscreen, paste, Start/Command/Super, desktop, Game Bar, task switcher, task manager / Force quit, IME switch, and the same move-window actions). Not the same as server commands.
-
-Restart server
-: Matched host command if the host advertises it.
-
-Reset display
-: Matched host command if advertised.
-
-Server commands
-: Apollo host scripts, distinct from keyboard shortcuts.
-
-Volume
-: Client volume. Amplification above 100% requires **Allow volume amplification**.
-
----
-
-## In-stream overlay — Options
-
-Input overlay
-: Extra on-stream input helper.
-
-Keyboard type / Taps to open keyboard
-: Same as Settings → Keyboard.
-
-Pointer mode
-: How touch/mouse pointer is interpreted (trackpad, gaming trackpad, multi-touch, absolute, swapped absolute, or disabled).
-
-Controllers
-: Connected pads, player slots, rumble + motion, rumble tests.
-
-Clipboard
-: Apollo-only fetch / edit / upload / paste of host clipboard text.
-
-Video rotation
-: Rotate the presented video (portrait virtual displays).
-
-Scale mode
-: Same as Settings **Video scale mode**, live.
-
-Low latency pacing
-: Same as Settings, toggleable during a stream.
-
-Full-range video
-: Same as Settings, applied live by the renderer.
-
-Allow volume amplification
-: Same as Settings. Quick volume max is 100% or 500%.
-
-Remember Zoom & Pan
-: Same as Settings. Persist overlay zoom/pan between sessions.
-
-Zoom / Pan X / Pan Y
-: Compact 84px sliders (1.0–4.0× and −1.0–1.0), same size as overlay volume. Reset returns to 1.0× centered.
-
-Guide key
-: Same chord / system-button options as Settings.
-
-Image Adjustments
-: Dithering, upscaling, upscaling mode, RCAS — same as Settings.
-
----
-
-## In-stream overlay — Performance
-
-Live telemetry for the current stream. Hidden when Settings → Debug → **Show Performance tab** is off (default on). Full explanation: **[Performance & telemetry](performance.md)**.
-
-| Row | Meaning |
+| Tab | Page |
 |---|---|
-| Video bitrate | **Actual / configured** Mbps (measured payload vs Settings) |
-| Switch Wi-Fi | Client Wi-Fi signal; graph under the row |
-| Receive latency | Pipeline text: **R · D · Q · G · C** ms |
-| Decode / Render / GPU render | Stage latencies |
-| Packet loss | Recent network drop % |
-| Host / Network / Decoder / Rendered FPS | Pipeline frame rates (graphs on network and decoder) |
-| Frame queue | `depth / target` (+ jitter ms in low-latency mode) |
-| Presentation | Scale mode · Full or Limited |
-| Mode, CPU / GPU / Memory clock, Battery | Switch runtime (read-only) |
-| Benchmark | Start / stop / save / clear; exports queue, bitrate, startup fields |
-| Show debugging view | On-stream debug overlay |
-| On-screen log | Overlay log lines |
+| Overview | [In-stream overlay](overlay.md) |
+| Quick | [Overlay — Quick](overlay-quick.md) |
+| Options | [Overlay — Options](overlay-options.md) |
+| Performance | [Overlay — Performance](overlay-performance.md) |
+| Credits | [Credits](credits.md) |
 
-Debug sits under Stream Performance after Benchmark.
-
----
-
-## Credits for these options
-
-Moonlight-Switch (XITRIX) is the base client. Frame-rate-sync / low-latency pacing is adapted from nyanpasu64’s Moonlight-Switch work ([#323](https://github.com/XITRIX/Moonlight-Switch/issues/323)). Apollo virtual display and related host commands follow Apollo / Artemis Classic behavior.
+Debug (on-stream debug view + log) sits under Performance after Benchmark; see Settings → Debug above.

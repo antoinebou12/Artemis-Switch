@@ -40,7 +40,9 @@ Settings help is on GitHub Pages ([IPC Toolkit](https://ipctk.xyz)-style **blue*
 | [Install](https://antoinebou12.github.io/Artemis-Switch/install.html) | NRO path and title redirection |
 | [Settings](https://antoinebou12.github.io/Artemis-Switch/settings.html) | Full option reference |
 | [Stream profiles](https://antoinebou12.github.io/Artemis-Switch/profiles.html) | Presets, schema, what is stored |
+| [In-stream overlay](https://antoinebou12.github.io/Artemis-Switch/overlay.html) | Quick / Options / Performance (+ UML) |
 | [Performance & telemetry](https://antoinebou12.github.io/Artemis-Switch/performance.html) | Bitrate, pipeline stages, benchmark |
+| [Credits](https://antoinebou12.github.io/Artemis-Switch/credits.html) | Moonlight-Switch, Apollo, #323 |
 
 Source: [`docs/source/`](docs/source/).
 

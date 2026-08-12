@@ -11,7 +11,13 @@ GitHub Pages site for Artemis Switch, in the same shape as [IPC Toolkit](https:/
 | Install | `source/install.md` |
 | Settings (every option) | `source/settings.md` |
 | Stream profiles | `source/profiles.md` |
+| In-stream overlay | `source/overlay.md` |
+| Overlay — Quick | `source/overlay-quick.md` |
+| Overlay — Options | `source/overlay-options.md` |
+| Overlay — Performance | `source/overlay-performance.md` |
 | Performance & telemetry | `source/performance.md` |
+| Credits | `source/credits.md` |
+| Diagrams (UML / Mermaid SVG) | `source/_static/diagrams/` |
 
 ## Build locally
 
