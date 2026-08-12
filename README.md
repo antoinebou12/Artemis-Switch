@@ -43,6 +43,32 @@ Source: [`docs/source/`](docs/source/).
 
 ---
 
+## Recommended host and clients
+
+Hosts and clients are separate. Pick a **server** on the PC, then a **client** on each device. Virtual display, HDR, and monitor power-off are configured on the host web UI, not in this Switch app.
+
+### Host (PC server)
+
+| Host | Notes |
+|---|---|
+| **[Vibepollo](https://github.com/Nonary/Vibepollo)** | **Best results in testing.** Apollo-based host with native virtual displays, HDR handling, and turning physical monitors off when a stream starts. |
+| **[Apollo](https://github.com/ClassicOldSong/Apollo)** | Strong virtual-display host (SudoVDA). Same GameStream path; use the web UI for display options. |
+| [Sunshine](https://github.com/LizardByte/Sunshine) | Compatibility baseline. Works with every Moonlight client; no Apollo-style virtual display extras. |
+
+### Client (device)
+
+| Client | Device | Notes |
+|---|---|---|
+| **[Artemis Switch](https://github.com/antoinebou12/Artemis-Switch)** (this app) | Nintendo Switch | Moonlight-Switch fork with FSR/RCAS, stream profiles, and Switch presentation. |
+| **[Artemide](https://github.com/derflacco/moonlight-android)** | Android | Highly recommended on Android: ultra-low latency (ULL), direct presentation, built-in FSR upscaling. FSR Performance / Balanced / Quality presets inspired this fork. |
+| [Artemis](https://github.com/ClassicOldSong/moonlight-android) (Moonlight Noir) | Android | Apollo’s companion client (virtual display / host UX inspiration). |
+| [Moonlight](https://github.com/moonlight-stream) | PC, Android, iOS, … | Official clients. |
+| [Moonlight V+](https://github.com/qiin2333/moonlight-vplus) | Android | Alternative Android fork (frame-gen and extra host tools). |
+
+**Why this stack:** Vibepollo or Apollo on the PC plus Artemide on Android (and Artemis Switch on the docked/handheld Switch) is the closest to a console-like session: the host creates the virtual display, manages HDR, and can blank physical monitors, while the client stays low-latency and can upscale a smaller stream with FSR.
+
+---
+
 ## Feature overview
 
 | Area | What you get |
@@ -166,7 +192,7 @@ The Performance page exposes live streaming and renderer information:
 ### Architecture
 
 ```text
-Sunshine / Apollo host
+Vibepollo / Apollo / Sunshine host
         │
         │ Moonlight GameStream
         │ + verified Apollo extensions when available
@@ -362,6 +388,7 @@ Sunshine and standard Moonlight/GameStream behavior remain the compatibility bas
 | [XITRIX/Moonlight-Switch](https://github.com/XITRIX/Moonlight-Switch) | Upstream Switch client | Base |
 | [LizardByte/Sunshine](https://github.com/LizardByte/Sunshine) | Standard GameStream host | Host |
 | [ClassicOldSong/Apollo](https://github.com/ClassicOldSong/Apollo) | Sunshine-fork host (gated extensions) | Host |
+| [Nonary/Vibepollo](https://github.com/Nonary/Vibepollo) | Apollo-fork host (virtual display / HDR) | Host |
 | [moonlight-stream](https://github.com/moonlight-stream) | Moonlight ecosystem | Protocol |
 
 ---
@@ -388,8 +415,10 @@ Artemis Switch is a fork of [Moonlight-Switch](https://github.com/XITRIX/Moonlig
 |---|---|---|
 | [XITRIX/Moonlight-Switch](https://github.com/XITRIX/Moonlight-Switch) | Original Switch client (this fork’s base) | Upstream |
 | [ClassicOldSong/Apollo](https://github.com/ClassicOldSong/Apollo) | Sunshine-fork host (capability-gated extensions) | Host |
+| [Nonary/Vibepollo](https://github.com/Nonary/Vibepollo) | Apollo-fork host; best results in testing | Host |
 | [ClassicOldSong/moonlight-android](https://github.com/ClassicOldSong/moonlight-android) | Artemis / Moonlight Noir Android client (UX inspiration) | Client |
-| [derflacco/moonlight-android](https://github.com/derflacco/moonlight-android) | Artemide Android client (FSR Performance / Balanced / Quality preset UX) | Client |
+| [derflacco/moonlight-android](https://github.com/derflacco/moonlight-android) | Artemide Android client (ULL, FSR presets) | Client |
+| [qiin2333/moonlight-vplus](https://github.com/qiin2333/moonlight-vplus) | Moonlight V+ Android client (alternative) | Client |
 | [LizardByte/Sunshine](https://github.com/LizardByte/Sunshine) | Standard GameStream host | Host |
 | [moonlight-stream](https://github.com/moonlight-stream) | Moonlight ecosystem / protocol | Protocol |
 | [Rock88/moonlight-nx](https://github.com/rock88/moonlight-nx) | Moonlight-NX streaming foundations | Legacy |
@@ -398,7 +427,8 @@ Artemis Switch is a fork of [Moonlight-Switch](https://github.com/XITRIX/Moonlig
 
 - **XITRIX** — Moonlight-Switch author and original codebase
 - **ClassicOldSong** — Apollo host and Artemis (Moonlight Noir) client
-- **derflacco** — Artemide FSR Performance / Balanced / Quality presets (client UX inspiration)
+- **Nonary** — Vibepollo host (virtual display / HDR; best results in testing)
+- **derflacco** — Artemide Android client (ULL, FSR Performance / Balanced / Quality)
 - **Rock88** / Moonlight-NX — streaming foundations reused in Moonlight-Switch
 - **Natinusala** / **Xfangfang** — Borealis (including later ports)
 - **Moonlight team** — GameStream client and protocol work
