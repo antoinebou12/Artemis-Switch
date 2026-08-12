@@ -36,10 +36,7 @@ class AppListView : public Box {
     View* hintView = nullptr;
     DetailCell* webConfig = nullptr;
     DetailCell* streamProfile = nullptr;
-    DetailCell* apolloVirtualDisplay = nullptr;
-    DetailCell* apolloScaleFactor = nullptr;
     DetailCell* appSearch = nullptr;
-    DetailCell* appRefresh = nullptr;
     Sidebar* sidebar = nullptr;
     Box* contentColumn = nullptr;
     Box* appsContainer = nullptr;
@@ -68,6 +65,5 @@ class AppListView : public Box {
     void bindAppListRefresh(View* view);
     void updateFavoriteAction(AppCell* cell, Host host, const AppInfo& app);
     void refreshStreamProfileLabel();
-    void refreshApolloHostOptions();
     void refreshWebConfigVisibility();
 };

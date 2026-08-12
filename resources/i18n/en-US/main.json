@@ -19,7 +19,7 @@
         "thanks_6": " Everyone involved into app development",
         "thanks_7": " You, for using my homebrew!",
         "thanks_community": "Moonlight-Switch community ideas",
-        "thanks_community_body": "Feature ideas credited to Moonlight-Switch issue reporters (implementations in this fork):\n #110 benwa — Swap X/Y for starring\n #195 orcavia — Disable swipe-to-open overlay\n #163 antegorov — Swap mouse-mode sticks\n #70 xyourmomx — Profiles / multi-endpoint hosts\n #112 xenophobentx — 5.1 surround audio\n #295 linckosz — FSR-like upscaling\n #254 JoJuStudio / #250 bengrahamreview / #144 MetalGooseSolid — WireGuard / remote VPN\n #24 windraver / #165 Msv777 — Terminate host app on disconnect\n #252 Befeeter — Experimental AV1\n #58 gcseed — Debug overlay corner\n #239 HackZy01 / #283 AquaSteam — Language and keyboard\n #266 Moby812 — Virtual display (Apollo)\nFull links are in the repository README Credits section.",
+        "thanks_community_body": "Feature ideas credited to Moonlight-Switch issue reporters (implementations in this fork):\n #110 benwa — Swap X/Y for starring\n #195 orcavia — Disable swipe-to-open overlay\n #163 antegorov — Swap mouse-mode sticks\n #70 xyourmomx — Profiles / multi-endpoint hosts\n #112 xenophobentx — 5.1 surround audio\n #295 linckosz — FSR-like upscaling\n #254 JoJuStudio / #250 bengrahamreview / #144 MetalGooseSolid — WireGuard / remote VPN\n #24 windraver / #165 Msv777 — Terminate host app on disconnect\n #252 Befeeter — Experimental AV1\n #58 gcseed — Debug overlay corner\n #239 HackZy01 / #283 AquaSteam — Language and keyboard\n #266 Moby812 — Virtual display (Apollo)\n derflacco/moonlight-android (Artemide) — FSR Performance / Balanced / Quality presets\nFull links are in the repository README Credits section.",
         "title": "About",
         "version": "Artemis Switch v{} by antoinebou12"
     },
@@ -127,7 +127,11 @@
             "profile_section_audio": "Audio",
             "profile_section_keyboard": "Keyboard",
             "profile_section_mouse": "Mouse",
-            "profile_section_controller": "Controller"
+            "profile_section_controller": "Controller",
+            "fsr_preset": "FSR preset",
+            "fsr_preset_performance": "Performance",
+            "fsr_preset_balanced": "Balanced",
+            "fsr_preset_quality": "Quality"
         },
         "overlay": {
             "options": "Options",

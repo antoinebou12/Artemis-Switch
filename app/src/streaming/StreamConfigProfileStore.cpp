@@ -1,5 +1,6 @@
 #include "StreamConfigProfileStore.hpp"
 
+#include "FsrPreset.hpp"
 #include "StreamConfigProfileNormalize.hpp"
 #include "DefaultStreamProfiles.hpp"
 #include "StreamProfileStore.hpp"
@@ -180,6 +181,7 @@ json_t* profileToJson(const StreamConfigProfile& profile) {
     json_object_set_new(item, "rcas", profile.rcas ? json_true() : json_false());
     json_object_set_new(item, "rcas_strength",
                         json_real(static_cast<double>(profile.rcasStrength)));
+    json_object_set_new(item, "fsr_preset", json_integer(profile.fsrPreset));
 
     json_object_set_new(item, "stream_audio_configuration",
                         json_integer(static_cast<int>(
@@ -327,6 +329,9 @@ StreamConfigProfile profileFromJson(json_t* object) {
     profile.rcasStrength =
         jsonToFloat(json_object_get(object, "rcas_strength"),
                     profile.rcasStrength);
+    if (json_t* fsrPreset = json_object_get(object, "fsr_preset");
+        json_is_integer(fsrPreset))
+        profile.fsrPreset = static_cast<int>(json_integer_value(fsrPreset));
 
     if (json_t* audio = json_object_get(object, "stream_audio_configuration");
         json_is_integer(audio))
@@ -528,6 +533,8 @@ StreamConfigProfile normalizeProfile(StreamConfigProfile profile) {
     profile.ditheringStrength =
         std::clamp(profile.ditheringStrength, 1.0f, 10.0f);
     profile.rcasStrength = std::clamp(profile.rcasStrength, 0.0f, 1.0f);
+    profile.fsrPreset =
+        static_cast<int>(normalizeFsrPreset(profile.fsrPreset));
     profile.deadzoneLeft = std::clamp(profile.deadzoneLeft, 0.0f, 1.0f);
     profile.deadzoneRight = std::clamp(profile.deadzoneRight, 0.0f, 1.0f);
     profile.rumbleForce = std::clamp(profile.rumbleForce, 0.0f, 1.0f);

@@ -255,6 +255,12 @@
             "touch_disabled": "觸控關閉",
             "move_window_left_hint": "",
             "move_window_right_hint": ""
+        },
+        "settings": {
+            "fsr_preset": "FSR preset",
+            "fsr_preset_performance": "Performance",
+            "fsr_preset_balanced": "Balanced",
+            "fsr_preset_quality": "Quality"
         }
     }
 }

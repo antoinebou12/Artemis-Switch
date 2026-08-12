@@ -46,6 +46,8 @@ struct StreamConfigProfile {
     float ditheringStrength = 3.0f;
     bool rcas = true;
     float rcasStrength = 0.2f;
+    // 0 = Off. Named presets write upscalingMode + rcas* in the editor.
+    int fsrPreset = 0;
 
     // Motion (Artemis Settings)
     bool forwardMotion = true;
@@ -94,7 +96,7 @@ struct StreamConfigProfile {
 
 class StreamConfigProfileStore {
 public:
-    static constexpr int SchemaVersion = 11;
+    static constexpr int SchemaVersion = 12;
     static StreamConfigProfileStore& instance();
 
     const std::vector<StreamConfigProfile>& list();

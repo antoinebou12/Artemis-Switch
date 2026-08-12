@@ -22,7 +22,6 @@
 #include "features/input/ControllerDiagnostics.hpp"
 #include "features/input/InputSettingsStore.hpp"
 #include "features/input/HostKeyboardShortcuts.hpp"
-#include "features/apollo/ApolloHostOptionsStore.hpp"
 #include "features/apollo/ServerCommandShortcuts.hpp"
 #include "features/stream/AdvancedStreamOptionsStore.hpp"
 #include "features/video/DisplayTransformStore.hpp"
@@ -97,23 +96,6 @@ std::string scaleModeText(artemis::video::ScaleMode mode) {
     default:
         return "artemis/settings/fill"_i18n;
     }
-}
-
-std::string virtualDisplayTargetText(
-    artemis::apollo::VirtualDisplayTarget target) {
-    using Target = artemis::apollo::VirtualDisplayTarget;
-    switch (target) {
-    case Target::Off: return "artemis/overlay/vd_off"_i18n;
-    case Target::CurrentProfile: return "artemis/overlay/vd_current"_i18n;
-    case Target::Handheld: return "artemis/overlay/vd_handheld"_i18n;
-    case Target::Docked: return "artemis/overlay/vd_docked"_i18n;
-    case Target::PortraitHandheld:
-        return "artemis/overlay/vd_portrait_handheld"_i18n;
-    case Target::PortraitDocked:
-        return "artemis/overlay/vd_portrait_docked"_i18n;
-    case Target::Custom: return "artemis/overlay/vd_custom"_i18n;
-    }
-    return "artemis/overlay/vd_off"_i18n;
 }
 
 std::string rotationText(artemis::video::Rotation rotation) {

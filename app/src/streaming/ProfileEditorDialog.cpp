@@ -4,6 +4,7 @@
 
 #include "ProfileEditorDialog.hpp"
 
+#include "FsrPreset.hpp"
 #include "StreamConfigProfileNormalize.hpp"
 #include "features/input/PointerSettings.hpp"
 #include "features/input/SwitchMotionPolicy.hpp"
@@ -13,6 +14,7 @@
 #include "views/boolean_slider_cell.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <borealis.hpp>
 #include <fmt/format.h>
 #include <functional>
@@ -25,6 +27,8 @@ using namespace brls::literals;
 
 namespace artemis::streaming {
 namespace {
+
+static_assert(kFsrPresetUpscalingFsr1 == UPSCALING_FSR1);
 
 void addHeader(brls::Box* content, const std::string& title,
                float paddingTop = 60.0f) {
@@ -187,24 +191,78 @@ void addDitheringCell(brls::Box* content, StreamConfigProfile* draft) {
     content->addView(cell);
 }
 
-void addRcasCell(brls::Box* content, StreamConfigProfile* draft) {
+BooleanSliderCell* addRcasCell(brls::Box* content, StreamConfigProfile* draft,
+                               const std::function<void()>& onUserEdit) {
     auto* cell = new BooleanSliderCell();
-    cell->init("settings/rcas_sharpening"_i18n, draft->rcas, [draft, cell](bool on) {
-        draft->rcas = on;
-        cell->setSliderVisibility(on ? brls::Visibility::VISIBLE
-                                     : brls::Visibility::GONE);
-    });
+    cell->init("settings/rcas_sharpening"_i18n, draft->rcas,
+               [draft, cell, onUserEdit](bool on) {
+                   draft->rcas = on;
+                   cell->setSliderVisibility(on ? brls::Visibility::VISIBLE
+                                                : brls::Visibility::GONE);
+                   if (onUserEdit)
+                       onUserEdit();
+               });
     cell->setProgress(std::clamp(draft->rcasStrength, 0.0f, 1.0f));
     cell->setValueText(
         fmt::format("{:.0f}%", draft->rcasStrength * 100.0f));
     cell->setSliderVisibility(draft->rcas ? brls::Visibility::VISIBLE
                                           : brls::Visibility::GONE);
-    cell->getProgressEvent()->subscribe([draft, cell](float p) {
+    cell->getProgressEvent()->subscribe([draft, cell, onUserEdit](float p) {
         draft->rcasStrength = std::clamp(p, 0.0f, 1.0f);
         cell->setValueText(
             fmt::format("{:.0f}%", draft->rcasStrength * 100.0f));
+        if (onUserEdit)
+            onUserEdit();
     });
     content->addView(cell);
+    return cell;
+}
+
+void syncRcasCell(BooleanSliderCell* cell, const StreamConfigProfile& draft) {
+    cell->setOn(draft.rcas);
+    cell->setProgress(std::clamp(draft.rcasStrength, 0.0f, 1.0f));
+    cell->setValueText(
+        fmt::format("{:.0f}%", draft.rcasStrength * 100.0f));
+    cell->setSliderVisibility(draft.rcas ? brls::Visibility::VISIBLE
+                                         : brls::Visibility::GONE);
+}
+
+std::string fsrPresetLabel(int preset) {
+    switch (normalizeFsrPreset(preset)) {
+    case FsrPreset::Performance:
+        return "artemis/settings/fsr_preset_performance"_i18n;
+    case FsrPreset::Balanced:
+        return "artemis/settings/fsr_preset_balanced"_i18n;
+    case FsrPreset::Quality:
+        return "artemis/settings/fsr_preset_quality"_i18n;
+    case FsrPreset::Off:
+    default:
+        return "hints/off"_i18n;
+    }
+}
+
+void setFsrPresetRowEnabled(brls::DetailCell* cell, bool enabled) {
+    cell->setFocusable(enabled);
+    brls::Theme theme = brls::Application::getTheme();
+    cell->title->setTextColor(enabled ? theme["brls/text"]
+                                      : theme["brls/text_disabled"]);
+    cell->setDetailTextColor(enabled
+                                 ? theme["brls/list/listItem_value_color"]
+                                 : theme["brls/text_disabled"]);
+}
+
+void maybeClearFsrPreset(StreamConfigProfile* draft, brls::DetailCell* cell) {
+    if (draft->fsrPreset == 0)
+        return;
+    FsrPresetValues expected;
+    if (!fsrPresetValues(normalizeFsrPreset(draft->fsrPreset), &expected))
+        return;
+    if (static_cast<int>(draft->upscalingMode) == expected.upscalingMode &&
+        draft->rcas == expected.rcas &&
+        std::abs(draft->rcasStrength - expected.rcasStrength) < 0.001f)
+        return;
+    draft->fsrPreset = 0;
+    cell->setDetailText(fsrPresetLabel(0));
 }
 
 std::string heightLabel(int height) {
@@ -598,7 +656,20 @@ void openProfileEditor(const std::string& profileId,
     addDitheringCell(content, draft);
     auto* upscaleCell =
         addDetail(content, "settings/upscaling"_i18n, upscalingLabel(draft->upscalingMode));
-    upscaleCell->registerClickAction([draft, upscaleCell](brls::View*) {
+    auto* fsrPresetCell =
+        addDetail(content, "artemis/settings/fsr_preset"_i18n,
+                  fsrPresetLabel(draft->fsrPreset));
+    auto updateFsrPresetEnabled = [draft, fsrPresetCell]() {
+        setFsrPresetRowEnabled(
+            fsrPresetCell,
+            fsrPresetSelectable(static_cast<int>(draft->upscalingMode)));
+    };
+    updateFsrPresetEnabled();
+    auto* rcasCell = addRcasCell(content, draft, [draft, fsrPresetCell]() {
+        maybeClearFsrPreset(draft, fsrPresetCell);
+    });
+    upscaleCell->registerClickAction(
+        [draft, upscaleCell, fsrPresetCell, updateFsrPresetEnabled](brls::View*) {
         const std::vector<std::string> options = {
             "hints/off"_i18n, "FSR1", "SGSR1", "NIS"};
         int selected = 0;
@@ -618,19 +689,64 @@ void openProfileEditor(const std::string& profileId,
         }
         auto* dropdown = new brls::Dropdown(
             "settings/upscaling"_i18n, options,
-            [draft, upscaleCell](int index) {
+            [draft, upscaleCell, fsrPresetCell,
+             updateFsrPresetEnabled](int index) {
                 draft->upscalingMode =
                     index == 1   ? UPSCALING_FSR1
                     : index == 2 ? UPSCALING_SGSR1
                     : index == 3 ? UPSCALING_NIS
                                  : UPSCALING_OFF;
+                if (draft->upscalingMode == UPSCALING_OFF)
+                    draft->fsrPreset = 0;
                 upscaleCell->setDetailText(upscalingLabel(draft->upscalingMode));
+                fsrPresetCell->setDetailText(fsrPresetLabel(draft->fsrPreset));
+                updateFsrPresetEnabled();
             },
             selected);
         brls::Application::pushActivity(new brls::Activity(dropdown));
         return true;
     });
-    addRcasCell(content, draft);
+    fsrPresetCell->registerClickAction(
+        [draft, upscaleCell, fsrPresetCell, rcasCell,
+         updateFsrPresetEnabled](brls::View*) {
+        if (!fsrPresetSelectable(static_cast<int>(draft->upscalingMode)))
+            return false;
+        const std::vector<FsrPreset> values = {
+            FsrPreset::Off, FsrPreset::Performance, FsrPreset::Balanced,
+            FsrPreset::Quality};
+        std::vector<std::string> options;
+        int selected = 0;
+        const auto current = normalizeFsrPreset(draft->fsrPreset);
+        for (size_t i = 0; i < values.size(); ++i) {
+            options.push_back(fsrPresetLabel(static_cast<int>(values[i])));
+            if (values[i] == current)
+                selected = static_cast<int>(i);
+        }
+        auto* dropdown = new brls::Dropdown(
+            "artemis/settings/fsr_preset"_i18n, options,
+            [draft, upscaleCell, fsrPresetCell, rcasCell,
+             updateFsrPresetEnabled, values](int index) {
+                if (index < 0 || index >= static_cast<int>(values.size()))
+                    return;
+                draft->fsrPreset = static_cast<int>(values[static_cast<size_t>(index)]);
+                int mode = static_cast<int>(draft->upscalingMode);
+                bool rcas = draft->rcas;
+                float strength = draft->rcasStrength;
+                if (applyFsrPreset(draft->fsrPreset, &mode, &rcas, &strength)) {
+                    draft->upscalingMode = static_cast<UpscalingMode>(mode);
+                    draft->rcas = rcas;
+                    draft->rcasStrength = strength;
+                    upscaleCell->setDetailText(
+                        upscalingLabel(draft->upscalingMode));
+                    syncRcasCell(rcasCell, *draft);
+                }
+                fsrPresetCell->setDetailText(fsrPresetLabel(draft->fsrPreset));
+                updateFsrPresetEnabled();
+            },
+            selected);
+        brls::Application::pushActivity(new brls::Activity(dropdown));
+        return true;
+    });
 
     auto* scaleCell = addDetail(content, "artemis/settings/video_scale_mode"_i18n,
                                 scaleLabel(draft->scaleMode));

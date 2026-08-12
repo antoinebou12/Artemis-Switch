@@ -19,6 +19,10 @@ void BooleanSliderCell::init(const std::string& title, bool isOn,
     updateTitle();
 }
 
+void BooleanSliderCell::setOn(bool on) {
+    toggle->setOn(on, false);
+}
+
 void BooleanSliderCell::setValueText(const std::string& text) {
     valueText = text;
     updateTitle();

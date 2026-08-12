@@ -19,7 +19,7 @@
         "thanks_6": " Tous ceux qui développent des Apps",
         "thanks_7": " Vous, pour utiliser cet homebrew !",
         "thanks_community": "Idées de la communauté Moonlight-Switch",
-        "thanks_community_body": "Idées issues des signalements Moonlight-Switch (implémentations dans ce fork) :\n #110 benwa — Échanger X/Y pour les favoris\n #195 orcavia — Désactiver le swipe de l'overlay\n #163 antegorov — Échanger les sticks en mode souris\n #70 xyourmomx — Profils / hôtes multi-adresses\n #112 xenophobentx — Audio surround 5.1\n #295 linckosz — Upscaling type FSR\n #254 JoJuStudio / #250 bengrahamreview / #144 MetalGooseSolid — WireGuard / VPN distant\n #24 windraver / #165 Msv777 — Quitter l'app hôte à la déconnexion\n #252 Befeeter — AV1 expérimental\n #58 gcseed — Coin de l'overlay de debug\n #239 HackZy01 / #283 AquaSteam — Langue et clavier\n #266 Moby812 — Affichage virtuel (Apollo)\nLiens complets dans la section Credits du README du dépôt.",
+        "thanks_community_body": "Idées issues des signalements Moonlight-Switch (implémentations dans ce fork) :\n #110 benwa — Échanger X/Y pour les favoris\n #195 orcavia — Désactiver le swipe de l'overlay\n #163 antegorov — Échanger les sticks en mode souris\n #70 xyourmomx — Profils / hôtes multi-adresses\n #112 xenophobentx — Audio surround 5.1\n #295 linckosz — Upscaling type FSR\n #254 JoJuStudio / #250 bengrahamreview / #144 MetalGooseSolid — WireGuard / VPN distant\n #24 windraver / #165 Msv777 — Quitter l'app hôte à la déconnexion\n #252 Befeeter — AV1 expérimental\n #58 gcseed — Coin de l'overlay de debug\n #239 HackZy01 / #283 AquaSteam — Langue et clavier\n #266 Moby812 — Affichage virtuel (Apollo)\n derflacco/moonlight-android (Artemide) — Préréglages FSR Performance / Équilibré / Qualité\nLiens complets dans la section Credits du README du dépôt.",
         "title": "À propos",
         "version": "Artemis Switch v{} par antoinebou12"
     },
@@ -127,7 +127,11 @@
             "profile_section_audio": "Audio",
             "profile_section_keyboard": "Clavier",
             "profile_section_mouse": "Souris",
-            "profile_section_controller": "Manette"
+            "profile_section_controller": "Manette",
+            "fsr_preset": "Préréglage FSR",
+            "fsr_preset_performance": "Performance",
+            "fsr_preset_balanced": "Équilibré",
+            "fsr_preset_quality": "Qualité"
         },
         "overlay": {
             "options": "Options",

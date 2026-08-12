@@ -389,6 +389,7 @@ Artemis Switch is a fork of [Moonlight-Switch](https://github.com/XITRIX/Moonlig
 | [XITRIX/Moonlight-Switch](https://github.com/XITRIX/Moonlight-Switch) | Original Switch client (this fork’s base) | Upstream |
 | [ClassicOldSong/Apollo](https://github.com/ClassicOldSong/Apollo) | Sunshine-fork host (capability-gated extensions) | Host |
 | [ClassicOldSong/moonlight-android](https://github.com/ClassicOldSong/moonlight-android) | Artemis / Moonlight Noir Android client (UX inspiration) | Client |
+| [derflacco/moonlight-android](https://github.com/derflacco/moonlight-android) | Artemide Android client (FSR Performance / Balanced / Quality preset UX) | Client |
 | [LizardByte/Sunshine](https://github.com/LizardByte/Sunshine) | Standard GameStream host | Host |
 | [moonlight-stream](https://github.com/moonlight-stream) | Moonlight ecosystem / protocol | Protocol |
 | [Rock88/moonlight-nx](https://github.com/rock88/moonlight-nx) | Moonlight-NX streaming foundations | Legacy |
@@ -397,6 +398,7 @@ Artemis Switch is a fork of [Moonlight-Switch](https://github.com/XITRIX/Moonlig
 
 - **XITRIX** — Moonlight-Switch author and original codebase
 - **ClassicOldSong** — Apollo host and Artemis (Moonlight Noir) client
+- **derflacco** — Artemide FSR Performance / Balanced / Quality presets (client UX inspiration)
 - **Rock88** / Moonlight-NX — streaming foundations reused in Moonlight-Switch
 - **Natinusala** / **Xfangfang** — Borealis (including later ports)
 - **Moonlight team** — GameStream client and protocol work

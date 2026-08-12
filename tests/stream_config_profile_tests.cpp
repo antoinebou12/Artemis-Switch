@@ -1,4 +1,5 @@
 #include "DefaultStreamProfiles.hpp"
+#include "FsrPreset.hpp"
 #include "StreamAspectRatio.hpp"
 #include "StreamConfigProfileNormalize.hpp"
 
@@ -62,7 +63,7 @@ int main() {
     assert(profile.rumbleForce <= 1.0f + 1e-6f);
     assert(profile.name == "Profile");
 
-    assert(kDefaultStreamProfiles.size() == 8);
+    assert(kDefaultStreamProfiles.size() == 13);
     assert(std::strcmp(kDefaultActiveProfileName, "720p 60 10M") == 0);
     assert(isDefaultProfileName(kDefaultActiveProfileName));
 
@@ -70,22 +71,29 @@ int main() {
     std::set<int> bitrates;
     for (const auto& spec : kDefaultStreamProfiles) {
         assert(spec.fps == 30 || spec.fps == 60);
-        assert(spec.height == 360 || spec.height == 720 || spec.height == 1080);
+        assert(spec.height == 360 || spec.height == 480 || spec.height == 540 ||
+               spec.height == 720 || spec.height == 1080);
         names.insert(spec.name);
         bitrates.insert(spec.bitrateKbps);
     }
-    assert(names.size() == 8);
+    assert(names.size() == 13);
     assert(names.count("360p 30 0.5M") == 1);
     assert(names.count("360p 30 1M") == 1);
+    assert(names.count("480p 30 5M") == 1);
+    assert(names.count("480p 60 10M") == 1);
+    assert(names.count("540p 30 5M") == 1);
+    assert(names.count("540p 60 10M") == 1);
     assert(names.count("720p 30 10M") == 1);
     assert(names.count("720p 60 10M") == 1);
+    assert(names.count("720p 60 20M") == 1);
     assert(names.count("1080p 30 20M") == 1);
     assert(names.count("1080p 60 20M") == 1);
     assert(names.count("1080p 60 50M") == 1);
     assert(names.count("1080p 60 100M") == 1);
     assert(names.count("720p 4:3") == 0);
     assert(names.count("360p remote") == 0);
-    const std::set<int> expectedBitrates{500, 1000, 10000, 20000, 50000, 100000};
+    const std::set<int> expectedBitrates{500, 1000, 5000, 10000, 20000, 50000,
+                                         100000};
     assert(bitrates == expectedBitrates);
 
     std::vector<std::string> existing;
@@ -99,6 +107,42 @@ int main() {
     const auto missing = missingDefaultProfiles(existing);
     assert(missing.size() == 1);
     assert(std::strcmp(missing.front().name, "720p 60 10M") == 0);
+
+    assert(normalizeFsrPreset(0) == FsrPreset::Off);
+    assert(normalizeFsrPreset(99) == FsrPreset::Off);
+    assert(normalizeFsrPreset(-1) == FsrPreset::Off);
+    assert(normalizeFsrPreset(1) == FsrPreset::Performance);
+    assert(normalizeFsrPreset(2) == FsrPreset::Balanced);
+    assert(normalizeFsrPreset(3) == FsrPreset::Quality);
+    assert(!fsrPresetSelectable(0));
+    assert(fsrPresetSelectable(kFsrPresetUpscalingFsr1));
+
+    int mode = 0;
+    bool rcas = false;
+    float strength = 0.0f;
+    assert(!applyFsrPreset(static_cast<int>(FsrPreset::Off), &mode, &rcas,
+                           &strength));
+    assert(mode == 0);
+    assert(!rcas);
+    assert(strength == 0.0f);
+
+    assert(applyFsrPreset(static_cast<int>(FsrPreset::Performance), &mode, &rcas,
+                          &strength));
+    assert(mode == kFsrPresetUpscalingFsr1);
+    assert(rcas);
+    assert(strength == 0.50f);
+
+    assert(applyFsrPreset(static_cast<int>(FsrPreset::Balanced), &mode, &rcas,
+                          &strength));
+    assert(mode == kFsrPresetUpscalingFsr1);
+    assert(rcas);
+    assert(strength == 0.35f);
+
+    assert(applyFsrPreset(static_cast<int>(FsrPreset::Quality), &mode, &rcas,
+                          &strength));
+    assert(mode == kFsrPresetUpscalingFsr1);
+    assert(rcas);
+    assert(strength == 0.20f);
 
     return 0;
 }

@@ -287,9 +287,9 @@ Tunnel status
 
 ## Stream profiles
 
-Named stream snapshots that match the Settings stream fields 1:1: quality (including **Native** resolution, **aspect ratio**, and resolution scale), bitrate, image adjustments, stream/audio, controller, keyboard, mouse (**Touchscreen mode** plus pointer mode), plus Artemis extras (custom resolution, full-range, packet size, scale mode, **Remember Zoom & Pan**, controller/console motion). Stored as `profile.json`. Launch width is derived from profile height plus that profile’s 16:9 / 4:3 setting. Apollo virtual display and scale live on the Host tab, not in the profile editor. Language, host OS, overlay chords, VPN, and Debug stay in Settings only. Editing or assigning a profile does not change global Settings.
+Named stream snapshots that match the Settings stream fields 1:1: quality (including **Native** resolution, **aspect ratio**, and resolution scale), bitrate, image adjustments, stream/audio, controller, keyboard, mouse (**Touchscreen mode** plus pointer mode), plus Artemis extras (custom resolution, full-range, packet size, scale mode, **Remember Zoom & Pan**, controller/console motion). Stored as `profile.json`. Launch width is derived from profile height plus that profile’s 16:9 / 4:3 setting. **FSR preset** (Off / Performance / Balanced / Quality) is profile-only and default Off; named presets write existing FSR1 (EASU) plus RCAS strength and are greyed out while upscaling is Off. Language, host OS, overlay chords, VPN, and Debug stay in Settings only. Editing or assigning a profile does not change global Settings.
 
-On first launch (empty `profile.json`), Artemis seeds eight 30/60 FPS presets: `360p 30 0.5M`, `360p 30 1M`, `720p 30 10M`, `720p 60 10M` (active), `1080p 30 20M`, `1080p 60 20M`, `1080p 60 50M`, `1080p 60 100M`. Existing custom profiles are not replaced. Deleting every profile does not auto-reseed.
+On first launch (empty `profile.json`), Artemis seeds thirteen 30/60 FPS presets: `360p 30 0.5M`, `360p 30 1M`, `480p 30 5M`, `480p 60 10M`, `540p 30 5M`, `540p 60 10M`, `720p 30 10M`, `720p 60 10M` (active), `720p 60 20M`, `1080p 30 20M`, `1080p 60 20M`, `1080p 60 50M`, `1080p 60 100M`. Existing custom profiles are not replaced. Deleting every profile does not auto-reseed. Virtual display and scale stay on the Sunshine/Apollo host web UI.
 
 Default profile
 : Global fallback when a host has no assigned profile.
@@ -330,13 +330,13 @@ Search
 
 ### Applications
 
-Game grid plus search and refresh. Starting an app uses the selected profile.
+Game grid plus search. Starting an app uses the selected profile.
 
 Search apps
 : Filter the grid by name (**LB**, or the Search row). Does not hit the host.
 
 Refresh apps
-: **Y** (also the Refresh row). Reconnects, then `GET /applist?uniqueid=…` on the Sunshine/Apollo HTTPS port (usually 47984). Use this after adding or renaming apps in the host web UI. Apollo may also include UUID / input-only entries in that XML.
+: **Y**. Reconnects, then `GET /applist?uniqueid=…` on the Sunshine/Apollo HTTPS port (usually 47984). Use this after adding or renaming apps in the host web UI. Apollo may also include UUID / input-only entries in that XML.
 
 ### Host
 
@@ -345,12 +345,6 @@ Host web config
 
 Stream profile
 : Profile assigned to this host, or **Global settings**. New / Edit / Delete / rename live here. Saving a profile does not change the Settings tab.
-
-Apollo virtual display
-: Per-host Apollo virtual display: Off, current stream size, handheld, docked, portrait, or custom `WIDTHxHEIGHT@HZ`. Not in Settings or stream profiles.
-
-Apollo scale factor
-: Per-host DPI / scale sent to Apollo for that virtual display.
 
 Wake up
 : Send Wake-on-LAN if the host was configured for it.
