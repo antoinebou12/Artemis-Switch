@@ -6,9 +6,13 @@ namespace artemis::performance {
 
 struct LitePerformanceSnapshot {
     double networkMbps = 0.0;
+    double configuredMbps = 0.0;
     double receiveLatencyMs = 0.0;
     double decodeLatencyMs = 0.0;
     double renderLatencyMs = 0.0;
+    double queueWaitMs = 0.0;
+    double clientPipelineMs = 0.0;
+    double queueJitterMs = 0.0;
     double packetLossPercent = 0.0;
     double hostFps = 0.0;
     double receivedFps = 0.0;

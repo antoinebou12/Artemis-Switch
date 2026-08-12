@@ -24,6 +24,7 @@
 #include "http.h"
 #include "../features/host/HostAddressParse.hpp"
 #include "../features/stream/FrameRateOptions.hpp"
+#include "../host/GameStreamHostCapabilities.hpp"
 #include <Limelight.h>
 #include <borealis/core/logger.hpp>
 #include <errno.h>
@@ -66,9 +67,8 @@ bool _SERVER_DATA::isSunshine() const {
 }
 
 bool _SERVER_DATA::isApollo() const {
-    return virtualDisplayCapable || virtualDisplayDriverReady ||
-           hasApolloPermissionField || !serverCommands.empty() ||
-           !currentGameUuid.empty();
+    return artemis::host::detectServerCapabilities(*this).kind ==
+           artemis::host::HostKind::Apollo;
 }
 
 static int load_serverinfo(PSERVER_DATA server, bool https) {

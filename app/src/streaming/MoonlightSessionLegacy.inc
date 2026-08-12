@@ -1,5 +1,6 @@
 #include "MoonlightSession.hpp"
 #include "AVFrameHolder.hpp"
+#include "FramePipelineTelemetry.hpp"
 #include "GameStreamClient.hpp"
 #include "InputManager.hpp"
 #include "Settings.hpp"
@@ -444,6 +445,11 @@ void MoonlightSession::draw(NVGcontext* vg, int width, int height) {
             [this, vg, width, height](AVFrame* frame) {
                 m_video_renderer->draw(vg, width, height, frame, m_video_format);
             });
+
+        const auto pipe =
+            artemis::streaming::FramePipelineTelemetry::instance().snapshot();
+        AVFrameHolder::instance().updatePresentCostMs(
+            pipe.renderMsP95, pipe.gpuSubmitMsP95, pipe.havePresentCostSamples);
 
         const uint64_t now = LiGetMillis();
         if (m_last_stats_update_ms == 0 || now - m_last_stats_update_ms >= 250) {

@@ -84,9 +84,17 @@ BenchmarkSummary BenchmarkAccumulator::summarize() const {
     result.renderMs = summarizeValues(collect(m_samples, [](const auto& s){ return s.renderMs; }));
     result.gpuRenderMs = summarizeValues(collect(m_samples, [](const auto& s){ return s.gpuRenderMs; }));
     result.clientProcessingMs = summarizeValues(collect(m_samples, [](const auto& s){
+        if (s.clientPipelineMs > 0.0f)
+            return static_cast<double>(s.clientPipelineMs);
         return static_cast<double>(s.receiveMs) + static_cast<double>(s.decodeMs) +
                static_cast<double>(s.decoderDelayMs) + static_cast<double>(s.renderMs);
     }));
+    result.queueDepth = summarizeValues(collect(m_samples, [](const auto& s){ return s.queueDepth; }));
+    result.queueJitterMs = summarizeValues(collect(m_samples, [](const auto& s){ return s.queueJitterMs; }));
+    result.queueWaitMs = summarizeValues(collect(m_samples, [](const auto& s){ return s.queueWaitMs; }));
+    result.clientPipelineMs = summarizeValues(collect(m_samples, [](const auto& s){ return s.clientPipelineMs; }));
+    result.presentIntervalMs = summarizeValues(collect(m_samples, [](const auto& s){ return s.presentIntervalMs; }));
+    result.actualVideoMbps = summarizeValues(collect(m_samples, [](const auto& s){ return s.actualVideoMbps; }));
 
     const auto& first = m_samples.front();
     const auto& last = m_samples.back();
@@ -105,6 +113,9 @@ BenchmarkSummary BenchmarkAccumulator::summarize() const {
     result.queueOverflowDrops = deltaCounter(first.queueOverflowDrops, last.queueOverflowDrops);
     result.queuePacingSkips = deltaCounter(first.queuePacingSkips, last.queuePacingSkips);
     result.queueResyncs = deltaCounter(first.queueResyncs, last.queueResyncs);
+    result.timeToFirstPacketMs = last.timeToFirstPacketMs;
+    result.timeToFirstDecodeMs = last.timeToFirstDecodeMs;
+    result.timeToFirstPresentMs = last.timeToFirstPresentMs;
     result.stabilityScore = calculateStabilityScore(result, m_targetFps);
     return result;
 }

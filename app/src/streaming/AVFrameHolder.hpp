@@ -20,6 +20,9 @@ extern "C" {
 // so that pop() can release this frame at the right moment.
 struct TimedFrame {
     std::chrono::steady_clock::time_point timeEstimate{};
+    std::chrono::steady_clock::time_point networkComplete{};
+    std::chrono::steady_clock::time_point decodeDone{};
+    std::chrono::steady_clock::time_point queued{};
     AVFrame* frame = nullptr;
 };
 
@@ -59,6 +62,10 @@ public:
     [[nodiscard]] double getEstimatedSourceFps() const;
     // Low-latency jitter estimate in milliseconds (0 when legacy path is active).
     [[nodiscard]] double getJitterMs() const;
+
+    // Feed measured present cost into the adaptive low-latency gate.
+    void updatePresentCostMs(double renderP95Ms, double gpuSubmitP95Ms,
+                             bool haveSamples);
 
     void cleanup();
 
@@ -114,6 +121,11 @@ private:
     double ll_intervalVelocityNs = 0.0;   // rate-of-change term
     double ll_jitterNs           = 0.0;   // EMA of absolute prediction error (ns)
     std::chrono::steady_clock::time_point ll_lastArrival{};
+
+    // Adaptive present-cost samples (from renderer telemetry).
+    double ll_renderP95Ms = 0.0;
+    double ll_gpuSubmitP95Ms = 0.0;
+    bool   ll_havePresentCost = false;
 
     mutable std::mutex m_mutex;
 
@@ -181,6 +193,12 @@ class AVFrameHolder : public Singleton<AVFrameHolder> {
     [[nodiscard]] size_t getFrameQueuePlayoutResyncStat() const { return m_frame_queue.getPlayoutResyncStat(); }
     [[nodiscard]] double getFrameQueueEstimatedSourceFps() const { return m_frame_queue.getEstimatedSourceFps(); }
     [[nodiscard]] double getFrameQueueJitterMs() const { return m_frame_queue.getJitterMs(); }
+
+    void updatePresentCostMs(double renderP95Ms, double gpuSubmitP95Ms,
+                             bool haveSamples) {
+        m_frame_queue.updatePresentCostMs(renderP95Ms, gpuSubmitP95Ms,
+                                          haveSamples);
+    }
 
   private:
     AVFrameQueue m_frame_queue;

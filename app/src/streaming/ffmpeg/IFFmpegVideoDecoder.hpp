@@ -33,7 +33,16 @@ struct VideoDecodeStats {
     float session_decoding_time;
     float session_decoder_delay;
 
+    // Measured incoming video payload rate over the last stats window (Mbps).
+    float current_video_mbps;
+
+    // Pipeline timing from FramePipelineTelemetry (ms).
+    float current_queue_wait_ms;
+    float current_client_pipeline_ms;
+
     uint64_t measurement_start_timestamp;
+    // Steady-clock micros for the open progress window (0 = unset).
+    uint64_t measurement_start_us;
 };
 
 class IFFmpegVideoDecoder {

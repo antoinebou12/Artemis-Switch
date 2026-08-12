@@ -834,6 +834,25 @@ void openProfileEditor(const std::string& profileId,
     addBool(content, "artemis/settings/low_latency_pacing"_i18n,
             draft->lowLatencyPacing,
             [draft](bool v) { draft->lowLatencyPacing = v; });
+    {
+        auto* queueCell =
+            addDetail(content, "artemis/settings/frames_queue_size"_i18n,
+                      std::to_string(std::clamp(draft->framesQueueSize, 1, 5)));
+        queueCell->registerClickAction([draft, queueCell](brls::View*) {
+            std::vector<std::string> labels = {"1", "2", "3", "4", "5"};
+            int selected = std::clamp(draft->framesQueueSize, 1, 5) - 1;
+            auto* dropdown = new brls::Dropdown(
+                "artemis/settings/frames_queue_size"_i18n, labels,
+                [draft, queueCell](int index) {
+                    draft->framesQueueSize = std::clamp(index + 1, 1, 5);
+                    queueCell->setDetailText(
+                        std::to_string(draft->framesQueueSize));
+                },
+                selected);
+            brls::Application::pushActivity(new brls::Activity(dropdown));
+            return true;
+        });
+    }
 
     auto packetSizeLabel = [](int size) -> std::string {
         if (size <= 0)

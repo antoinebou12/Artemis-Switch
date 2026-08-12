@@ -242,7 +242,10 @@ Packet-loss guard
 : When packet size is Auto/1392, use **1024** bytes for low-MTU or VPN links. Sunshine may still clamp packet size on the host.
 
 Low latency pacing
-: Occupancy / alpha-beta frame pacing aimed at lower input lag. **Off by default**; can stutter more on unstable Wi-Fi.
+: Adaptive present-deadline gate with aggressive latest-frame-wins. Uses measured render/GPU cost instead of a fixed 6 ms lead. **Off by default**; can stutter more on unstable Wi-Fi. Also on overlay **Options**.
+
+Frame queue size
+: How many decoded frames to keep (1–5, default 3). Low latency pacing still targets at most one buffered frame.
 
 Packet size
 : RTP payload size: **Auto** (1392, or 1024 with packet-loss guard), a preset, or **Custom** (200–65535 bytes).
@@ -287,7 +290,7 @@ Tunnel status
 
 ## Stream profiles
 
-Named stream snapshots that match the Settings stream fields 1:1: quality (including **Native** resolution, **aspect ratio**, and resolution scale), bitrate, image adjustments, stream/audio, controller, keyboard, mouse (**Touchscreen mode** plus pointer mode), plus Artemis extras (custom resolution, full-range, packet size, scale mode, **Remember Zoom & Pan**, controller/console motion). Stored as `profile.json`. Launch width is derived from profile height plus that profile’s 16:9 / 4:3 setting. **FSR preset** (Off / Performance / Balanced / Quality) is profile-only and default Off; named presets write existing FSR1 (EASU) plus RCAS strength and are greyed out while upscaling is Off. Language, host OS, overlay chords, VPN, and Debug stay in Settings only. Editing or assigning a profile does not change global Settings.
+Named stream snapshots that match the Settings stream fields 1:1: quality (including **Native** resolution, **aspect ratio**, and resolution scale), bitrate, image adjustments, stream/audio, controller, keyboard, mouse (**Touchscreen mode** plus pointer mode), plus Artemis extras (custom resolution, full-range, packet size, **frame queue size**, **low latency pacing**, scale mode, **Remember Zoom & Pan**, controller/console motion). Stored as `profile.json` (schema 13). Launch width is derived from profile height plus that profile’s 16:9 / 4:3 setting. **FSR preset** (Off / Performance / Balanced / Quality) is profile-only and default Off; named presets write existing FSR1 (EASU) plus RCAS strength and are greyed out while upscaling is Off. Built-in seeds include **720p 60 Low Latency**. Language, host OS, overlay chords, VPN, and Debug stay in Settings only. Editing or assigning a profile does not change global Settings.
 
 On first launch (empty `profile.json`), Artemis seeds thirteen 30/60 FPS presets: `360p 30 0.5M`, `360p 30 1M`, `480p 30 5M`, `480p 60 10M`, `540p 30 5M`, `540p 60 10M`, `720p 30 10M`, `720p 60 10M` (active), `720p 60 20M`, `1080p 30 20M`, `1080p 60 20M`, `1080p 60 50M`, `1080p 60 100M`. Existing custom profiles are not replaced. Deleting every profile does not auto-reseed. Virtual display and scale stay on the Sunshine/Apollo host web UI.
 

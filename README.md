@@ -77,8 +77,8 @@ Hosts and clients are separate. Pick a **server** on the PC, then a **client** o
 | **Video filtering** | FSR/EASU upscaling (FSR1 / SGSR1 / NIS), RCAS sharpening, dithering, Full/Limited range |
 | **Stream profiles** | Named full settings profiles (`profile.json`); per-host assign; import/export; 30–120 FPS |
 | **Cleaner controls** | Slim Quick Actions; Options for rotation, filters, pointer, host shortcuts, and more |
-| **Performance & diagnostics** | Live latency, packet loss, render timing, Switch clocks, Benchmark, then Debug / logs |
-| **Switch optimizations** | WLAN priority mode, frame-queue telemetry, motion/controller policy, NVDEC + deko3d |
+| **Performance & diagnostics** | Actual vs configured bitrate, queue wait / jitter, receive→present pipeline ms, startup timing, Benchmark export |
+| **Switch optimizations** | Adaptive low-latency pacing (deadline + latest-frame-wins), WLAN priority, frame-queue telemetry, NVDEC + deko3d |
 
 ---
 

@@ -63,20 +63,27 @@ int main() {
     assert(profile.rumbleForce <= 1.0f + 1e-6f);
     assert(profile.name == "Profile");
 
-    assert(kDefaultStreamProfiles.size() == 13);
+    assert(kDefaultStreamProfiles.size() == 14);
     assert(std::strcmp(kDefaultActiveProfileName, "720p 60 10M") == 0);
     assert(isDefaultProfileName(kDefaultActiveProfileName));
 
     std::set<std::string> names;
     std::set<int> bitrates;
+    bool foundLowLatency = false;
     for (const auto& spec : kDefaultStreamProfiles) {
         assert(spec.fps == 30 || spec.fps == 60);
         assert(spec.height == 360 || spec.height == 480 || spec.height == 540 ||
                spec.height == 720 || spec.height == 1080);
         names.insert(spec.name);
         bitrates.insert(spec.bitrateKbps);
+        if (std::strcmp(spec.name, "720p 60 Low Latency") == 0) {
+            foundLowLatency = true;
+            assert(spec.lowLatencyPacing);
+            assert(spec.framesQueueSize == 2);
+        }
     }
-    assert(names.size() == 13);
+    assert(foundLowLatency);
+    assert(names.size() == 14);
     assert(names.count("360p 30 0.5M") == 1);
     assert(names.count("360p 30 1M") == 1);
     assert(names.count("480p 30 5M") == 1);
@@ -86,6 +93,7 @@ int main() {
     assert(names.count("720p 30 10M") == 1);
     assert(names.count("720p 60 10M") == 1);
     assert(names.count("720p 60 20M") == 1);
+    assert(names.count("720p 60 Low Latency") == 1);
     assert(names.count("1080p 30 20M") == 1);
     assert(names.count("1080p 60 20M") == 1);
     assert(names.count("1080p 60 50M") == 1);

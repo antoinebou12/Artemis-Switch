@@ -367,9 +367,6 @@ void PerformanceTab::refresh() {
     wifiGraph->pushSample(connectionKind == ConnectionKind::Wifi
         ? artemis::performance::normalizeWifiSignal(signalLevel)
         : 0.0f);
-    setDetailTextIfChanged(network, fmt::format(
-        "{:.1f} Mbps",
-        static_cast<double>(Settings::instance().bitrate()) / 1000.0));
 
     auto* session = MoonlightSession::activeSession();
 
@@ -461,10 +458,16 @@ void PerformanceTab::refresh() {
         : 0.0;
 
     artemis::performance::LitePerformanceSnapshot snapshot;
-    snapshot.networkMbps = static_cast<double>(Settings::instance().bitrate()) / 1000.0;
+    snapshot.configuredMbps =
+        static_cast<double>(Settings::instance().bitrate()) / 1000.0;
+    snapshot.networkMbps = decode.current_video_mbps > 0.0f
+                               ? static_cast<double>(decode.current_video_mbps)
+                               : snapshot.configuredMbps;
     snapshot.receiveLatencyMs = decode.current_receive_time;
     snapshot.decodeLatencyMs = decode.current_decoding_time;
     snapshot.renderLatencyMs = render.rendering_time;
+    snapshot.queueWaitMs = decode.current_queue_wait_ms;
+    snapshot.clientPipelineMs = decode.current_client_pipeline_ms;
     snapshot.gpuRenderMs = render.gpu_rendering_time;
     snapshot.packetLossPercent = lossPercent;
     snapshot.hostFps = decode.current_host_fps;
@@ -472,14 +475,18 @@ void PerformanceTab::refresh() {
     snapshot.decodedFps = decode.current_decoded_fps;
     snapshot.renderedFps = render.rendered_fps;
 #if ARTEMIS_HAS_FRAME_QUEUE
-    snapshot.queueDepth = AVFrameHolder::instance().getFrameQueueSize();
-    snapshot.queueTarget = AVFrameHolder::instance().getFrameQueueTargetDepth();
-    snapshot.queueCapacity = AVFrameHolder::instance().getFrameQueueCapacity();
+    snapshot.queueDepth = static_cast<int>(AVFrameHolder::instance().getFrameQueueSize());
+    snapshot.queueTarget =
+        static_cast<int>(AVFrameHolder::instance().getFrameQueueTargetDepth());
+    snapshot.queueCapacity =
+        static_cast<int>(AVFrameHolder::instance().getFrameQueueCapacity());
+    snapshot.queueJitterMs = AVFrameHolder::instance().getFrameQueueJitterMs();
 #endif
     snapshot.presentationMode = scaleModeLabel();
     snapshot.colorRange = colorRangeLabel();
     const auto lite = artemis::performance::buildLiteStatus(snapshot);
 
+    setDetailTextIfChanged(network, lite.networkText);
     setDetailTextIfChanged(receiveLatency, lite.latencyText);
     setDetailTextIfChanged(decodeLatency, lite.decodeText);
     setDetailTextIfChanged(renderLatency, lite.renderText);

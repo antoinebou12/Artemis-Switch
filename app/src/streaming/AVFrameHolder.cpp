@@ -9,6 +9,8 @@
 //
 
 #include "AVFrameHolder.hpp"
+#include "FramePipelineTelemetry.hpp"
+#include "PresentDeadline.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -33,10 +35,6 @@ constexpr double kMaximumOccupancyCorrection   = 0.08;
 constexpr double kLL_Alpha = 1.0 / 8.0;
 // Fast convergence factor (used when the deviation is large, e.g. after a gap).
 constexpr double kLL_FastAlpha = 1.0 / 4.0;
-// Fixed lead time before estimated next-frame arrival at which a frame is released.
-constexpr double kLL_GateLeadMs = 6.0;
-// Jitter multiplier added to the gate lead time.
-constexpr double kLL_JitterGateMultiplier = 1.5;
 
 // ---- Helpers ---------------------------------------------------------------
 
@@ -63,6 +61,27 @@ void recycleFrame(std::queue<AVFrame*>& freeQueue, AVFrame*& frame) {
     av_frame_unref(frame);
     freeQueue.push(frame);
     frame = nullptr;
+}
+
+TimedFrame makeTimedFrame(AVFrame* frame,
+                          std::chrono::steady_clock::time_point timeEstimate,
+                          std::chrono::steady_clock::time_point now) {
+    TimedFrame tf;
+    tf.timeEstimate = timeEstimate;
+    tf.queued = now;
+    tf.frame = frame;
+    std::chrono::steady_clock::time_point networkComplete{};
+    std::chrono::steady_clock::time_point decodeDone{};
+    if (artemis::streaming::FramePipelineTelemetry::instance()
+            .consumePendingDecodeTiming(networkComplete, decodeDone)) {
+        tf.networkComplete = networkComplete;
+        tf.decodeDone = decodeDone;
+    } else {
+        tf.networkComplete = now;
+        tf.decodeDone = now;
+    }
+    artemis::streaming::FramePipelineTelemetry::instance().noteFrameQueued(now);
+    return tf;
 }
 
 } // namespace
@@ -153,7 +172,7 @@ bool AVFrameQueue::push(AVFrame* item) {
         recordArrivalLocked(now);
     }
 
-    queue.push_back({timeEstimate, queuedFrame});
+    queue.push_back(makeTimedFrame(queuedFrame, timeEstimate, now));
     pushesSincePop++;
     maxPushBurstStat = std::max(maxPushBurstStat, pushesSincePop);
 
@@ -205,22 +224,14 @@ AVFrame* AVFrameQueue::pop(bool* consumed) {
     // LOW-LATENCY PATH
     // ========================================================================
     if (lowLatency) {
-        // Drop frames that are more than one estimated interval stale,
-        // but always keep at least one frame for display continuity.
-        if (ll_smoothedIntervalNs > 0.0) {
-            const auto staleThreshold = std::chrono::nanoseconds(
-                static_cast<int64_t>(ll_smoothedIntervalNs));
-            while (queue.size() > 1) {
-                if (now >= queue.front().timeEstimate + staleThreshold) {
-                    AVFrame* dropped = queue.front().frame;
-                    queue.pop_front();
-                    recycleFrame(freeQueue, dropped);
-                    framesDroppedStat++;
-                    pacingSkipStat++;
-                } else {
-                    break;
-                }
-            }
+        // Aggressive latest-frame-wins: if the renderer is behind, skip
+        // straight to the newest complete frame.
+        while (queue.size() > 1) {
+            AVFrame* dropped = queue.front().frame;
+            queue.pop_front();
+            recycleFrame(freeQueue, dropped);
+            framesDroppedStat++;
+            pacingSkipStat++;
         }
 
         if (queue.empty()) {
@@ -231,21 +242,25 @@ AVFrame* AVFrameQueue::pop(bool* consumed) {
             return bufferFrame;
         }
 
-        // Present gate: release frame (6 ms + 1.5 × jitter) before its
-        // estimated next-frame time to give the renderer a head-start.
-        const double gateNsVal =
-            kLL_GateLeadMs * 1.0e6 + kLL_JitterGateMultiplier * ll_jitterNs;
+        const double jitterMs = ll_jitterNs / 1.0e6;
+        const double leadMs = artemis::streaming::presentGateLeadMs(
+            ll_renderP95Ms, ll_gpuSubmitP95Ms, ll_havePresentCost, jitterMs);
         const auto gateNs = std::chrono::nanoseconds(
-            static_cast<int64_t>(std::max(0.0, gateNsVal)));
+            static_cast<int64_t>(std::max(0.0, leadMs) * 1.0e6));
 
         if (now < queue.front().timeEstimate - gateNs) {
             scheduledHoldStat++;
             return bufferFrame;
         }
 
-        recycleFrame(freeQueue, bufferFrame);
-        bufferFrame = queue.front().frame;
+        TimedFrame selected = queue.front();
         queue.pop_front();
+        artemis::streaming::FramePipelineTelemetry::instance().noteFrameSelected(
+            selected.networkComplete, selected.decodeDone, now);
+        recycleFrame(freeQueue, bufferFrame);
+        bufferFrame = selected.frame;
+        // Preserve timing on the buffer frame via telemetry last-select path;
+        // renderer reads networkComplete from the last selected stamp.
         localClockPacedFrameStat++;
         if (consumed) {
             *consumed = true;
@@ -467,6 +482,14 @@ double AVFrameQueue::getJitterMs() const {
     return ll_jitterNs / 1.0e6;
 }
 
+void AVFrameQueue::updatePresentCostMs(double renderP95Ms, double gpuSubmitP95Ms,
+                                       bool haveSamples) {
+    std::lock_guard<std::mutex> lock(m_mutex);
+    ll_renderP95Ms = renderP95Ms;
+    ll_gpuSubmitP95Ms = gpuSubmitP95Ms;
+    ll_havePresentCost = haveSamples;
+}
+
 // ---------------------------------------------------------------------------
 // cleanup
 // ---------------------------------------------------------------------------
@@ -498,6 +521,9 @@ void AVFrameQueue::cleanup() {
     playoutResyncNeeded      = true;
 
     resetLLFilterLocked();
+    ll_renderP95Ms = 0.0;
+    ll_gpuSubmitP95Ms = 0.0;
+    ll_havePresentCost = false;
 
     if (bufferFrame) {
         av_frame_free(&bufferFrame);
@@ -539,7 +565,7 @@ bool AVFrameQueue::pushTransferredLocked(AVFrame* item) {
         recordArrivalLocked(now);
     }
 
-    queue.push_back({timeEstimate, item});
+    queue.push_back(makeTimedFrame(item, timeEstimate, now));
     pushesSincePop++;
     maxPushBurstStat = std::max(maxPushBurstStat, pushesSincePop);
 
