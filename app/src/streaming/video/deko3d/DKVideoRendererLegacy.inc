@@ -3,7 +3,10 @@
 #define FF_API_AVPICTURE
 
 #include "DKVideoRenderer.hpp"
+#include "FrameColorRange.hpp"
+#include "FramePipelineTelemetry.hpp"
 #include "Settings.hpp"
+#include "../../../features/stream/AdvancedStreamOptionsStore.hpp"
 #include <borealis/platforms/switch/switch_platform.hpp>
 
 #include <libavcodec/avcodec.h>
@@ -261,14 +264,15 @@ namespace
 
     static void getFrameColorInfo(AVFrame* frame, AVColorSpace& colorSpace,
                                   bool& colorFull) {
-        colorFull = frame->color_range == AVCOL_RANGE_JPEG;
-
-        // NVDEC/NVTEGRA frames can report JPEG range even when stream
-        // negotiation requested limited range. This manifests as lifted blacks.
-        if (frame->format == AV_PIX_FMT_NVTEGRA &&
-            frame->color_range == AVCOL_RANGE_JPEG) {
-            colorFull = false;
-        }
+        const bool frameReportsJpeg =
+            frame->color_range == AVCOL_RANGE_JPEG;
+        const bool isNvtegra = frame->format == AV_PIX_FMT_NVTEGRA;
+        const bool negotiatedOrForcedFull =
+            artemis::stream::AdvancedStreamOptionsStore::instance()
+                .get()
+                .forceFullRangeVideo;
+        colorFull = artemis::streaming::effectiveFrameFullRange(
+            frameReportsJpeg, isNvtegra, negotiatedOrForcedFull);
 
         switch (frame->colorspace) {
         case AVCOL_SPC_SMPTE170M:
@@ -1255,6 +1259,8 @@ void DKVideoRenderer::draw(NVGcontext* vg, int width, int height, AVFrame* frame
         return;
     }
 
+    using clock = std::chrono::steady_clock;
+    const auto before_render_tp = clock::now();
     uint64_t before_render = LiGetMillis();
 
     if (!m_video_render_stats_progress.rendered_frames) {
@@ -1295,7 +1301,13 @@ void DKVideoRenderer::draw(NVGcontext* vg, int width, int height, AVFrame* frame
 #endif
     }
 
-    const uint64_t render_time = LiGetMillis() - before_render;
+    const auto after_render_tp = clock::now();
+    const double renderMsPrecise =
+        std::chrono::duration<double, std::milli>(after_render_tp -
+                                                  before_render_tp)
+            .count();
+    const uint64_t render_time =
+        static_cast<uint64_t>(std::max(0.0, renderMsPrecise));
     frames++;
     timeCount += render_time;
 
@@ -1308,19 +1320,32 @@ void DKVideoRenderer::draw(NVGcontext* vg, int width, int height, AVFrame* frame
     m_video_render_stats_progress.total_render_time += render_time;
     m_video_render_stats_progress.rendered_frames++;
 
-    const uint64_t stats_interval_ms = 200;
-    const uint64_t stats_now = LiGetMillis();
-    if (stats_now - m_video_render_stats_progress.measurement_start_timestamp >=
-        stats_interval_ms) {
+    const double gpuMs =
+        m_video_render_stats_cache.gpu_rendering_time > 0.0f
+            ? static_cast<double>(m_video_render_stats_cache.gpu_rendering_time)
+            : renderMsPrecise;
+    artemis::streaming::FramePipelineTelemetry::instance().noteFramePresented(
+        renderMsPrecise, gpuMs);
+
+    constexpr auto kStatsInterval = std::chrono::milliseconds(250);
+    static clock::time_point s_stats_window_start{};
+    static bool s_stats_window_started = false;
+    if (!s_stats_window_started) {
+        s_stats_window_start = before_render_tp;
+        s_stats_window_started = true;
+    }
+    if (after_render_tp - s_stats_window_start >= kStatsInterval) {
         m_video_render_stats_cache = m_video_render_stats_progress;
         m_video_render_stats_progress = {};
 
-        const uint64_t elapsed_time =
-            stats_now - m_video_render_stats_cache.measurement_start_timestamp;
+        const double elapsed_sec =
+            std::chrono::duration<double>(after_render_tp - s_stats_window_start)
+                .count();
+        const float elapsed_time = static_cast<float>(elapsed_sec * 1000.0);
         m_video_render_stats_cache.rendered_fps =
-            elapsed_time && m_video_render_stats_cache.rendered_frames > 1
+            elapsed_time > 0.0f && m_video_render_stats_cache.rendered_frames > 1
                 ? (float)(m_video_render_stats_cache.rendered_frames - 1) /
-                      ((float)elapsed_time / 1000.0f)
+                      (elapsed_time / 1000.0f)
                 : 0.0f;
 
         m_video_render_stats_cache.rendering_time =
@@ -1356,6 +1381,10 @@ void DKVideoRenderer::draw(NVGcontext* vg, int width, int height, AVFrame* frame
                    (float)m_video_render_stats_cache.sharpened_frames) /
                       1000.0f
                 : 0.0f;
+
+        s_stats_window_start = after_render_tp;
+        m_video_render_stats_progress.measurement_start_timestamp =
+            LiGetMillis();
     }
 }
 

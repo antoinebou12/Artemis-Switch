@@ -63,5 +63,14 @@ int main() {
         false, false, false, 0, {}, false);
     assert(realSunshine.kind == HostKind::Sunshine);
 
+    // Version identity without field noise.
+    HostMetadata vibepolloLike;
+    vibepolloLike.gsVersion = "Vibepollo 1.0";
+    assert(HostCapabilityPolicy::detect(vibepolloLike).kind == HostKind::Sunshine);
+
+    HostMetadata apolloToken;
+    apolloToken.gsVersion = "Apollo-fork";
+    assert(HostCapabilityPolicy::detect(apolloToken).kind == HostKind::Apollo);
+
     return 0;
 }

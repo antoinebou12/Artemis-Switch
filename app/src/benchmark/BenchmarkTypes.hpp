@@ -17,6 +17,17 @@ struct BenchmarkSample {
     float decoderDelayMs = 0.0f;
     float renderMs = 0.0f;
     float gpuRenderMs = 0.0f;
+    float queueDepth = 0.0f;
+    float queueTarget = 0.0f;
+    float queueJitterMs = 0.0f;
+    float estimatedSourceFps = 0.0f;
+    float presentIntervalMs = 0.0f;
+    float queueWaitMs = 0.0f;
+    float clientPipelineMs = 0.0f;
+    float actualVideoMbps = 0.0f;
+    float timeToFirstPacketMs = -1.0f;
+    float timeToFirstDecodeMs = -1.0f;
+    float timeToFirstPresentMs = -1.0f;
     uint64_t totalReceivedFrames = 0;
     uint64_t networkDroppedFrames = 0;
     uint64_t queueUnderflows = 0;
@@ -48,6 +59,12 @@ struct BenchmarkSummary {
     DistributionSummary renderMs;
     DistributionSummary gpuRenderMs;
     DistributionSummary clientProcessingMs;
+    DistributionSummary queueDepth;
+    DistributionSummary queueJitterMs;
+    DistributionSummary queueWaitMs;
+    DistributionSummary clientPipelineMs;
+    DistributionSummary presentIntervalMs;
+    DistributionSummary actualVideoMbps;
     uint64_t receivedFrames = 0;
     uint64_t networkDroppedFrames = 0;
     double networkDropPercent = 0.0;
@@ -56,6 +73,9 @@ struct BenchmarkSummary {
     uint64_t queueOverflowDrops = 0;
     uint64_t queuePacingSkips = 0;
     uint64_t queueResyncs = 0;
+    float timeToFirstPacketMs = -1.0f;
+    float timeToFirstDecodeMs = -1.0f;
+    float timeToFirstPresentMs = -1.0f;
     double stabilityScore = 0.0;
 };
 

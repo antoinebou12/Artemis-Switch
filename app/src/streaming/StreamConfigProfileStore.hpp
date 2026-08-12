@@ -32,6 +32,8 @@ struct StreamConfigProfile {
     bool forceFullRangeVideo = false;
     bool preventPacketLoss = false;
     bool lowLatencyPacing = false;
+    // Frame queue depth (1–5). Default 3 matches Settings.
+    int framesQueueSize = 3;
     // 0 = Auto (see artemis::stream::resolveStreamPacketSize).
     int packetSize = 0;
     bool customResolutionEnabled = false;
@@ -96,7 +98,7 @@ struct StreamConfigProfile {
 
 class StreamConfigProfileStore {
 public:
-    static constexpr int SchemaVersion = 12;
+    static constexpr int SchemaVersion = 13;
     static StreamConfigProfileStore& instance();
 
     const std::vector<StreamConfigProfile>& list();

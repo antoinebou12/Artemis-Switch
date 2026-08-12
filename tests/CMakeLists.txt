@@ -66,6 +66,22 @@ add_artemis_test(host_capability_tests
     app/src/host/HostCapabilities.cpp
     app/src/host)
 
+add_executable(present_deadline_test
+    "${REPO_ROOT}/tests/present_deadline_test.cpp"
+)
+target_include_directories(present_deadline_test PRIVATE
+    "${REPO_ROOT}/app/src/streaming")
+target_compile_features(present_deadline_test PRIVATE cxx_std_20)
+add_test(NAME present_deadline_test COMMAND present_deadline_test)
+
+add_executable(frame_color_range_test
+    "${REPO_ROOT}/tests/frame_color_range_test.cpp"
+)
+target_include_directories(frame_color_range_test PRIVATE
+    "${REPO_ROOT}/app/src/streaming")
+target_compile_features(frame_color_range_test PRIVATE cxx_std_20)
+add_test(NAME frame_color_range_test COMMAND frame_color_range_test)
+
 add_artemis_test(host_address_parse_test
     tests/host_address_parse_test.cpp
     app/src/features/host/HostAddressParse.cpp

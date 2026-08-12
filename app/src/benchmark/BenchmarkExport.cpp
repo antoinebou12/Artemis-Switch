@@ -148,6 +148,18 @@ std::string BenchmarkExport::toJson(const ExportProfile& p,
     writeDistJson(out, "gpu_render_ms", st.gpuRenderMs);
     out << ",\n";
     writeDistJson(out, "client_processing_ms", st.clientProcessingMs);
+    out << ",\n";
+    writeDistJson(out, "queue_depth", st.queueDepth);
+    out << ",\n";
+    writeDistJson(out, "queue_jitter_ms", st.queueJitterMs);
+    out << ",\n";
+    writeDistJson(out, "queue_wait_ms", st.queueWaitMs);
+    out << ",\n";
+    writeDistJson(out, "client_pipeline_ms", st.clientPipelineMs);
+    out << ",\n";
+    writeDistJson(out, "present_interval_ms", st.presentIntervalMs);
+    out << ",\n";
+    writeDistJson(out, "actual_video_mbps", st.actualVideoMbps);
     out << ",\n"
         << "    \"received_frames\": " << st.receivedFrames << ",\n"
         << "    \"network_dropped_frames\": " << st.networkDroppedFrames << ",\n"
@@ -157,6 +169,9 @@ std::string BenchmarkExport::toJson(const ExportProfile& p,
         << "    \"queue_overflow_drops\": " << st.queueOverflowDrops << ",\n"
         << "    \"queue_pacing_skips\": " << st.queuePacingSkips << ",\n"
         << "    \"queue_resyncs\": " << st.queueResyncs << ",\n"
+        << "    \"time_to_first_packet_ms\": " << st.timeToFirstPacketMs << ",\n"
+        << "    \"time_to_first_decode_ms\": " << st.timeToFirstDecodeMs << ",\n"
+        << "    \"time_to_first_present_ms\": " << st.timeToFirstPresentMs << ",\n"
         << "    \"stability_score\": " << st.stabilityScore << "\n"
         << "  }\n"
         << "}\n";

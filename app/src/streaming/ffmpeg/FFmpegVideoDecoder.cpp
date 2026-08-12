@@ -1,10 +1,13 @@
 #include "FFmpegVideoDecoder.hpp"
 #include "AVFrameHolder.hpp"
 #include "FFmpegVideoDecoderPlatformHelpers.hpp"
+#include "FramePipelineTelemetry.hpp"
 #include "Settings.hpp"
 #include "borealis.hpp"
 #include "MoonlightSession.hpp"
 
+#include <algorithm>
+#include <chrono>
 #include <cstring>
 
 #if defined(_WIN32)
@@ -263,6 +266,8 @@ int FFmpegVideoDecoder::finalize_decoder_setup() {
     if (m_decoder_finalized) {
         return 0;
     }
+
+    artemis::streaming::FramePipelineTelemetry::instance().noteStreamStart();
 
     m_use_zero_copy_holder = false;
 #if defined(PLATFORM_SWITCH) && defined(BOREALIS_USE_DEKO3D)
@@ -708,6 +713,11 @@ void FFmpegVideoDecoder::cleanup() {
     }
 
     AVFrameHolder::instance().cleanup();
+    artemis::streaming::FramePipelineTelemetry::instance().reset();
+    m_stats_window_started = false;
+    m_stats_window_bytes = 0;
+    m_video_decode_stats_progress = {};
+    m_video_decode_stats_cache = {};
     delete[] m_frames;
     m_frames = nullptr;
     m_frames_size = 0;
@@ -723,9 +733,24 @@ int FFmpegVideoDecoder::submit_decode_unit(PDECODE_UNIT decode_unit) {
     if (decode_unit->fullLength < DECODER_BUFFER_SIZE) {
         PLENTRY entry = decode_unit->bufferList;
 
-        if (m_video_decode_stats_progress.measurement_start_timestamp == 0) {
-            m_video_decode_stats_progress.measurement_start_timestamp = LiGetMillis();
+        using clock = std::chrono::steady_clock;
+        const auto packetArrival = clock::now();
+        artemis::streaming::FramePipelineTelemetry::instance().noteFirstPacket(
+            static_cast<size_t>(decode_unit->fullLength));
+
+        if (!m_stats_window_started) {
+            m_stats_window_start = packetArrival;
+            m_stats_window_started = true;
+            m_video_decode_stats_progress.measurement_start_timestamp =
+                LiGetMillis();
+            m_video_decode_stats_progress.measurement_start_us =
+                static_cast<uint64_t>(
+                    std::chrono::duration_cast<std::chrono::microseconds>(
+                        packetArrival.time_since_epoch())
+                        .count());
         }
+        m_stats_window_bytes +=
+            static_cast<uint64_t>(decode_unit->fullLength);
 
         if (!m_last_frame) {
             m_last_frame = decode_unit->frameNumber;
@@ -793,7 +818,7 @@ int FFmpegVideoDecoder::submit_decode_unit(PDECODE_UNIT decode_unit) {
         m_video_decode_stats_progress.current_reassembly_time += LiGetMillis() - (decode_unit->receiveTimeUs / 1000);
         m_frames_in++;
 
-        uint64_t before_decode = LiGetMillis();
+        const auto before_decode = clock::now();
 
         if (length > DECODER_BUFFER_SIZE) {
             brls::Logger::error("FFmpeg: Big buffer to decode...");
@@ -807,8 +832,17 @@ int FFmpegVideoDecoder::submit_decode_unit(PDECODE_UNIT decode_unit) {
 
             m_frames_out += decoded_frames;
 
-            auto decodeTime = LiGetMillis() - before_decode;
-            m_video_decode_stats_progress.current_decode_time += decodeTime;
+            const auto after_decode = clock::now();
+            const double decodeMs =
+                std::chrono::duration<double, std::milli>(after_decode -
+                                                          before_decode)
+                    .count();
+            // Accumulate microseconds for precision; averages convert to ms.
+            m_video_decode_stats_progress.current_decode_time +=
+                static_cast<uint32_t>(std::max(0.0, decodeMs) * 1000.0);
+
+            artemis::streaming::FramePipelineTelemetry::instance()
+                .noteDecodedFrame(packetArrival, after_decode);
 
             // Also count the frame-to-frame delay if the decoder is delaying
             // frames until a subsequent frame is submitted.
@@ -820,11 +854,8 @@ int FFmpegVideoDecoder::submit_decode_unit(PDECODE_UNIT decode_unit) {
                 pending_frames * (1000 / m_stream_fps);
             m_video_decode_stats_progress.current_decoded_frames += decoded_frames;
 
-            const int time_interval = 60;
-            timeCount += decodeTime;
-            if (timeCount >= time_interval) {
-                // brls::Logger::debug("FPS: {}", frames / 5.0f);
-
+            constexpr auto kStatsWindow = std::chrono::milliseconds(250);
+            if (after_decode - m_stats_window_start >= kStatsWindow) {
                 m_video_decode_stats_cache = m_video_decode_stats_progress;
                 m_video_decode_stats_progress = {};
 
@@ -837,35 +868,98 @@ int FFmpegVideoDecoder::submit_decode_unit(PDECODE_UNIT decode_unit) {
 
                 m_video_decode_stats_progress.network_dropped_frames = m_video_decode_stats_cache.network_dropped_frames;
 
+                const double elapsedSec =
+                    std::chrono::duration<double>(after_decode -
+                                                  m_stats_window_start)
+                        .count();
+                const float elapsedMs =
+                    static_cast<float>(elapsedSec * 1000.0);
                 uint64_t now = LiGetMillis();
                 m_video_decode_stats_cache.current_host_fps =
-                    (float)m_video_decode_stats_cache.total_frames /
-                    ((float)(now - m_video_decode_stats_cache.measurement_start_timestamp) /
-                    1000);
+                    elapsedMs > 0.0f
+                        ? (float)m_video_decode_stats_cache.total_frames /
+                              (elapsedMs / 1000.0f)
+                        : 0.0f;
                 m_video_decode_stats_cache.current_received_fps =
-                        (float)m_video_decode_stats_cache.current_received_frames /
-                        ((float)(now - m_video_decode_stats_cache.measurement_start_timestamp) /
-                    1000);
+                    elapsedMs > 0.0f
+                        ? (float)m_video_decode_stats_cache
+                                  .current_received_frames /
+                              (elapsedMs / 1000.0f)
+                        : 0.0f;
                 m_video_decode_stats_cache.current_decoded_fps =
-                        (float)m_video_decode_stats_cache.current_decoded_frames /
-                        ((float)(now - m_video_decode_stats_cache.measurement_start_timestamp) /
-                    1000);
+                    elapsedMs > 0.0f
+                        ? (float)m_video_decode_stats_cache
+                                  .current_decoded_frames /
+                              (elapsedMs / 1000.0f)
+                        : 0.0f;
 
-                m_video_decode_stats_cache.current_receive_time = (float) m_video_decode_stats_cache.current_reassembly_time /
-                                                                  (float) m_video_decode_stats_cache.current_received_frames;
-                m_video_decode_stats_cache.current_decoding_time = (float) m_video_decode_stats_cache.current_decode_time /
-                                                                   (float) m_video_decode_stats_cache.current_decoded_frames;
-                m_video_decode_stats_cache.current_decoder_delay = (float) m_video_decode_stats_cache.current_decoder_delay_time /
-                                                                   (float) m_video_decode_stats_cache.current_decoded_frames;
+                m_video_decode_stats_cache.current_receive_time =
+                    m_video_decode_stats_cache.current_received_frames
+                        ? (float)m_video_decode_stats_cache
+                                  .current_reassembly_time /
+                              (float)m_video_decode_stats_cache
+                                  .current_received_frames
+                        : 0.0f;
+                // current_decode_time is microseconds in this window.
+                m_video_decode_stats_cache.current_decoding_time =
+                    m_video_decode_stats_cache.current_decoded_frames
+                        ? ((float)m_video_decode_stats_cache.current_decode_time /
+                           1000.0f) /
+                              (float)m_video_decode_stats_cache
+                                  .current_decoded_frames
+                        : 0.0f;
+                m_video_decode_stats_cache.current_decoder_delay =
+                    m_video_decode_stats_cache.current_decoded_frames
+                        ? (float)m_video_decode_stats_cache
+                                  .current_decoder_delay_time /
+                              (float)m_video_decode_stats_cache
+                                  .current_decoded_frames
+                        : 0.0f;
 
-                m_video_decode_stats_cache.session_receive_time = (float) m_video_decode_stats_cache.total_reassembly_time /
-                                                                  (float) m_video_decode_stats_cache.total_received_frames;
-                m_video_decode_stats_cache.session_decoding_time = (float) m_video_decode_stats_cache.total_decode_time /
-                                                                   (float) m_video_decode_stats_cache.total_decoded_frames;
-                m_video_decode_stats_cache.session_decoder_delay = (float) m_video_decode_stats_cache.total_decoder_delay_time /
-                                                                   (float) m_video_decode_stats_cache.total_decoded_frames;
+                m_video_decode_stats_cache.session_receive_time =
+                    m_video_decode_stats_cache.total_received_frames
+                        ? (float)m_video_decode_stats_cache
+                                  .total_reassembly_time /
+                              (float)m_video_decode_stats_cache
+                                  .total_received_frames
+                        : 0.0f;
+                m_video_decode_stats_cache.session_decoding_time =
+                    m_video_decode_stats_cache.total_decoded_frames
+                        ? ((float)m_video_decode_stats_cache.total_decode_time /
+                           1000.0f) /
+                              (float)m_video_decode_stats_cache
+                                  .total_decoded_frames
+                        : 0.0f;
+                m_video_decode_stats_cache.session_decoder_delay =
+                    m_video_decode_stats_cache.total_decoded_frames
+                        ? (float)m_video_decode_stats_cache
+                                  .total_decoder_delay_time /
+                              (float)m_video_decode_stats_cache
+                                  .total_decoded_frames
+                        : 0.0f;
 
-                timeCount -= time_interval;
+                if (elapsedSec > 0.0) {
+                    m_video_decode_stats_cache.current_video_mbps =
+                        static_cast<float>((m_stats_window_bytes * 8.0) /
+                                           (elapsedSec * 1'000'000.0));
+                }
+
+                const auto pipe =
+                    artemis::streaming::FramePipelineTelemetry::instance()
+                        .snapshot();
+                m_video_decode_stats_cache.current_queue_wait_ms =
+                    pipe.queueWaitMs;
+                m_video_decode_stats_cache.current_client_pipeline_ms =
+                    pipe.clientPipelineMs;
+
+                m_stats_window_start = after_decode;
+                m_stats_window_bytes = 0;
+                m_video_decode_stats_progress.measurement_start_timestamp = now;
+                m_video_decode_stats_progress.measurement_start_us =
+                    static_cast<uint64_t>(
+                        std::chrono::duration_cast<std::chrono::microseconds>(
+                            after_decode.time_since_epoch())
+                            .count());
             }
 
         }

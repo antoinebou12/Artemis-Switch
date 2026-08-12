@@ -104,6 +104,21 @@ ArtemisSettingsTab::ArtemisSettingsTab() {
                                Settings::instance().save();
                            });
 
+    {
+        int queueSize = Settings::instance().frames_queue_size();
+        if (queueSize < 1)
+            queueSize = 1;
+        if (queueSize > 5)
+            queueSize = 5;
+        framesQueueSize->init(
+            "artemis/settings/frames_queue_size"_i18n,
+            {"1", "2", "3", "4", "5"}, queueSize - 1, [](int selected) {
+                const int size = std::clamp(selected + 1, 1, 5);
+                Settings::instance().set_frames_queue_size(size);
+                Settings::instance().save();
+            });
+    }
+
     const auto packetPresets = std::vector<int>{
         artemis::stream::kPacketSizeAuto, 1024, 1346,
         artemis::stream::kPacketSizeDefault};
@@ -162,6 +177,16 @@ ArtemisSettingsTab::ArtemisSettingsTab() {
                                    enabled);
                                Settings::instance().save();
                            });
+    framesQueueSize->init("artemis/settings/frames_queue_size"_i18n,
+                          {"1", "2", "3", "4", "5"},
+                          std::clamp(Settings::instance().frames_queue_size(),
+                                     1, 5) -
+                              1,
+                          [](int selected) {
+                              Settings::instance().set_frames_queue_size(
+                                  std::clamp(selected + 1, 1, 5));
+                              Settings::instance().save();
+                          });
     packetSize->init("artemis/settings/packet_size"_i18n,
                      {"artemis/settings/packet_size_auto"_i18n}, 0, [](int) {});
     forceFullRange->setEnabled(false);

@@ -11,15 +11,35 @@ HostMetadata metadataFromServerData(const SERVER_DATA& server) {
 }
 
 HostCapabilities detectServerCapabilities(const SERVER_DATA& server) {
-    auto capabilities = HostCapabilityPolicy::detect(metadataFromServerData(server));
+    const auto fromVersion =
+        HostCapabilityPolicy::detect(metadataFromServerData(server));
+    const auto fromFields = HostCapabilityPolicy::fromApolloServerInfo(
+        server.virtualDisplayCapable, server.virtualDisplayDriverReady,
+        server.hasApolloPermissionField, server.permission,
+        server.serverCommands, !server.currentGameUuid.empty());
 
-    // SERVER_DATA::isSunshine() is authoritative for the standard fallback.
-    // Do not promote an unidentified Sunshine server to Apollo.
-    if (capabilities.kind != HostKind::Apollo && server.isSunshine()) {
-        capabilities = HostCapabilityPolicy::standardSunshine();
-        capabilities.detectionReason = "SERVER_DATA identified Sunshine";
+    const bool apolloIdentity = fromVersion.kind == HostKind::Apollo ||
+                                fromFields.kind == HostKind::Apollo;
+
+    // Sunshine without Apollo identity stays Sunshine-safe.
+    if (!apolloIdentity) {
+        if (server.isSunshine()) {
+            auto capabilities = HostCapabilityPolicy::standardSunshine();
+            capabilities.detectionReason = "SERVER_DATA identified Sunshine";
+            return capabilities;
+        }
+        return fromVersion;
     }
 
+    // Prefer field-derived capability flags when Apollo server-info fields exist;
+    // otherwise use version/extension identity defaults.
+    HostCapabilities capabilities =
+        fromFields.kind == HostKind::Apollo ? fromFields : fromVersion;
+    if (fromVersion.kind == HostKind::Apollo &&
+        fromFields.kind == HostKind::Apollo) {
+        capabilities.detectionReason =
+            "Apollo identity with server-info fields";
+    }
     return capabilities;
 }
 

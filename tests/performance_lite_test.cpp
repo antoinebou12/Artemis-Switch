@@ -1,6 +1,7 @@
 #include "../app/src/features/performance/PerformanceLite.hpp"
 
 #include <cassert>
+#include <string>
 
 using artemis::performance::LitePerformanceSnapshot;
 using artemis::performance::buildLiteStatus;
@@ -9,30 +10,35 @@ using artemis::performance::normalizeWifiSignal;
 int main() {
     {
         LitePerformanceSnapshot snapshot;
-        snapshot.networkMbps = 25.0;
-        snapshot.receiveLatencyMs = 1.25;
-        snapshot.decodeLatencyMs = 3.5;
-        snapshot.renderLatencyMs = 2.0;
+        snapshot.networkMbps = 2.8;
+        snapshot.configuredMbps = 4.9;
+        snapshot.receiveLatencyMs = 0.8;
+        snapshot.decodeLatencyMs = 2.6;
+        snapshot.renderLatencyMs = 0.7;
+        snapshot.queueWaitMs = 1.9;
+        snapshot.clientPipelineMs = 6.0;
+        snapshot.queueJitterMs = 1.3;
         snapshot.gpuRenderMs = 1.5;
         snapshot.packetLossPercent = 0.02;
         snapshot.hostFps = 60.0;
         snapshot.receivedFps = 59.9;
         snapshot.decodedFps = 59.8;
         snapshot.renderedFps = 59.98;
-        snapshot.queueDepth = 2;
-        snapshot.queueTarget = 3;
+        snapshot.queueDepth = 0;
+        snapshot.queueTarget = 1;
         snapshot.queueCapacity = 8;
         snapshot.presentationMode = "Fill";
         snapshot.colorRange = "Full";
         const auto status = buildLiteStatus(snapshot);
-        assert(status.networkText == "25.0 Mbps");
-        assert(status.latencyText == "1.25 ms");
-        assert(status.decodeText == "3.50 ms");
-        assert(status.renderText == "2.00 ms");
+        assert(status.networkText == "2.8 / 4.9 Mbps");
+        assert(status.latencyText.find("R 0.80") != std::string::npos);
+        assert(status.latencyText.find("C 6.00") != std::string::npos);
+        assert(status.decodeText == "2.60 ms");
+        assert(status.renderText == "0.70 ms");
         assert(status.gpuText == "1.50 ms");
         assert(status.packetLossText == "0.02%");
         assert(status.fpsText == "59.98 FPS");
-        assert(status.frameQueueText == "2 / 3 / 8");
+        assert(status.frameQueueText == "0 / 1 · j 1.3 ms");
         assert(status.presentationText == "Fill · Full");
         assert(status.healthy);
     }

@@ -15,8 +15,23 @@ std::string fixed(double value, int precision, const char* suffix) {
 
 LitePerformanceStatus buildLiteStatus(const LitePerformanceSnapshot& snapshot) {
     LitePerformanceStatus status;
-    status.networkText = fixed(std::max(0.0, snapshot.networkMbps), 1, " Mbps");
-    status.latencyText = fixed(std::max(0.0, snapshot.receiveLatencyMs), 2, " ms");
+    {
+        std::ostringstream out;
+        out << std::fixed << std::setprecision(1)
+            << std::max(0.0, snapshot.networkMbps) << " / "
+            << std::max(0.0, snapshot.configuredMbps) << " Mbps";
+        status.networkText = out.str();
+    }
+    {
+        std::ostringstream out;
+        out << std::fixed << std::setprecision(2)
+            << "R " << std::max(0.0, snapshot.receiveLatencyMs)
+            << " · D " << std::max(0.0, snapshot.decodeLatencyMs)
+            << " · Q " << std::max(0.0, snapshot.queueWaitMs)
+            << " · G " << std::max(0.0, snapshot.renderLatencyMs)
+            << " · C " << std::max(0.0, snapshot.clientPipelineMs) << " ms";
+        status.latencyText = out.str();
+    }
     status.decodeText = fixed(std::max(0.0, snapshot.decodeLatencyMs), 2, " ms");
     status.renderText = fixed(std::max(0.0, snapshot.renderLatencyMs), 2, " ms");
     status.packetLossText = fixed(std::clamp(snapshot.packetLossPercent, 0.0, 100.0), 2, "%");
@@ -36,8 +51,11 @@ LitePerformanceStatus buildLiteStatus(const LitePerformanceSnapshot& snapshot) {
     }
     {
         std::ostringstream out;
-        out << snapshot.queueDepth << " / " << snapshot.queueTarget << " / "
-            << snapshot.queueCapacity;
+        out << snapshot.queueDepth << " / " << snapshot.queueTarget;
+        if (snapshot.queueJitterMs > 0.0) {
+            out << std::fixed << std::setprecision(1) << " · j "
+                << snapshot.queueJitterMs << " ms";
+        }
         status.frameQueueText = out.str();
     }
     status.presentationText =

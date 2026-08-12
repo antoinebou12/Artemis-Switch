@@ -70,7 +70,10 @@ class FFmpegVideoDecoder : public IFFmpegVideoDecoder {
 
     VideoDecodeStats m_video_decode_stats_progress = {};
     VideoDecodeStats m_video_decode_stats_cache = {};
-    uint64_t timeCount = 0;
+    // Open progress window start (steady clock). 0 = unset.
+    std::chrono::steady_clock::time_point m_stats_window_start{};
+    bool m_stats_window_started = false;
+    uint64_t m_stats_window_bytes = 0;
 
     char* m_ffmpeg_buffer = nullptr;
   #if defined(PLATFORM_ANDROID)

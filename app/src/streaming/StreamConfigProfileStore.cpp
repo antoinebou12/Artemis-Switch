@@ -152,6 +152,8 @@ json_t* profileToJson(const StreamConfigProfile& profile) {
                         profile.preventPacketLoss ? json_true() : json_false());
     json_object_set_new(item, "low_latency_pacing",
                         profile.lowLatencyPacing ? json_true() : json_false());
+    json_object_set_new(item, "frames_queue_size",
+                        json_integer(profile.framesQueueSize));
     json_object_set_new(item, "packet_size",
                         json_integer(artemis::stream::clampPacketSize(
                             profile.packetSize)));
@@ -293,6 +295,15 @@ StreamConfigProfile profileFromJson(json_t* object) {
         profile.preventPacketLoss = jsonToBool(loss);
     if (json_t* lowLatency = json_object_get(object, "low_latency_pacing"))
         profile.lowLatencyPacing = jsonToBool(lowLatency);
+    if (json_t* framesQueue = json_object_get(object, "frames_queue_size");
+        json_is_integer(framesQueue)) {
+        int size = static_cast<int>(json_integer_value(framesQueue));
+        if (size < 1)
+            size = 1;
+        if (size > 5)
+            size = 5;
+        profile.framesQueueSize = size;
+    }
     if (json_t* packetSize = json_object_get(object, "packet_size");
         json_is_integer(packetSize))
         profile.packetSize = artemis::stream::clampPacketSize(
@@ -463,6 +474,14 @@ void applyProfileToSettings(const StreamConfigProfile& profile, bool persist) {
     settings.set_rumble_force(profile.rumbleForce);
     settings.set_swap_joycon_stick_to_dpad(profile.swapStickToDpad);
     settings.set_low_latency_pacing(profile.lowLatencyPacing);
+    {
+        int size = profile.framesQueueSize;
+        if (size < 1)
+            size = 1;
+        if (size > 5)
+            size = 5;
+        settings.set_frames_queue_size(size);
+    }
     if (!profile.mappingLayoutTitle.empty()) {
         auto* layouts = settings.get_mapping_laouts();
         for (size_t i = 0; layouts && i < layouts->size(); ++i) {
@@ -636,6 +655,7 @@ StreamConfigProfileStore::snapshotFromSettings(const std::string& name) {
     profile.forceFullRangeVideo = advanced.forceFullRangeVideo;
     profile.preventPacketLoss = advanced.preventPacketLoss;
     profile.lowLatencyPacing = settings.low_latency_pacing();
+    profile.framesQueueSize = settings.frames_queue_size();
     profile.packetSize =
         artemis::stream::clampPacketSize(advanced.packetSize);
     profile.scaleMode = artemis::video::VideoScaleStore::instance().get();
@@ -672,6 +692,8 @@ int StreamConfigProfileStore::addMissingDefaults() {
         profile.aspectRatio = StreamAspectRatio::Ratio16x9;
         profile.fps = spec.fps;
         profile.bitrateKbps = spec.bitrateKbps;
+        profile.lowLatencyPacing = spec.lowLatencyPacing;
+        profile.framesQueueSize = spec.framesQueueSize;
         profile.videoCodec = H264;
         profile.scaleMode = artemis::video::ScaleMode::Fill;
         m_profiles.push_back(profile);
