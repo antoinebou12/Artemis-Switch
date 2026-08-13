@@ -59,6 +59,7 @@ class StreamingView : public brls::Box {
     bool pendingTeardownTerminateApp = false;
     brls::Event<brls::KeyState>::Subscription keysSubscription;
     brls::Event<bool>::Subscription windowFocusSubscription;
+    brls::VoidEvent::Subscription windowShouldCloseSubscription;
     int touchScrollCounter = 0;
     size_t bottombarDelayTask = -1;
     bool m_use_hdr = false;

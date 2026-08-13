@@ -451,7 +451,7 @@
         "audio_51_surround": "Surround 5.1 (downmix sur Switch)",
         "terminate_app_on_disconnect": "Quitter l'app hôte à la déconnexion",
         "quality": "Qualité (Des paramètres plus élevés nécessitent un overclock CPU)",
-        "request_hdr": "Demander une vidéo HDR",
+        "request_hdr": "Demander une vidéo HDR (Vibepollo)",
         "resolution": "Résolution",
         "resolution_native": "Native",
         "resolution_scale": "Échelle",

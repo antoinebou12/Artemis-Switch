@@ -43,6 +43,13 @@ void merge_host(Host& target, const Host& source) {
     } else {
         target.ensure_endpoints();
     }
+    for (const auto& app : source.favorites) {
+        const bool exists = std::any_of(
+            target.favorites.begin(), target.favorites.end(),
+            [&](const App& favorite) { return favorite.app_id == app.app_id; });
+        if (!exists)
+            target.favorites.push_back(app);
+    }
 }
 
 std::string make_preferred_path(const fs::path& path) {
@@ -196,6 +203,10 @@ std::string Settings::peek_app_locale() {
 }
 
 void Settings::load() {
+    // Profile restore and language paths call load() again. Always replace
+    // lists — appending re-created hundreds of duplicate host tabs.
+    m_hosts.clear();
+    m_mapping_laouts.clear();
     loadBaseLayouts();
 
     json_t* root = json_load_file(settings_file_path(m_working_dir).c_str(), 0, nullptr);
@@ -292,7 +303,14 @@ void Settings::load() {
                             }
                         }
                         
-                        m_hosts.push_back(host);
+                        // Merge duplicates already present in settings.json
+                        // (same MAC, or same hostname + IP).
+                        if (Host* existing = find_host(m_hosts, host)) {
+                            merge_host(*existing, host);
+                            existing->ensure_endpoints();
+                        } else {
+                            m_hosts.push_back(host);
+                        }
                     }
                 }
             }

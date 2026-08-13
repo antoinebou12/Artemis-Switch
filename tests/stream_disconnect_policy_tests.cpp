@@ -23,6 +23,7 @@ int main() {
 
     assert(shouldReloadAppsAfterHostQuit(true));
     assert(shouldReloadAppsAfterHostQuit(false));
+    assert(shouldTerminateHostOnApplicationExit());
 
     markStreamUiClosed();
     assert(consumeStreamUiClosed());

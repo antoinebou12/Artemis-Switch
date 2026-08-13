@@ -809,6 +809,9 @@ elseif (USE_METAL_RENDERER)
     set(SUPPORT_HDR ON)
     add_definitions(-DUSE_METAL_RENDERER)
 elseif (USE_DEKO3D_RENDERER)
+    # Request HDR (10-bit HEVC/AV1) from the host. Recommended with Vibepollo;
+    # Switch presents tone-mapped when the display path is not native HDR.
+    set(SUPPORT_HDR ON)
     add_definitions(-DUSE_DEKO3D_RENDERER)
 endif ()
 

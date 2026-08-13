@@ -172,7 +172,7 @@
         "overlay_zero_time": "0 (즉시)",
         "paop": "PC에서 오디오 재생",
         "quality": "품질 (설정이 높을수록 CPU 오버클럭 필요)",
-        "request_hdr": "HDR 비디오 요청",
+        "request_hdr": "HDR 비디오 요청 (Vibepollo)",
         "resolution": "해상도",
         "resolution_native": "기본",
         "resolution_scale": "배율",

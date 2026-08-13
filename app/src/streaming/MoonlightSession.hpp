@@ -22,7 +22,9 @@ class MoonlightSession {
     static MoonlightSession* activeSession();
 
     void start(ServerCallback<bool> callback, bool is_sunshine);
-    void stop(int terminate_app);
+    void stop(int terminate_app, bool sync_host_quit = false);
+    // Process exit / app restart: stop Limelight and sync-cancel the host app.
+    void stopForApplicationExit();
     void set_address(const std::string& address) { m_address = address; }
     void setApolloLaunchOptions(APOLLO_LAUNCH_OPTIONS options) {
         m_apollo_launch_options = std::move(options);

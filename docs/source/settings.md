@@ -55,8 +55,8 @@ Resolution scale
 Video codec
 : **H.264**, **HEVC (H.265)**, or **AV1 (Experimental)**. Switch has no hardware AV1 in this build; AV1 may fail to open. Prefer H.264 or HEVC.
 
-Request HDR Video
-: Ask the host for HDR. Only useful if the host and display path actually output HDR.
+Request HDR Video (Vibepollo)
+: Ask the host for HDR (10-bit HEVC/AV1). Use with **[Vibepollo](https://github.com/Nonary/Vibepollo)** — that host handles HDR best in testing. Other hosts may ignore or mishandle the request.
 
 Decoder Threads
 : Software-decode thread count. **0 (No use threads)** leaves it to FFmpeg. Hardware decode ignores this.
@@ -106,7 +106,7 @@ Stream audio channels
 : **Stereo** or **5.1 surround (downmixed on Switch)**. Surround is mixed down on the client.
 
 Quit host app on disconnect
-: Terminate the streamed app on the PC when you disconnect. Off leaves the app running.
+: Terminate the streamed app on the PC when you use overlay **Disconnect**. Off leaves the app running after a manual disconnect. **Closing or restarting Artemis** (HOME exit, language restart, process quit) always stops the stream and cancels the host app, even when this is Off.
 
 Allow volume amplification
 : Let the overlay volume slider go above 100%. Also on overlay **Options** (live; Quick volume max is 100 or 500).

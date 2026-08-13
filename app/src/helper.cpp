@@ -7,6 +7,7 @@
 
 #include "helper.hpp"
 
+#include "MoonlightSession.hpp"
 #include "Settings.hpp"
 
 #include <utility>
@@ -29,6 +30,11 @@ void showError(const std::string& message, const std::function<void(void)>& cb) 
 }
 
 void requestAppRestart() {
+    // Language change etc.: cancel host + stop Limelight before Borealis exit
+    // shuts down the async thread pool.
+    if (MoonlightSession* session = MoonlightSession::activeSession())
+        session->stopForApplicationExit();
+
 #ifdef __SWITCH__
     const auto path = Settings::instance().launch_path();
     if (!path.empty()) {

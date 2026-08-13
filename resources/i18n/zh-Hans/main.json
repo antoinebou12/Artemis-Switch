@@ -172,7 +172,7 @@
         "overlay_zero_time": "0（立即）",
         "paop": "串流时在主机上也同时播放音频",
         "quality": "串流质量 (更高的质量需要CPU超频)",
-        "request_hdr": "请求 HDR 视频",
+        "request_hdr": "请求 HDR 视频 (Vibepollo)",
         "resolution": "分辨率",
         "resolution_native": "原生",
         "resolution_scale": "缩放",

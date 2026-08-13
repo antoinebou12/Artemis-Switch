@@ -812,3 +812,25 @@ void GameStreamClient::quit(const Host& host,
                             ServerCallback<bool>& callback) {
     quit(active_address(host), callback);
 }
+
+bool GameStreamClient::quitNow(const std::string& address) {
+    if (m_server_data.count(address) == 0) {
+        brls::Logger::warning(
+            "GameStreamClient: quitNow skipped, no cached server for {}",
+            address.c_str());
+        return false;
+    }
+
+    auto server_data = m_server_data[address];
+    const int status = gs_quit_app((PSERVER_DATA)&server_data);
+    if (status != GS_OK) {
+        brls::Logger::warning(
+            "GameStreamClient: quitNow failed for {}: {}", address.c_str(),
+            gs_error().c_str());
+        return false;
+    }
+
+    brls::Logger::info("GameStreamClient: quitNow cancelled host app on {}",
+                       address.c_str());
+    return true;
+}

@@ -29,7 +29,7 @@ public:
     void noteFirstPacket(size_t bytes) {
         std::lock_guard lock(m_mutex);
         ensureStreamLocked();
-        if (!m_.firstPacket) {
+        if (!m_.hasFirstPacket) {
             m_.firstPacket = clock::now();
             m_.hasFirstPacket = true;
         }

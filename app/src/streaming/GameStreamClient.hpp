@@ -106,6 +106,10 @@ class GameStreamClient : public Singleton<GameStreamClient> {
     void quit(const std::string& address, ServerCallback<bool>& callback);
     void quit(const Host& host, ServerCallback<bool>& callback);
 
+    // Synchronous /cancel for process exit — async quit can be killed by
+    // ThreadPool::shutdown before the HTTP request finishes.
+    bool quitNow(const std::string& address);
+
   private:
     template <typename T, typename Worker>
     void with_cached_server_data(const std::string& address,

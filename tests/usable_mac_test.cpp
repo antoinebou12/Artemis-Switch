@@ -15,5 +15,10 @@ int main() {
     assert(is_usable_mac("FF:FF:FF:FF:FF:FF"));
     assert(is_usable_mac("AABBCCDDEEFF"));
 
+    assert(normalize_mac_key("AA:BB:CC:DD:EE:FF") == "aabbccddeeff");
+    assert(normalize_mac_key("aa-bb-cc-dd-ee-ff") == "aabbccddeeff");
+    assert(normalize_mac_key("60:ff:9e:09:9f:ba") ==
+           normalize_mac_key("60:FF:9E:09:9F:BA"));
+
     return 0;
 }

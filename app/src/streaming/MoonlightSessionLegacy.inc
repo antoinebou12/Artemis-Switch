@@ -386,7 +386,7 @@ void MoonlightSession::start(ServerCallback<bool> callback, bool is_sunshine) {
         }, m_apollo_launch_options);
 }
 
-void MoonlightSession::stop(int terminate_app) {
+void MoonlightSession::stop(int terminate_app, bool sync_host_quit) {
     if (m_stop_requested)
         return;
 
@@ -396,10 +396,18 @@ void MoonlightSession::stop(int terminate_app) {
     // Sunshine can leave the host session paused after LiStopConnection alone
     // (community report: Moonlight-Switch #215). Always cancel for Sunshine so
     // other clients can reconnect without restarting the host service.
-    if (terminate_app || m_is_sunshine)
-        GameStreamClient::instance().quit(m_address, [](auto _) {});
+    if (terminate_app || m_is_sunshine) {
+        if (sync_host_quit)
+            GameStreamClient::instance().quitNow(m_address);
+        else
+            GameStreamClient::instance().quit(m_address, [](auto _) {});
+    }
 
     LiStopConnection();
+}
+
+void MoonlightSession::stopForApplicationExit() {
+    stop(/*terminate_app=*/1, /*sync_host_quit=*/true);
 }
 
 void MoonlightSession::restart() {

@@ -105,13 +105,26 @@ struct Host {
 };
 
 inline bool hosts_match(const Host& lhs, const Host& rhs) {
-    if (is_usable_mac(lhs.mac) && is_usable_mac(rhs.mac))
-        return lhs.mac == rhs.mac;
+    if (is_usable_mac(lhs.mac) && is_usable_mac(rhs.mac) &&
+        normalize_mac_key(lhs.mac) == normalize_mac_key(rhs.mac))
+        return true;
 
-    for (const auto& address : lhs.connection_addresses()) {
-        if (rhs.has_address(address))
-            return true;
-    }
+    auto shares_address = [&]() {
+        for (const auto& address : lhs.connection_addresses()) {
+            if (rhs.has_address(address))
+                return true;
+        }
+        return false;
+    };
+
+    // Same PC name + same IP (or shared endpoint) is the same host.
+    if (!lhs.hostname.empty() && lhs.hostname == rhs.hostname &&
+        shares_address())
+        return true;
+
+    // When either side lacks a usable MAC, fall back to address identity.
+    if (!is_usable_mac(lhs.mac) || !is_usable_mac(rhs.mac))
+        return shares_address();
 
     return false;
 }

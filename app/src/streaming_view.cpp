@@ -25,6 +25,7 @@
 #include "video/VideoScaleStore.hpp"
 #include "features/ui/StatsOverlayLayout.hpp"
 #include "streaming/StreamConfigProfileStore.hpp"
+#include "streaming/StreamDisconnectPolicy.hpp"
 #include "streaming/StreamProfileStore.hpp"
 #include "streaming/StreamUiLifecycle.hpp"
 #include "utils/ArtemisPlatformFeatures.hpp"
@@ -147,6 +148,17 @@ StreamingView::StreamingView(const Host& host, const AppInfo& app) : host(host),
         Application::getWindowFocusChangedEvent()->subscribe(
             [this](bool focused) { this->onWindowFocusChanged(focused); });
 #endif
+
+    // HOMEBREW exit / language restart: cancel host before ThreadPool dies.
+    windowShouldCloseSubscription =
+        Application::getWindowShouldCloseEvent()->subscribe([this] {
+            if (terminated || !session)
+                return;
+            terminated = true;
+            pendingTeardownTerminateApp =
+                artemis::streaming::shouldTerminateHostOnApplicationExit();
+            session->stopForApplicationExit();
+        });
 
 #if ARTEMIS_CLEAR_RUMBLE_ON_STREAM_START
     // Clear any rumble left from wireless pads connected before launch.
@@ -419,7 +431,7 @@ void StreamingView::draw(NVGcontext* vg, float x, float y, float width,
     if (pendingSuspendTerminate) {
         // Focus callback only records intent; tear down here on the main loop.
         pendingSuspendTerminate = false;
-        terminate(Settings::instance().terminate_app_on_disconnect());
+        terminate(artemis::streaming::shouldTerminateHostOnApplicationExit());
         return;
     }
 #endif
@@ -657,7 +669,8 @@ void StreamingView::finishTeardown() {
     teardownStarted = true;
 
     if (session)
-        session->stop(pendingTeardownTerminateApp);
+        session->stop(pendingTeardownTerminateApp,
+                      /*sync_host_quit=*/pendingTeardownTerminateApp);
     restoreGlobalSettingsIfNeeded();
     releaseInputBlock();
 
@@ -940,10 +953,18 @@ StreamingView::~StreamingView() {
     Application::getWindowFocusChangedEvent()->unsubscribe(
         windowFocusSubscription);
 #endif
+    Application::getWindowShouldCloseEvent()->unsubscribe(
+        windowShouldCloseSubscription);
     releaseInputBlock();
     restoreGlobalSettingsIfNeeded();
     if (session) {
-        session->stop(Settings::instance().terminate_app_on_disconnect());
+        // Prefer pending teardown choice; otherwise force host cancel on
+        // unexpected destroy (Application::clear during exit).
+        const bool terminateHost =
+            teardownStarted
+                ? pendingTeardownTerminateApp
+                : artemis::streaming::shouldTerminateHostOnApplicationExit();
+        session->stop(terminateHost, /*sync_host_quit=*/terminateHost);
         delete session;
         session = nullptr;
     }

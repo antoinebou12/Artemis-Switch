@@ -24,4 +24,9 @@ inline bool shouldReloadAppsAfterHostQuit(bool /*quitSucceeded*/) {
     return true;
 }
 
+// Artemis process exit / language restart / HOME-sleep end of stream: always
+// cancel the host session so Steam/Apollo is not left running headless.
+// Overlay "Disconnect" still honors Settings::terminate_app_on_disconnect.
+inline bool shouldTerminateHostOnApplicationExit() { return true; }
+
 } // namespace artemis::streaming

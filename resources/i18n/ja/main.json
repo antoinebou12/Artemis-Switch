@@ -172,7 +172,7 @@
         "overlay_zero_time": "0 (すぐに)",
         "paop": "PCでオーディオを再生する",
         "quality": "品質 (Higher settings requires CPU overclock)",
-        "request_hdr": "Request HDR Video",
+        "request_hdr": "Request HDR Video (Vibepollo)",
         "resolution": "解像度",
         "resolution_native": "ネイティブ",
         "resolution_scale": "倍率",
