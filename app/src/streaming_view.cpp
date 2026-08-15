@@ -174,7 +174,8 @@ StreamingView::StreamingView(const Host& host, const AppInfo& app) : host(host),
         host, [ASYNC_TOKEN](GSResult<SERVER_DATA> result) {
             ASYNC_RELEASE
             if (!result.isSuccess()) {
-                showError(result.error(), [this]() { terminate(false); });
+                terminate(false);
+                showError(result.error());
                 return;
             }
 
@@ -232,7 +233,8 @@ StreamingView::StreamingView(const Host& host, const AppInfo& app) : host(host),
 
                 loader->setHidden(true);
                 if (!result.isSuccess()) {
-                    showError(result.error(), [this]() { terminate(false); });
+                    terminate(false);
+                    showError(result.error());
                 }
             }, result.value().isSunshine());
         });
@@ -441,17 +443,19 @@ void StreamingView::draw(NVGcontext* vg, float x, float y, float width,
         return;
     }
 
-    // Present against the live Switch framebuffer size so dock↔handheld
-    // changes always full-blit even if the AppletFrame layout briefly lags.
+    if (artemis::streaming::shouldPresentStreamFrame(session->is_terminated(),
+                                                     session->is_active())) {
 #if defined(PLATFORM_SWITCH)
-    const int presentW =
-        Application::windowWidth > 0 ? Application::windowWidth : (int)width;
-    const int presentH =
-        Application::windowHeight > 0 ? Application::windowHeight : (int)height;
-    session->draw(vg, presentW, presentH);
+        const int presentW =
+            Application::windowWidth > 0 ? Application::windowWidth : (int)width;
+        const int presentH =
+            Application::windowHeight > 0 ? Application::windowHeight
+                                          : (int)height;
+        session->draw(vg, presentW, presentH);
 #else
-    session->draw(vg, (int)width, (int)height);
+        session->draw(vg, (int)width, (int)height);
 #endif
+    }
 
     if (!tempInputLock && session->is_active())
         handleInput();

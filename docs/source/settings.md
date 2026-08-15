@@ -38,13 +38,13 @@ Language
 
 ## Quality
 
-Higher quality needs more decode work. 1080p high bitrate usually wants CPU/GPU overclock.
+Higher quality needs more decode work. 1080p high bitrate usually wants CPU/GPU overclock. **1440p** and Native **2.0x** can stutter; drop to 1080p or 720p if it lags.
 
 FPS
 : Stream frame rate requested from the host (typical steps 30 / 40 / 60 / 90 / 120). The Artemis **Frame rate** row is the same value when you use a profile.
 
 Resolution
-: Stream width × height sent to Sunshine/Apollo. **Native** follows the Switch output. Custom sizes live under Artemis **Use custom resolution**.
+: Stream width × height sent to Sunshine/Apollo. **Native** follows the Switch output. **1440p (may lag)** is 2560×1440 at 16:9. Custom sizes live under Artemis **Use custom resolution** (up to 2560×1440).
 
 Aspect ratio
 : **16:9** or **4:3**. Changes how the requested resolution is interpreted with the scale mode.
@@ -245,7 +245,7 @@ Use custom resolution
 : Ignore the Quality resolution picker and send width × height below. Width/height rows hide when this is off.
 
 Custom width / Custom height
-: Exact stream size (width 640–1920, height 360–1080).
+: Exact stream size (width 640–2560, height 360–1440). 1440p may lag.
 
 ### Frame Rate & Video
 

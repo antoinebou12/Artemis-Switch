@@ -4,11 +4,11 @@ namespace artemis::ui {
 
 std::vector<QuickAction> buildQuickActions(const QuickMenuContext& context) {
     std::vector<QuickAction> actions = {
+        QuickAction::OpenMouseControls,
         QuickAction::ToggleKeyboard,
         QuickAction::MoveActiveWindow,
         QuickAction::CycleDisplayMode,
         QuickAction::ShowConnectedControllers,
-        QuickAction::OpenMouseControls,
         QuickAction::ToggleTouchControls,
         QuickAction::SendSpecialKey,
         context.benchmarkRunning ? QuickAction::StopBenchmark

@@ -17,7 +17,7 @@ struct DefaultStreamProfileSpec {
 };
 
 // Built-in presets: 30/60 FPS only. Seeds use 16:9; the editor can set 4:3.
-inline constexpr std::array<DefaultStreamProfileSpec, 14> kDefaultStreamProfiles{{
+inline constexpr std::array<DefaultStreamProfileSpec, 18> kDefaultStreamProfiles{{
     {"360p 30 0.5M", 360, 30, 500},
     {"360p 30 1M", 360, 30, 1000},
     {"480p 30 5M", 480, 30, 5000},
@@ -32,6 +32,10 @@ inline constexpr std::array<DefaultStreamProfileSpec, 14> kDefaultStreamProfiles
     {"1080p 60 20M", 1080, 60, 20000},
     {"1080p 60 50M", 1080, 60, 50000},
     {"1080p 60 100M", 1080, 60, 100000},
+    {"1440p 30 20M", 1440, 30, 20000},
+    {"1440p 30 50M", 1440, 30, 50000},
+    {"1440p 60 50M", 1440, 60, 50000},
+    {"1440p 60 100M", 1440, 60, 100000},
 }};
 
 inline constexpr const char* kDefaultActiveProfileName = "720p 60 10M";

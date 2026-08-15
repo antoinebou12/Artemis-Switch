@@ -19,6 +19,7 @@
 #include "features/input/InputSettingsStore.hpp"
 #include "features/video/UpscalingModeSelect.hpp"
 #include "keyboard_view.hpp"
+#include "StreamConfigProfileNormalize.hpp"
 #include <cmath>
 #include <iomanip>
 #include <sstream>
@@ -122,7 +123,7 @@ SettingsTab::SettingsTab() {
     std::vector<std::string> resolutions = {
         "settings/resolution_native"_i18n, "360p", "480p", "540p", "720p", "1080p",
 #if !defined(__PSV__)
-        "1440p",
+        "settings/resolution_1440p"_i18n,
 #endif
     };
     resolution->setText("settings/resolution"_i18n);
@@ -174,7 +175,22 @@ SettingsTab::SettingsTab() {
             resolutionScale->setSelection(2);
             break;
     }
-    resolutionScale->getEvent()->subscribe([](int selected) {
+    auto updateNativeResolutionScaleVisibility = [this]() {
+        resolutionScale->setVisibility(
+            resolution->getSelection() == 0 ? brls::Visibility::VISIBLE
+                                            : brls::Visibility::GONE);
+    };
+    auto updateResolutionLagWarning = [this]() {
+        const bool warn = artemis::streaming::highResolutionMayLag(
+            Settings::instance().resolution(),
+            Settings::instance().native_resolution_scale());
+        resolutionLagWarning->setVisibility(
+            warn ? brls::Visibility::VISIBLE : brls::Visibility::GONE);
+    };
+    updateNativeResolutionScaleVisibility();
+    updateResolutionLagWarning();
+    resolutionScale->getEvent()->subscribe(
+        [updateResolutionLagWarning](int selected) {
         switch (selected) {
             SET_SETTING(0, set_native_resolution_scale(50));
             SET_SETTING(1, set_native_resolution_scale(75));
@@ -184,6 +200,7 @@ SettingsTab::SettingsTab() {
 #endif
             DEFAULT;
         }
+        updateResolutionLagWarning();
     });
 
 #ifdef SUPPORT_UPSCALING
@@ -296,14 +313,8 @@ SettingsTab::SettingsTab() {
     rcas->removeFromSuperView(true);
 #endif
 
-    auto updateNativeResolutionScaleVisibility = [this]() {
-        resolutionScale->setVisibility(
-            resolution->getSelection() == 0 ? brls::Visibility::VISIBLE
-                                            : brls::Visibility::GONE);
-    };
-    updateNativeResolutionScaleVisibility();
-
-    resolution->getEvent()->subscribe([this, updateNativeResolutionScaleVisibility](int selected) {
+    resolution->getEvent()->subscribe([this, updateNativeResolutionScaleVisibility,
+                                       updateResolutionLagWarning](int selected) {
         switch (selected) {
             SET_SETTING(0, set_resolution(-1));
             SET_SETTING(1, set_resolution(360));
@@ -317,6 +328,7 @@ SettingsTab::SettingsTab() {
             DEFAULT;
         }
         updateNativeResolutionScaleVisibility();
+        updateResolutionLagWarning();
     });
 
 #if defined(__PSV__)

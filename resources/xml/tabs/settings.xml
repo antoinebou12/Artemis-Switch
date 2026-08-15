@@ -35,6 +35,10 @@
             <brls:SelectorCell
                 id="resolution"/>
 
+            <brls:Header
+                id="resolution_lag_warning"
+                title="@i18n/settings/resolution_high_warning"/>
+
             <brls:SelectorCell
                 id="aspect_ratio"/>
 

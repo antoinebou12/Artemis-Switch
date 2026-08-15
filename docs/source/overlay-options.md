@@ -15,6 +15,7 @@ The sequence above is what **Low latency pacing** drives when enabled: decode �
 | Control | Live? | Same as Settings? | Notes |
 |---|---|---|---|
 | Input overlay | Yes | Helper only | Extra on-stream input helper |
+| **Mouse shortcut** | Yes | Mouse input mode | Hold time + button chord to open mouse mode |
 | Keyboard type / taps | Yes | Keyboard | Same as Settings → Keyboard |
 | Pointer mode | Yes | Mouse / pointer | Trackpad, absolute, multi-touch, disabled, … |
 | Controllers | Yes | Controller | Pads, slots, rumble + motion tests |

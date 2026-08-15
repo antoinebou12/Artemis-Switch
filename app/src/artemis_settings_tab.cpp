@@ -410,7 +410,7 @@ void ArtemisSettingsTab::editWidth() {
         artemis::streaming::StreamProfileStore::instance().get();
     Application::getImeManager()->openForNumber(
         [this, current](long number) {
-            const int value = std::clamp(static_cast<int>(number), 640, 1920);
+            const int value = std::clamp(static_cast<int>(number), 640, 2560);
             artemis::streaming::StreamProfileStore::instance()
                 .setCustomResolution(current.customResolutionEnabled, value,
                                      current.height);
@@ -426,7 +426,7 @@ void ArtemisSettingsTab::editHeight() {
         artemis::streaming::StreamProfileStore::instance().get();
     Application::getImeManager()->openForNumber(
         [this, current](long number) {
-            const int value = std::clamp(static_cast<int>(number), 360, 1080);
+            const int value = std::clamp(static_cast<int>(number), 360, 1440);
             artemis::streaming::StreamProfileStore::instance()
                 .setCustomResolution(current.customResolutionEnabled,
                                      current.width, value);

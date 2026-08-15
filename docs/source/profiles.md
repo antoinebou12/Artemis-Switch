@@ -43,6 +43,12 @@ On first launch (empty `profile.json`), Artemis seeds these 30/60 FPS presets. *
 | 1080p 60 20M | 1080 | 60 | 20 Mbps | |
 | 1080p 60 50M | 1080 | 60 | 50 Mbps | |
 | 1080p 60 100M | 1080 | 60 | 100 Mbps | High bandwidth |
+| **1440p 30 20M** | 1440 | 30 | 20 Mbps | May lag on Switch |
+| **1440p 30 50M** | 1440 | 30 | 50 Mbps | May lag on Switch |
+| **1440p 60 50M** | 1440 | 60 | 50 Mbps | May lag on Switch |
+| **1440p 60 100M** | 1440 | 60 | 100 Mbps | May lag on Switch |
+
+1440p is **2560×1440** at 16:9. The Switch panel is 720p/1080p, so the extra pixels are decode cost. Settings shows a warning for 1440p and Native **2.0x**. Existing installs: **Add missing defaults** on Manage profiles.
 
 Seeds use **16:9**. The editor can switch a profile to **4:3**. Virtual display and Apollo scale stay on the host web UI, not in the profile.
 

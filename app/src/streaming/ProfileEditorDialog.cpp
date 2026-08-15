@@ -268,6 +268,9 @@ void maybeClearFsrPreset(StreamConfigProfile* draft, brls::DetailCell* cell) {
 std::string heightLabel(int height) {
     if (height < 0)
         return "settings/resolution_native"_i18n;
+    if (highResolutionMayLag(height))
+        return fmt::format("{}p — {}", height,
+                           "settings/may_lag"_i18n);
     return fmt::format("{}p", height);
 }
 

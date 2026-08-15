@@ -19,6 +19,8 @@ int main() {
 
     assert(streamWidthFromHeight(720, StreamAspectRatio::Ratio16x9) == 1280);
     assert(streamWidthFromHeight(1080, StreamAspectRatio::Ratio16x9) == 1920);
+    assert(streamWidthFromHeight(1440, StreamAspectRatio::Ratio16x9) == 2560);
+    assert(streamWidthFromHeight(1440, StreamAspectRatio::Ratio4x3) == 1920);
     assert(streamWidthFromHeight(720, StreamAspectRatio::Ratio4x3) == 960);
     assert(streamWidthFromHeight(1080, StreamAspectRatio::Ratio4x3) == 1440);
     assert(aspectRatioFromString("4:3") == StreamAspectRatio::Ratio4x3);
@@ -30,6 +32,13 @@ int main() {
     assert(normalizeProfileHeight(480) == 480);
     assert(normalizeProfileHeight(720) == 720);
     assert(normalizeProfileHeight(1080) == 1080);
+    assert(normalizeProfileHeight(1440) == 1440);
+    assert(normalizeProfileHeight(1400) == 1440);
+    assert(!highResolutionMayLag(720));
+    assert(!highResolutionMayLag(1080));
+    assert(highResolutionMayLag(1440));
+    assert(highResolutionMayLag(-1, 200));
+    assert(!highResolutionMayLag(-1, 100));
     assert(normalizeProfileHeight(700) == 720);
     assert(normalizeProfileHeight(400) == 360);
     assert(normalizeProfileHeight(900) == 720);
@@ -63,7 +72,7 @@ int main() {
     assert(profile.rumbleForce <= 1.0f + 1e-6f);
     assert(profile.name == "Profile");
 
-    assert(kDefaultStreamProfiles.size() == 14);
+    assert(kDefaultStreamProfiles.size() == 18);
     assert(std::strcmp(kDefaultActiveProfileName, "720p 60 10M") == 0);
     assert(isDefaultProfileName(kDefaultActiveProfileName));
 
@@ -73,7 +82,7 @@ int main() {
     for (const auto& spec : kDefaultStreamProfiles) {
         assert(spec.fps == 30 || spec.fps == 60);
         assert(spec.height == 360 || spec.height == 480 || spec.height == 540 ||
-               spec.height == 720 || spec.height == 1080);
+               spec.height == 720 || spec.height == 1080 || spec.height == 1440);
         names.insert(spec.name);
         bitrates.insert(spec.bitrateKbps);
         if (std::strcmp(spec.name, "720p 60 Low Latency") == 0) {
@@ -83,7 +92,7 @@ int main() {
         }
     }
     assert(foundLowLatency);
-    assert(names.size() == 14);
+    assert(names.size() == 18);
     assert(names.count("360p 30 0.5M") == 1);
     assert(names.count("360p 30 1M") == 1);
     assert(names.count("480p 30 5M") == 1);
@@ -98,6 +107,10 @@ int main() {
     assert(names.count("1080p 60 20M") == 1);
     assert(names.count("1080p 60 50M") == 1);
     assert(names.count("1080p 60 100M") == 1);
+    assert(names.count("1440p 30 20M") == 1);
+    assert(names.count("1440p 30 50M") == 1);
+    assert(names.count("1440p 60 50M") == 1);
+    assert(names.count("1440p 60 100M") == 1);
     assert(names.count("720p 4:3") == 0);
     assert(names.count("360p remote") == 0);
     const std::set<int> expectedBitrates{500, 1000, 5000, 10000, 20000, 50000,

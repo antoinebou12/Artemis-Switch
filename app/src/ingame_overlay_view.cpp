@@ -635,6 +635,22 @@ QuickTab::QuickTab(StreamingView* streamView) : streamView(streamView) {
     });
 
     quickMouse->setText("artemis/overlay/mouse_controls"_i18n);
+    auto refreshMouseShortcut = [this] {
+        const auto buttons =
+            Settings::instance().mouse_input_options().buttons;
+        if (buttons.empty()) {
+            quickMouse->setDetailText("artemis/overlay/mouse_shortcut_off"_i18n);
+            return;
+        }
+        std::string text;
+        for (size_t i = 0; i < buttons.size(); i++) {
+            text += brls::Hint::getKeyIcon(buttons[i], true);
+            if (i + 1 < buttons.size())
+                text += " + ";
+        }
+        quickMouse->setDetailText(text);
+    };
+    refreshMouseShortcut();
     quickMouse->registerClickAction([this](View*) {
         this->dismiss([this]() {
             auto* overlay = new StreamingInputOverlay(this->streamView);
@@ -899,6 +915,33 @@ OptionsTab::OptionsTab(StreamingView* streamView) : streamView(streamView) {
             auto* overlay = new StreamingInputOverlay(this->streamView);
             Application::pushActivity(new Activity(overlay));
         });
+        return true;
+    });
+
+    mouseInputTime->init(
+        "settings/overlay_time"_i18n,
+        {"settings/overlay_zero_time"_i18n, "1", "2", "3", "4", "5"},
+        Settings::instance().mouse_input_options().holdTime, [](int value) {
+            auto options = Settings::instance().mouse_input_options();
+            options.holdTime = value;
+            Settings::instance().set_mouse_input_options(options);
+            Settings::instance().save();
+        });
+
+    mouseInputButtons->setText("settings/overlay_buttons"_i18n);
+    setupButtonsSelectorCell(
+        mouseInputButtons, Settings::instance().mouse_input_options().buttons);
+    mouseInputButtons->registerClickAction([this](View* view) {
+        ButtonSelectingDialog* dialog = ButtonSelectingDialog::create(
+            "settings/mouse_input_setup_message"_i18n, [this](auto buttons) {
+                auto options = Settings::instance().mouse_input_options();
+                options.buttons = buttons;
+                Settings::instance().set_mouse_input_options(options);
+                Settings::instance().save();
+                setupButtonsSelectorCell(mouseInputButtons, buttons);
+            });
+
+        dialog->open();
         return true;
     });
 

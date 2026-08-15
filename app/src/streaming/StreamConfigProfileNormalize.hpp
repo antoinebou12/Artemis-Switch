@@ -28,6 +28,14 @@ inline int normalizeProfileHeight(int height) {
     return best;
 }
 
+// 1440p (and native 2.0x) is more decode work than the Switch panel. Warn in UI.
+inline bool highResolutionMayLag(int resolutionHeight,
+                                 int nativeScalePercent = 100) {
+    if (resolutionHeight >= 1440)
+        return true;
+    return resolutionHeight < 0 && nativeScalePercent >= 200;
+}
+
 inline int normalizeNativeResolutionScale(int scale) {
     switch (scale) {
     case 50:

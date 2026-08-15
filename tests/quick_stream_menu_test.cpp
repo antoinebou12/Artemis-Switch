@@ -9,6 +9,8 @@ using artemis::ui::buildQuickActions;
 
 int main() {
     auto actions = buildQuickActions({false, true});
+    assert(!actions.empty());
+    assert(actions.front() == QuickAction::OpenMouseControls);
     assert(std::find(actions.begin(), actions.end(), QuickAction::MoveActiveWindow) != actions.end());
     assert(std::find(actions.begin(), actions.end(), QuickAction::CycleDisplayMode) != actions.end());
     assert(std::find(actions.begin(), actions.end(), QuickAction::ShowConnectedControllers) != actions.end());

@@ -29,4 +29,11 @@ inline bool shouldReloadAppsAfterHostQuit(bool /*quitSucceeded*/) {
 // Overlay "Disconnect" still honors Settings::terminate_app_on_disconnect.
 inline bool shouldTerminateHostOnApplicationExit() { return true; }
 
+// Present only while the Limelight session is live. After a drop or start
+// error, skip deko3d so teardown can LiStopConnection on the next UI frame.
+inline bool shouldPresentStreamFrame(bool sessionTerminated,
+                                     bool sessionActive) {
+    return !sessionTerminated && sessionActive;
+}
+
 } // namespace artemis::streaming

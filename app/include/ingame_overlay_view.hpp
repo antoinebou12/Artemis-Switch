@@ -81,6 +81,8 @@ class OptionsTab : public brls::Box {
     void uploadClipboard(bool pasteAfterUpload);
 
     BRLS_BIND(brls::DetailCell, inputOverlayButton, "input_overlay");
+    BRLS_BIND(brls::SelectorCell, mouseInputTime, "mouse_input_time");
+    BRLS_BIND(brls::DetailCell, mouseInputButtons, "mouse_input_buttons");
     BRLS_BIND(brls::SelectorCell, keyboardType, "keyboard_type");
     BRLS_BIND(brls::SelectorCell, keyboardFingers, "keyboard_fingers");
     BRLS_BIND(brls::DetailCell, optionsPointerMode, "options_pointer_mode");

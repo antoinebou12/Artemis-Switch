@@ -12,9 +12,10 @@ Focused in-stream actions. Keep this tab small: keyboard, mouse, move-window, vo
 
 | Control | What it does |
 |---|---|
-| **Keyboard** | Open the on-screen keyboard |
-| **Mouse** | Enter mouse-input mode (placed next to Keyboard on purpose) |
+| **Mouse** | Enter mouse-input mode (first Quick row) |
 | **Mouse speed** | Compact 0.1×–2.0× slider (84px track), directly under Mouse |
+| **Mouse shortcut** | Hold-time + button chord (same as Settings). Shown on the Mouse row; set it under overlay **Options** |
+| **Keyboard** | Open the on-screen keyboard |
 | **Move window left / right** | Host shortcut to move the focused window. Labels follow **Host device** (Win / Command / Super) |
 | **Touch screen** | On/Off touch-as-mouse for this session |
 | **Host shortcuts** | Keyboard presets (Escape, fullscreen, paste, Start/Command/Super, desktop, Game Bar, task switcher, task manager / Force quit, IME switch, move-window). Not the same as server commands |
@@ -38,7 +39,7 @@ Focused in-stream actions. Keep this tab small: keyboard, mouse, move-window, vo
 |---|---|
 | [XITRIX/Moonlight-Switch](https://github.com/XITRIX/Moonlight-Switch) | Base overlay / Borealis streaming UI |
 | Apollo / Artemis Classic | Server commands and clipboard-style host actions |
-| This fork | Mouse next to keyboard; separate move-window left/right; OS-aware shortcut labels |
+| This fork | Mouse first on Quick; mouse shortcut chord in Options; OS-aware shortcut labels |
 
 ```{seealso}
 [Options](overlay-options.md) · [Credits](credits.md)

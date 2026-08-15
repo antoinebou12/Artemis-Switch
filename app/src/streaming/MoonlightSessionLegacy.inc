@@ -4,6 +4,7 @@
 #include "GameStreamClient.hpp"
 #include "InputManager.hpp"
 #include "Settings.hpp"
+#include "StreamDisconnectPolicy.hpp"
 #include "StreamProfileStore.hpp"
 #include "borealis.hpp"
 #include <string.h>
@@ -364,7 +365,13 @@ void MoonlightSession::start(ServerCallback<bool> callback, bool is_sunshine) {
 
                     brls::sync([callback, result] {
                         if (result != 0) {
-                            LiStopConnection();
+                            // Do not LiStopConnection here: this can still race
+                            // the in-flight deko3d present. Mark dead and let
+                            // StreamingView::terminate() stop on the next frame.
+                            if (m_active_session) {
+                                m_active_session->m_is_active = false;
+                                m_active_session->m_is_terminated = true;
+                            }
                             if (Settings::instance().video_codec() == AV1) {
                                 callback(GSResult<bool>::failure(
                                     "error/av1_decoder_unavailable"_i18n));
@@ -448,6 +455,10 @@ void MoonlightSession::restartWithApolloOptions(
 }
 
 void MoonlightSession::draw(NVGcontext* vg, int width, int height) {
+    if (!artemis::streaming::shouldPresentStreamFrame(m_is_terminated.load(),
+                                                      m_is_active.load()))
+        return;
+
     if (!m_input_only && m_video_decoder && m_video_renderer) {
         AVFrameHolder::instance().get(
             [this, vg, width, height](AVFrame* frame) {
