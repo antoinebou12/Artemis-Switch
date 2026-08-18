@@ -487,7 +487,7 @@ void PerformanceTab::refresh() {
     const auto lite = artemis::performance::buildLiteStatus(snapshot);
 
     setDetailTextIfChanged(network, lite.networkText);
-    setDetailTextIfChanged(receiveLatency, lite.latencyText);
+    setDetailTextIfChanged(receiveLatency, lite.receiveText);
     setDetailTextIfChanged(decodeLatency, lite.decodeText);
     setDetailTextIfChanged(renderLatency, lite.renderText);
     setDetailTextIfChanged(gpuRender, lite.gpuText);

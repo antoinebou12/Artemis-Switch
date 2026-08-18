@@ -18,6 +18,7 @@ struct HostIdentity {
 struct HostCapabilities {
     HostKind kind = HostKind::Unknown;
     bool standardGameStream = true;
+    bool gamepadInput = false;
     bool extendedLaunchOptions = false;
     bool preciseRefreshRate = false;
     bool virtualDisplay = false;

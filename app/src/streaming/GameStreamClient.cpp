@@ -1,6 +1,7 @@
 #include "GameStreamClient.hpp"
 #include "Settings.hpp"
 #include "WakeOnLanManager.hpp"
+#include "features/input/ControllerTopology.hpp"
 #include "host/HostIdentityProbe.hpp"
 #include <borealis.hpp>
 #include <algorithm>
@@ -768,13 +769,24 @@ void GameStreamClient::start(const std::string& address,
                              const APOLLO_LAUNCH_OPTIONS& apolloOptions) {
     m_config = config;
 
+    const int reportedControllers = Application::getPlatform()
+                                        ->getInputManager()
+                                        ->getControllersConnectedCount();
+    const int gamepadMask = static_cast<int>(
+        artemis::input::launchControllerMask(reportedControllers));
+    Logger::info("Advertising GameStream controller bitmap 0x{:X} for {} "
+                 "connected controller(s)",
+                 gamepadMask,
+                 artemis::input::clampControllerCount(reportedControllers));
+
     with_cached_server_data<STREAM_CONFIGURATION>(
         address, "Firstly call connect() & pair()...", callback,
-        [this, app_id, apolloOptions](const std::string& cachedAddress,
+        [this, app_id, apolloOptions, gamepadMask](const std::string& cachedAddress,
                        ServerCallback<STREAM_CONFIGURATION>& callback) {
             int status = gs_start_app(&m_server_data[cachedAddress], &m_config,
                                       app_id, Settings::instance().sops(),
-                                      Settings::instance().play_audio(), 0x1,
+                                      Settings::instance().play_audio(),
+                                      gamepadMask,
                                       &apolloOptions);
 
             brls::sync([this, callback, status] {

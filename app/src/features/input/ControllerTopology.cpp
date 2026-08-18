@@ -15,6 +15,13 @@ std::uint16_t connectedControllerMask(int reportedCount) {
                : static_cast<std::uint16_t>((1u << count) - 1u);
 }
 
+std::uint16_t launchControllerMask(int reportedCount) {
+    const auto connected = connectedControllerMask(reportedCount);
+    // Keep player one reserved so a controller connected after launch can be
+    // announced through the standard GameStream hot-plug event.
+    return connected == 0 ? 0x01 : connected;
+}
+
 std::vector<int> connectedControllerPlayers(int reportedCount) {
     const int count = clampControllerCount(reportedCount);
     std::vector<int> players;

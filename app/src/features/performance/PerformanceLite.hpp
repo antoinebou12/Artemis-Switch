@@ -32,7 +32,7 @@ struct LitePerformanceSnapshot {
 
 struct LitePerformanceStatus {
     std::string networkText;
-    std::string latencyText;
+    std::string receiveText;
     std::string decodeText;
     std::string renderText;
     std::string packetLossText;

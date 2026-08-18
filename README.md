@@ -66,7 +66,7 @@ Hosts and clients are separate. Pick a **server** on the PC, then a **client** o
 > **Using Vibeshine?** Pair Artemis Switch with the Vibeshine PC just like any other Moonlight-compatible client. Select the host in Artemis Switch, complete the PIN pairing in Vibeshine's web UI, and manage virtual displays, HDR, and other host-side options from Vibeshine.
 
 > [!TIP]
-> **Using Punktfunk?** First enable its opt-in GameStream plane by following the official [Connect with Moonlight guide](https://docs.punktfunk.unom.io/docs/moonlight). Pair from `https://<host>:47992/`, then choose resolution and FPS in Artemis; Punktfunk creates the matching virtual display. A native-only Punktfunk host cannot accept Moonlight clients.
+> **Using Punktfunk?** First enable its opt-in GameStream plane by following the official [Connect with Moonlight guide](https://docs.punktfunk.unom.io/docs/moonlight). Pair from `https://<host>:47992/`, then choose resolution and FPS in Artemis; Punktfunk creates the matching virtual display. Artemis advertises the connected Joy-Con / controller slots in the GameStream launch and forwards standard Moonlight gamepad, hot-plug, rumble, and motion events. On Windows, keep Punktfunk's bundled virtual-gamepad driver installed. A native-only Punktfunk host cannot accept Moonlight clients.
 
 ### Host integration matrix
 

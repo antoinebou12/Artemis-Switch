@@ -24,6 +24,7 @@ HostCapabilities HostCapabilityPolicy::standardSunshine() {
     HostCapabilities c;
     c.kind = HostKind::Sunshine;
     c.standardGameStream = true;
+    c.gamepadInput = true;
     c.detectionReason = "standard GameStream/Sunshine fallback";
     return c;
 }
@@ -32,6 +33,7 @@ HostCapabilities HostCapabilityPolicy::apollo() {
     HostCapabilities c;
     c.kind = HostKind::Apollo;
     c.standardGameStream = true;
+    c.gamepadInput = true;
     c.extendedLaunchOptions = true;
     c.preciseRefreshRate = true;
     c.virtualDisplay = true;
@@ -43,6 +45,7 @@ HostCapabilities HostCapabilityPolicy::vibeshine() {
     HostCapabilities c;
     c.kind = HostKind::Vibeshine;
     c.standardGameStream = true;
+    c.gamepadInput = true;
     c.extendedLaunchOptions = true;
     c.preciseRefreshRate = true;
     c.detectionReason = "explicit Vibeshine identity";
@@ -53,6 +56,7 @@ HostCapabilities HostCapabilityPolicy::punktfunk() {
     HostCapabilities c;
     c.kind = HostKind::Punktfunk;
     c.standardGameStream = true;
+    c.gamepadInput = true;
     c.hostManagedVirtualDisplay = true;
     c.detectionReason = "Punktfunk health probe";
     return c;

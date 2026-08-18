@@ -26,22 +26,14 @@
             <brls:DetailCell id="options_pointer_mode"/>
             <brls:DetailCell id="options_controllers"/>
 
-            <brls:Header title="@i18n/artemis/overlay/apollo_options" paddingTop="60"/>
+            <brls:Header id="host_integration_header" title="@i18n/artemis/overlay/host_integration" paddingTop="60"/>
             <brls:DetailCell id="options_clipboard"/>
-            <brls:DetailCell id="options_rotation"/>
-            <brls:DetailCell id="options_scale_mode"/>
+
+            <brls:Header title="@i18n/artemis/overlay/artemis_settings" paddingTop="60"/>
+            <brls:DetailCell id="options_display"/>
             <brls:BooleanCell id="options_low_latency_pacing"/>
             <brls:BooleanCell id="options_full_range"/>
             <brls:BooleanCell id="options_volume_amp"/>
-            <brls:BooleanCell id="options_remember_zoom_pan"/>
-
-            <brls:Header id="zoom_header" paddingTop="60" title="@i18n/artemis/overlay/zoom"/>
-            <brls:Slider id="options_zoom_slider" width="auto" height="84" grow="1"/>
-            <brls:Header id="pan_x_header" paddingTop="60" title="@i18n/artemis/overlay/pan_x"/>
-            <brls:Slider id="options_pan_x_slider" width="auto" height="84" grow="1"/>
-            <brls:Header id="pan_y_header" paddingTop="60" title="@i18n/artemis/overlay/pan_y"/>
-            <brls:Slider id="options_pan_y_slider" width="auto" height="84" grow="1"/>
-            <brls:DetailCell id="options_reset_zoom_pan"/>
 
             <brls:Header title="@i18n/settings/guide_key" paddingTop="60"/>
             <brls:DetailCell id="guide_key_buttons"/>

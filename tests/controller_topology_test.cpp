@@ -18,6 +18,11 @@ int main() {
     assert(connectedControllerMask(5) == 0x1F);
     assert(connectedControllerMask(20) == 0x1F);
 
+    assert(launchControllerMask(0) == 0x01);
+    assert(launchControllerMask(1) == 0x01);
+    assert(launchControllerMask(2) == 0x03);
+    assert(launchControllerMask(5) == 0x1F);
+
     const auto players = connectedControllerPlayers(5);
     assert(players.size() == 5);
     assert(players.front() == 1);

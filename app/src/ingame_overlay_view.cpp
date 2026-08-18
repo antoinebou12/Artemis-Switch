@@ -345,6 +345,132 @@ public:
     }
 };
 
+class DisplayOptionsPanel final : public brls::Box {
+public:
+    DisplayOptionsPanel() : brls::Box(brls::Axis::COLUMN) {
+        setWidth(720);
+        setPadding(24, 28, 24, 28);
+        setAlignItems(brls::AlignItems::STRETCH);
+
+        auto* title = new brls::Header();
+        title->setTitle("artemis/overlay/display_options"_i18n);
+        addView(title);
+
+        auto* rotation = new brls::DetailCell();
+        rotation->setText("artemis/overlay/rotation"_i18n);
+        rotation->setDetailText(rotationText(
+            artemis::video::DisplayTransformStore::instance().get().rotation));
+        rotation->registerClickAction([rotation](brls::View*) {
+            auto& store = artemis::video::DisplayTransformStore::instance();
+            const auto next = artemis::video::nextRotation(store.get().rotation);
+            MoonlightInputManager::instance().dropInput();
+            store.setRotation(next);
+            rotation->setDetailText(rotationText(next));
+            return true;
+        });
+        addView(rotation);
+
+        auto* scale = new brls::DetailCell();
+        scale->setText("artemis/overlay/scale_mode"_i18n);
+        scale->setDetailText(
+            scaleModeText(artemis::video::VideoScaleStore::instance().get()));
+        scale->registerClickAction([scale](brls::View*) {
+            auto& store = artemis::video::VideoScaleStore::instance();
+            store.set(artemis::video::nextScaleMode(store.get()));
+            scale->setDetailText(scaleModeText(store.get()));
+            return true;
+        });
+        addView(scale);
+
+        auto* remember = new brls::BooleanCell();
+        remember->init(
+            "artemis/settings/remember_zoom_pan"_i18n,
+            artemis::video::ZoomPanStore::instance()
+                .get()
+                .rememberBetweenSessions,
+            [](bool enabled) {
+                artemis::video::ZoomPanStore::instance().setRemember(enabled);
+            });
+        addView(remember);
+
+        auto* zoomHeader = new brls::Header();
+        zoomHeader->setTitle("artemis/overlay/zoom"_i18n);
+        zoomHeader->setMarginTop(24);
+        addView(zoomHeader);
+        auto* zoom = new brls::Slider();
+        zoom->setHeight(84);
+        zoom->setGrow(1.0f);
+        addView(zoom);
+
+        auto* panXHeader = new brls::Header();
+        panXHeader->setTitle("artemis/overlay/pan_x"_i18n);
+        panXHeader->setMarginTop(24);
+        addView(panXHeader);
+        auto* panX = new brls::Slider();
+        panX->setHeight(84);
+        panX->setGrow(1.0f);
+        addView(panX);
+
+        auto* panYHeader = new brls::Header();
+        panYHeader->setTitle("artemis/overlay/pan_y"_i18n);
+        panYHeader->setMarginTop(24);
+        addView(panYHeader);
+        auto* panY = new brls::Slider();
+        panY->setHeight(84);
+        panY->setGrow(1.0f);
+        addView(panY);
+
+        auto* reset = new brls::DetailCell();
+        reset->setText("artemis/settings/reset_zoom_pan"_i18n);
+        addView(reset);
+
+        const auto refresh = [zoomHeader, zoom, panXHeader, panX, panYHeader,
+                              panY] {
+            const auto state = artemis::video::normalizeZoomPan(
+                artemis::video::ZoomPanStore::instance().get().state);
+            zoomHeader->setSubtitle(fmt::format("{:.1f}x", state.zoom));
+            panXHeader->setSubtitle(fmt::format("{:.2f}", state.panX));
+            panYHeader->setSubtitle(fmt::format("{:.2f}", state.panY));
+            zoom->setProgress(artemis::video::zoomToSlider(state.zoom));
+            panX->setProgress(artemis::video::panToSlider(state.panX));
+            panY->setProgress(artemis::video::panToSlider(state.panY));
+        };
+        refresh();
+
+        zoom->getProgressEvent()->subscribe([zoomHeader](float progress) {
+            auto& store = artemis::video::ZoomPanStore::instance();
+            auto state = store.get().state;
+            state.zoom = artemis::video::sliderToZoom(progress);
+            store.setState(state);
+            zoomHeader->setSubtitle(fmt::format(
+                "{:.1f}x", artemis::video::normalizeZoomPan(store.get().state).zoom));
+        });
+        panX->getProgressEvent()->subscribe([panXHeader](float progress) {
+            auto& store = artemis::video::ZoomPanStore::instance();
+            auto state = store.get().state;
+            state.panX = artemis::video::sliderToPan(progress);
+            store.setState(state);
+            panXHeader->setSubtitle(fmt::format(
+                "{:.2f}", artemis::video::normalizeZoomPan(store.get().state).panX));
+        });
+        panY->getProgressEvent()->subscribe([panYHeader](float progress) {
+            auto& store = artemis::video::ZoomPanStore::instance();
+            auto state = store.get().state;
+            state.panY = artemis::video::sliderToPan(progress);
+            store.setState(state);
+            panYHeader->setSubtitle(fmt::format(
+                "{:.2f}", artemis::video::normalizeZoomPan(store.get().state).panY));
+        });
+        reset->registerClickAction([reset, refresh](brls::View*) {
+            artemis::video::ZoomPanStore::instance().reset();
+            refresh();
+            reset->setDetailText(
+                "artemis/settings/reset_zoom_pan_done"_i18n);
+            return true;
+        });
+    }
+};
+
 }
 
 bool debug = false;
@@ -591,9 +717,12 @@ QuickTab::QuickTab(StreamingView* streamView) : streamView(streamView) {
                        "artemis/overlay/reset_display_hint"_i18n);
 
     quickServerCommands->setText("artemis/overlay/server_commands"_i18n);
-    quickServerCommands->setDetailText(
-        commandsAllowed ? "artemis/overlay/server_commands_hint"_i18n
-                        : "artemis/overlay/command_not_advertised"_i18n);
+    if (!commandsAllowed) {
+        quickServerCommands->setVisibility(Visibility::GONE);
+    } else {
+        quickServerCommands->setDetailText(
+            "artemis/overlay/server_commands_hint"_i18n);
+    }
     quickServerCommands->registerClickAction([this](View*) {
         const auto host =
             GameStreamClient::instance().server_data(this->streamView->getHost());
@@ -633,7 +762,7 @@ QuickTab::QuickTab(StreamingView* streamView) : streamView(streamView) {
         const auto buttons =
             Settings::instance().mouse_input_options().buttons;
         if (buttons.empty()) {
-            quickMouse->setDetailText("artemis/overlay/mouse_shortcut_off"_i18n);
+            quickMouse->setDetailText("");
             return;
         }
         std::string text;
@@ -689,6 +818,11 @@ QuickTab::QuickTab(StreamingView* streamView) : streamView(streamView) {
 OptionsTab::OptionsTab(StreamingView* streamView) : streamView(streamView) {
     this->inflateFromXMLRes("xml/views/ingame_overlay/options_tab.xml");
 
+    const auto server =
+        GameStreamClient::instance().server_data(streamView->getHost());
+    const auto hostCapabilities =
+        artemis::host::detectServerCapabilities(server);
+
     const auto connectedControllerCount = [] {
         const int reported = Application::getPlatform()
                                  ->getInputManager()
@@ -729,7 +863,12 @@ OptionsTab::OptionsTab(StreamingView* streamView) : streamView(streamView) {
     });
 
     optionsControllers->setText("artemis/overlay/controllers"_i18n);
-    optionsControllers->setDetailText(controllerCountText());
+    optionsControllers->setDetailText(
+        hostCapabilities.kind == artemis::host::HostKind::Punktfunk
+            ? "artemis/overlay/punktfunk_gamepad"_i18n
+            : controllerCountText());
+    if (!hostCapabilities.gamepadInput)
+        optionsControllers->setVisibility(Visibility::GONE);
     optionsControllers->registerClickAction(
         [this, controllerCountText](View*) {
             optionsControllers->setDetailText(controllerCountText());
@@ -742,40 +881,29 @@ OptionsTab::OptionsTab(StreamingView* streamView) : streamView(streamView) {
             return true;
         });
 
-    const auto server = GameStreamClient::instance().server_data(streamView->getHost());
-    const bool clipboardAvailable =
-        artemis::host::detectServerCapabilities(server).clipboardSync;
+    const bool clipboardAvailable = hostCapabilities.clipboardSync;
     optionsClipboard->setText("artemis/overlay/clipboard"_i18n);
-    optionsClipboard->setDetailText(clipboardAvailable
-                                        ? "artemis/overlay/fetch_edit_paste"_i18n
-                                        : "artemis/overlay/command_not_advertised"_i18n);
+    if (!clipboardAvailable) {
+        hostIntegrationHeader->setVisibility(Visibility::GONE);
+        optionsClipboard->setVisibility(Visibility::GONE);
+    } else {
+        optionsClipboard->setDetailText(
+            "artemis/overlay/fetch_edit_paste"_i18n);
+    }
     optionsClipboard->registerClickAction([this](View*) {
         openClipboardPanel();
         return true;
     });
 
-    auto& transformStore = artemis::video::DisplayTransformStore::instance();
-    optionsRotation->setText("artemis/overlay/rotation"_i18n);
-    optionsRotation->setDetailText(rotationText(transformStore.get().rotation));
-    optionsRotation->registerClickAction([this](View*) {
-        auto& store = artemis::video::DisplayTransformStore::instance();
-        const auto rotation = artemis::video::nextRotation(store.get().rotation);
-        MoonlightInputManager::instance().dropInput();
-        store.setRotation(rotation);
-        optionsRotation->setDetailText(rotationText(rotation));
-        return true;
-    });
-
-    auto refreshScaleLabel = [this] {
-        optionsScaleMode->setText("artemis/overlay/scale_mode"_i18n);
-        optionsScaleMode->setDetailText(
-            scaleModeText(artemis::video::VideoScaleStore::instance().get()));
-    };
-    refreshScaleLabel();
-    optionsScaleMode->registerClickAction([this, refreshScaleLabel](View*) {
-        auto& store = artemis::video::VideoScaleStore::instance();
-        store.set(artemis::video::nextScaleMode(store.get()));
-        refreshScaleLabel();
+    optionsDisplay->setText("artemis/overlay/display_options"_i18n);
+    optionsDisplay->setDetailText("artemis/overlay/display_options_hint"_i18n);
+    optionsDisplay->registerClickAction([](View*) {
+        auto* panel = new DisplayOptionsPanel();
+        auto* scroll = new ScrollingFrame();
+        scroll->setContentView(panel);
+        auto* frame = new AppletFrame(scroll);
+        frame->setTitle("artemis/overlay/display_options"_i18n);
+        Application::pushActivity(new Activity(frame));
         return true;
     });
 
@@ -808,59 +936,6 @@ OptionsTab::OptionsTab(StreamingView* streamView) : streamView(streamView) {
             if (!enabled && Settings::instance().get_volume() > 100)
                 Settings::instance().set_volume(100);
             Settings::instance().save();
-        });
-
-    optionsRememberZoomPan->init(
-        "artemis/settings/remember_zoom_pan"_i18n,
-        artemis::video::ZoomPanStore::instance().get().rememberBetweenSessions,
-        [](bool enabled) {
-            artemis::video::ZoomPanStore::instance().setRemember(enabled);
-        });
-
-    auto refreshZoomPanSliders = [this] {
-        const auto state = artemis::video::normalizeZoomPan(
-            artemis::video::ZoomPanStore::instance().get().state);
-        zoomHeader->setSubtitle(fmt::format("{:.1f}x", state.zoom));
-        panXHeader->setSubtitle(fmt::format("{:.2f}", state.panX));
-        panYHeader->setSubtitle(fmt::format("{:.2f}", state.panY));
-        zoomSlider->setProgress(artemis::video::zoomToSlider(state.zoom));
-        panXSlider->setProgress(artemis::video::panToSlider(state.panX));
-        panYSlider->setProgress(artemis::video::panToSlider(state.panY));
-        optionsResetZoomPan->setText("artemis/settings/reset_zoom_pan"_i18n);
-    };
-    refreshZoomPanSliders();
-
-    zoomSlider->getProgressEvent()->subscribe([this](float progress) {
-        auto& store = artemis::video::ZoomPanStore::instance();
-        auto state = store.get().state;
-        state.zoom = artemis::video::sliderToZoom(progress);
-        store.setState(state);
-        const auto normalized = artemis::video::normalizeZoomPan(store.get().state);
-        zoomHeader->setSubtitle(fmt::format("{:.1f}x", normalized.zoom));
-    });
-    panXSlider->getProgressEvent()->subscribe([this](float progress) {
-        auto& store = artemis::video::ZoomPanStore::instance();
-        auto state = store.get().state;
-        state.panX = artemis::video::sliderToPan(progress);
-        store.setState(state);
-        const auto normalized = artemis::video::normalizeZoomPan(store.get().state);
-        panXHeader->setSubtitle(fmt::format("{:.2f}", normalized.panX));
-    });
-    panYSlider->getProgressEvent()->subscribe([this](float progress) {
-        auto& store = artemis::video::ZoomPanStore::instance();
-        auto state = store.get().state;
-        state.panY = artemis::video::sliderToPan(progress);
-        store.setState(state);
-        const auto normalized = artemis::video::normalizeZoomPan(store.get().state);
-        panYHeader->setSubtitle(fmt::format("{:.2f}", normalized.panY));
-    });
-    optionsResetZoomPan->registerClickAction(
-        [this, refreshZoomPanSliders](View*) {
-            artemis::video::ZoomPanStore::instance().reset();
-            refreshZoomPanSliders();
-            optionsResetZoomPan->setDetailText(
-                "artemis/settings/reset_zoom_pan_done"_i18n);
-            return true;
         });
 
     guideKeyButtons->setText("settings/guide_key_buttons"_i18n);

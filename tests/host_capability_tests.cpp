@@ -8,6 +8,7 @@ int main() {
     const auto sunshine = HostCapabilityPolicy::standardSunshine();
     assert(sunshine.kind == HostKind::Sunshine);
     assert(sunshine.standardGameStream);
+    assert(sunshine.gamepadInput);
     assert(!sunshine.extendedLaunchOptions);
     assert(!sunshine.preciseRefreshRate);
     assert(!sunshine.virtualDisplay);
@@ -18,6 +19,7 @@ int main() {
     const auto apollo = HostCapabilityPolicy::apollo();
     assert(apollo.kind == HostKind::Apollo);
     assert(apollo.standardGameStream);
+    assert(apollo.gamepadInput);
     assert(apollo.extendedLaunchOptions);
     assert(apollo.preciseRefreshRate);
     assert(apollo.virtualDisplay);
@@ -98,6 +100,7 @@ int main() {
     const auto punktfunk = HostCapabilityPolicy::punktfunk();
     assert(punktfunk.kind == HostKind::Punktfunk);
     assert(punktfunk.standardGameStream);
+    assert(punktfunk.gamepadInput);
     assert(punktfunk.hostManagedVirtualDisplay);
     assert(!punktfunk.extendedLaunchOptions);
 

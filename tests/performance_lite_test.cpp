@@ -31,8 +31,7 @@ int main() {
         snapshot.colorRange = "Full";
         const auto status = buildLiteStatus(snapshot);
         assert(status.networkText == "2.8 / 4.9 Mbps");
-        assert(status.latencyText.find("R 0.80") != std::string::npos);
-        assert(status.latencyText.find("C 6.00") != std::string::npos);
+        assert(status.receiveText == "0.80 ms");
         assert(status.decodeText == "2.60 ms");
         assert(status.renderText == "0.70 ms");
         assert(status.gpuText == "1.50 ms");
