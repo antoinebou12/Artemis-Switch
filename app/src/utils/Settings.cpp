@@ -27,6 +27,14 @@ const Host* find_host(const std::vector<Host>& hosts, const Host& target) {
     return it != hosts.end() ? &(*it) : nullptr;
 }
 
+Host* find_host_for_upsert(std::vector<Host>& hosts, const Host& target) {
+    auto it = std::find_if(hosts.begin(), hosts.end(),
+                           [target](const Host& host) {
+                               return hosts_match_for_upsert(host, target);
+                           });
+    return it != hosts.end() ? &(*it) : nullptr;
+}
+
 void merge_host(Host& target, const Host& source) {
     if (!source.address.empty())
         target.address = source.address;
@@ -98,7 +106,7 @@ void Settings::add_host(const Host& host) {
     Host incoming = host;
     incoming.ensure_endpoints();
 
-    if (Host* existing = find_host(m_hosts, incoming)) {
+    if (Host* existing = find_host_for_upsert(m_hosts, incoming)) {
         merge_host(*existing, incoming);
         existing->ensure_endpoints();
     } else if (!incoming.preferred_address().empty() && is_usable_mac(incoming.mac)) {
@@ -209,6 +217,7 @@ void Settings::load() {
     m_mapping_laouts.clear();
     loadBaseLayouts();
 
+    bool removedDuplicateHosts = false;
     json_t* root = json_load_file(settings_file_path(m_working_dir).c_str(), 0, nullptr);
     
     if (root && json_typeof(root) == JSON_OBJECT) {
@@ -305,9 +314,10 @@ void Settings::load() {
                         
                         // Merge duplicates already present in settings.json
                         // (same MAC, or same hostname + IP).
-                        if (Host* existing = find_host(m_hosts, host)) {
+                        if (Host* existing = find_host_for_upsert(m_hosts, host)) {
                             merge_host(*existing, host);
                             existing->ensure_endpoints();
+                            removedDuplicateHosts = true;
                         } else {
                             m_hosts.push_back(host);
                         }
@@ -723,6 +733,11 @@ void Settings::load() {
         
         json_decref(root);
     }
+
+    // Persist the compacted host list so duplicate tabs do not return on the
+    // next launch. This only runs when at least one duplicate was merged.
+    if (removedDuplicateHosts)
+        save();
 }
 
 void Settings::save() {

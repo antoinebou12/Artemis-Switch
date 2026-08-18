@@ -41,7 +41,8 @@
     "app_list": {
         "reload_app_list": "Actualiser",
         "refresh": "Actualiser les apps",
-        "refresh_hint": "Liste Sunshine / Apollo",
+        "refresh_hint": "Liste des apps de l’hôte",
+        "load_more": "Charger plus de jeux",
         "run_current": "Exécuter l'application",
         "running": "En cours d'exécution",
         "search": "Rechercher des apps",

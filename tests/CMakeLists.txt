@@ -9,6 +9,12 @@ add_executable(artemis_test_smoke smoke_test.cpp)
 target_compile_features(artemis_test_smoke PRIVATE cxx_std_20)
 add_test(NAME artemis_test_smoke COMMAND artemis_test_smoke)
 
+add_executable(app_library_paging_test app_library_paging_test.cpp)
+target_include_directories(app_library_paging_test PRIVATE
+    "${REPO_ROOT}/app/src/features/ui")
+target_compile_features(app_library_paging_test PRIVATE cxx_std_20)
+add_test(NAME app_library_paging_test COMMAND app_library_paging_test)
+
 function(add_artemis_test target test_source feature_source include_dir)
     add_executable(${target}
         "${REPO_ROOT}/${test_source}"

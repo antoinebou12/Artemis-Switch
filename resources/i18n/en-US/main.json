@@ -41,7 +41,8 @@
     "app_list": {
         "reload_app_list": "Refresh",
         "refresh": "Refresh apps",
-        "refresh_hint": "Sunshine / Apollo list",
+        "refresh_hint": "Host app list",
+        "load_more": "Load more games",
         "run_current": "Run current app",
         "running": "Running",
         "search": "Search apps",

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "HostDeviceOs.hpp"
+#include "HostRecordIdentity.hpp"
 #include "Singleton.hpp"
 #include "UsableMac.hpp"
 #include <borealis.hpp>
@@ -127,6 +128,11 @@ inline bool hosts_match(const Host& lhs, const Host& rhs) {
         return shares_address();
 
     return false;
+}
+
+inline bool hosts_match_for_upsert(const Host& lhs, const Host& rhs) {
+    return hosts_match(lhs, rhs) ||
+           hosts_share_display_name(lhs.hostname, rhs.hostname);
 }
 
 class Settings : public Singleton<Settings> {

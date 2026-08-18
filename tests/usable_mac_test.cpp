@@ -1,4 +1,5 @@
 #include "UsableMac.hpp"
+#include "HostRecordIdentity.hpp"
 
 #include <cassert>
 
@@ -19,6 +20,19 @@ int main() {
     assert(normalize_mac_key("aa-bb-cc-dd-ee-ff") == "aabbccddeeff");
     assert(normalize_mac_key("60:ff:9e:09:9f:ba") ==
            normalize_mac_key("60:FF:9E:09:9F:BA"));
+
+    assert(normalize_host_display_name("  ANTOINEPC ") == "antoinepc");
+    assert(hosts_share_display_name("ANTOINEPC", " antoinepc "));
+    assert(!hosts_share_display_name("", ""));
+
+    assert(stable_host_profile_key("AA:BB:CC:DD:EE:FF",
+                                   "11:22:33:44:55:66", "192.168.1.10") ==
+           "AA:BB:CC:DD:EE:FF");
+    assert(stable_host_profile_key("00:00:00:00:00:00",
+                                   "11:22:33:44:55:66", "192.168.1.10") ==
+           "11:22:33:44:55:66");
+    assert(stable_host_profile_key("", "", "192.168.1.10") ==
+           "192.168.1.10");
 
     return 0;
 }

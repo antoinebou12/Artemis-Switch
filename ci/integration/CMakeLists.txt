@@ -15,6 +15,13 @@ function(add_artemis_test target test_source feature_source include_dir)
     add_test(NAME ${target} COMMAND ${target})
 endfunction()
 
+add_executable(app_library_paging_test
+    "${REPO_ROOT}/tests/app_library_paging_test.cpp")
+target_include_directories(app_library_paging_test PRIVATE
+    "${REPO_ROOT}/app/src/features/ui")
+target_compile_features(app_library_paging_test PRIVATE cxx_std_20)
+add_test(NAME app_library_paging_test COMMAND app_library_paging_test)
+
 add_artemis_test(benchmark_tests
     tests/benchmark_tests.cpp
     app/src/benchmark/BenchmarkAccumulator.cpp

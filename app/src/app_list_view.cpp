@@ -10,6 +10,7 @@
 #include "main_tabs_view.hpp"
 #include "MoonlightSession.hpp"
 #include "features/ui/QrCodeView.hpp"
+#include "features/ui/AppLibraryPaging.hpp"
 #include "host/GameStreamHostCapabilities.hpp"
 #include "host/HostIdentityProbe.hpp"
 #include "streaming/HostProfileKey.hpp"
@@ -21,6 +22,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <unordered_map>
 #include <vector>
 
 namespace {
@@ -91,8 +93,32 @@ AppListView::AppListView(const Host& host) : Box(Axis::ROW), host(host) {
     });
     appsContainer->addView(appSearch);
 
-    gridView = new GridView();
-    appsContainer->addView(gridView);
+    appsScroll = new ScrollingFrame();
+    appsScroll->setGrow(1.0f);
+    // Natural scrolling keeps the first row anchored below Search and prevents
+    // a focused bottom-row tile from being centered over the footer hints.
+    appsScroll->setScrollingBehavior(ScrollingBehavior::NATURAL);
+
+    appsScrollContent = new Box(Axis::COLUMN);
+    appsScrollContent->setAlignItems(AlignItems::STRETCH);
+    appsScrollContent->setPaddingBottom(16);
+
+    gridView = new GridView(
+        static_cast<int>(artemis::ui::AppLibraryColumns));
+    appsScrollContent->addView(gridView);
+
+    loadMoreApps = new DetailCell();
+    loadMoreApps->setText("app_list/load_more"_i18n);
+    loadMoreApps->title->setSingleLine(true);
+    loadMoreApps->detail->setSingleLine(true);
+    loadMoreApps->setVisibility(Visibility::GONE);
+    loadMoreApps->registerClickAction([this](View*) {
+        loadNextAppPage();
+        return true;
+    });
+    appsScrollContent->addView(loadMoreApps);
+    appsScroll->setContentView(appsScrollContent);
+    appsContainer->addView(appsScroll);
     contentColumn->addView(appsContainer);
 
     hostContainer = new Box(Axis::COLUMN);
@@ -458,6 +484,7 @@ void AppListView::updateAppList() {
     loading = true;
 
     gridView->clearViews();
+    resetAppPagination();
     Application::giveFocus(this);
     loader->setHidden(false);
     currentApp = std::nullopt;
@@ -516,6 +543,7 @@ void AppListView::updateAppList() {
                                         return lScore > rScore;
                                     });
                             }
+                            resetAppPagination();
                             rebuildAppGrid();
                             if (activePane == Pane::Applications)
                                 showPane(Pane::Applications, true);
@@ -570,6 +598,7 @@ void AppListView::promptAppSearch() {
                    std::isspace(static_cast<unsigned char>(trimmed.back())))
                 trimmed.pop_back();
             appSearchQuery = std::move(trimmed);
+            resetAppPagination();
             refreshAppSearchLabel();
             // Prefer an in-memory filter when apps are already cached so the
             // grid updates immediately after the IME closes.
@@ -594,15 +623,60 @@ void AppListView::rebuildAppGrid() {
     currentApp = std::nullopt;
     hintView->setVisibility(Visibility::GONE);
 
+    // Host status is independent of the current search/page. Preserve the
+    // running-game indicator even when that app is outside the visible batch.
+    if (cachedCurrentGame != 0) {
+        const auto running = std::find_if(
+            cachedApps.begin(), cachedApps.end(), [this](const AppInfo& app) {
+                return app.app_id == cachedCurrentGame;
+            });
+        if (running != cachedApps.end())
+            setCurrentApp(*running);
+    }
+
     const std::string needle = lowercaseCopy(appSearchQuery);
+    std::vector<const AppInfo*> uniqueApps;
+    std::unordered_map<std::string, std::size_t> appByName;
+    uniqueApps.reserve(cachedApps.size());
+
     for (const AppInfo& app : cachedApps) {
         if (!needle.empty()) {
             const auto haystack = lowercaseCopy(app.name);
             if (haystack.find(needle) == std::string::npos)
                 continue;
         }
-        if (app.app_id == cachedCurrentGame)
-            setCurrentApp(app);
+
+        std::string nameKey = artemis::ui::appLibraryNameKey(app.name);
+        if (nameKey.empty())
+            nameKey = "#" + std::to_string(app.app_id);
+
+        const auto [entry, inserted] =
+            appByName.emplace(nameKey, uniqueApps.size());
+        if (inserted) {
+            uniqueApps.push_back(&app);
+            continue;
+        }
+
+        // If duplicate display names have different IDs, retain the entry that
+        // is currently running, then a favorite, otherwise server order wins.
+        const AppInfo* existing = uniqueApps[entry->second];
+        const int existingPriority =
+            (existing->app_id == cachedCurrentGame ? 2 : 0) +
+            (Settings::instance().is_favorite(host, existing->app_id) ? 1 : 0);
+        const int candidatePriority =
+            (app.app_id == cachedCurrentGame ? 2 : 0) +
+            (Settings::instance().is_favorite(host, app.app_id) ? 1 : 0);
+        if (candidatePriority > existingPriority)
+            uniqueApps[entry->second] = &app;
+    }
+
+    filteredAppCount = 0;
+    displayedAppCount = 0;
+    for (const AppInfo* appPtr : uniqueApps) {
+        const AppInfo& app = *appPtr;
+        ++filteredAppCount;
+        if (displayedAppCount >= visibleAppLimit)
+            continue;
 
         auto* cell = new AppCell(host, app, cachedCurrentGame);
         cell->setFavorite(
@@ -610,10 +684,39 @@ void AppListView::rebuildAppGrid() {
         bindAppListRefresh(cell);
         gridView->addView(cell);
         updateFavoriteAction(cell, host, app);
+        ++displayedAppCount;
+    }
+
+    if (loadMoreApps) {
+        const auto page = artemis::ui::appLibraryPageWindow(
+            filteredAppCount, visibleAppLimit);
+        loadMoreApps->setVisibility(page.hasMore ? Visibility::VISIBLE
+                                                 : Visibility::GONE);
+        loadMoreApps->setDetailText(std::to_string(displayedAppCount) +
+                                    " / " +
+                                    std::to_string(filteredAppCount));
     }
     gridView->invalidate();
     if (appsContainer)
         appsContainer->invalidate();
+}
+
+void AppListView::loadNextAppPage() {
+    const size_t firstNewIndex = displayedAppCount;
+    visibleAppLimit = artemis::ui::nextAppLibraryLimit(
+        filteredAppCount, visibleAppLimit);
+    rebuildAppGrid();
+
+    if (gridView && firstNewIndex < gridView->getChildren().size())
+        Application::giveFocus(gridView->getChildren()[firstNewIndex]);
+}
+
+void AppListView::resetAppPagination() {
+    visibleAppLimit = artemis::ui::AppLibraryPageSize;
+    displayedAppCount = 0;
+    filteredAppCount = 0;
+    if (appsScroll)
+        appsScroll->setContentOffsetY(0, false);
 }
 
 void AppListView::setCurrentApp(const AppInfo& app) {

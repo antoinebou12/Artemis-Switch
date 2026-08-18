@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Settings.hpp"
+#include "HostRecordIdentity.hpp"
 #include "UsableMac.hpp"
 
 #include <string>
@@ -8,15 +9,12 @@
 namespace artemis::streaming {
 
 inline std::string host_profile_key(const Host& host) {
-    if (is_usable_mac(host.mac))
-        return host.mac;
-    return host.preferred_address();
+    return stable_host_profile_key(host.mac, {}, host.preferred_address());
 }
 
 inline std::string host_profile_key(const Host& host, const std::string& serverMac) {
-    if (is_usable_mac(serverMac))
-        return serverMac;
-    return host_profile_key(host);
+    return stable_host_profile_key(host.mac, serverMac,
+                                   host.preferred_address());
 }
 
 } // namespace artemis::streaming
