@@ -50,15 +50,36 @@ Source: [`docs/source/`](docs/source/).
 
 ## Recommended host and clients
 
-Hosts and clients are separate. Pick a **server** on the PC, then a **client** on each device. Virtual display, HDR, and monitor power-off are configured on the host web UI, not in this Switch app.
+Hosts and clients are separate. Pick a **server** on the PC, then a **client** on each device. Artemis uses Moonlight/GameStream for pairing and streaming; host administration stays in the selected host's own web UI.
 
 ### Host (PC server)
 
 | Host | Notes |
 |---|---|
 | **[Vibepollo](https://github.com/Nonary/Vibepollo)** | **Best results in testing.** Apollo-based host with native virtual displays, HDR handling, and turning physical monitors off when a stream starts. |
+| **[Vibeshine](https://github.com/Nonary/vibeshine)** | Sunshine-based host with display automation, native virtual displays, and frame-pacing integrations. Artemis Switch connects through the standard Moonlight/GameStream path. |
+| **[Punktfunk](https://punktfunk.unom.io/)** | Native-first host with an opt-in Moonlight/GameStream plane. It creates a virtual display matching the resolution and FPS requested by Artemis. |
 | **[Apollo](https://github.com/ClassicOldSong/Apollo)** | Strong virtual-display host (SudoVDA). Same GameStream path; use the web UI for display options. |
 | [Sunshine](https://github.com/LizardByte/Sunshine) | Compatibility baseline. Works with every Moonlight client; no Apollo-style virtual display extras. |
+
+> [!TIP]
+> **Using Vibeshine?** Pair Artemis Switch with the Vibeshine PC just like any other Moonlight-compatible client. Select the host in Artemis Switch, complete the PIN pairing in Vibeshine's web UI, and manage virtual displays, HDR, and other host-side options from Vibeshine.
+
+> [!TIP]
+> **Using Punktfunk?** First enable its opt-in GameStream plane by following the official [Connect with Moonlight guide](https://docs.punktfunk.unom.io/docs/moonlight). Pair from `https://<host>:47992/`, then choose resolution and FPS in Artemis; Punktfunk creates the matching virtual display. A native-only Punktfunk host cannot accept Moonlight clients.
+
+### Host integration matrix
+
+| Feature | Vibeshine | Punktfunk |
+|---|---|---|
+| Pairing and app list | Moonlight/GameStream | Moonlight/GameStream (must be enabled) |
+| Requested resolution / FPS | Standard mode plus precise-FPS launch options | Standard GameStream mode; host matches the requested mode |
+| Virtual display | Client-requested through advertised Vibeshine launch fields | Host-managed automatically |
+| HDR | Host-advertised; requires a compatible capture/codec path | Host-advertised only when its 10-bit capture and encoder path is available |
+| Mouse, keyboard, controllers | Standard GameStream input | Standard GameStream input |
+| Web console | `https://<host>:47990/` | `https://<host>:47992/` |
+
+Artemis probes only unauthenticated product/version surfaces and stores no host credentials. It does not control Punktfunk's [management API](https://docs.punktfunk.unom.io/openapi.json), Vibeshine scoped API tokens, or either host's native administration plane.
 
 ### Client (device)
 
@@ -70,7 +91,7 @@ Hosts and clients are separate. Pick a **server** on the PC, then a **client** o
 | [Moonlight](https://github.com/moonlight-stream) | PC, Android, iOS, … | Official clients. |
 | [Moonlight V+](https://github.com/qiin2333/moonlight-vplus) | Android | Alternative Android fork (frame-gen and extra host tools). |
 
-**Why this stack:** Vibepollo or Apollo on the PC plus Artemide on Android (and Artemis Switch on the docked/handheld Switch) is the closest to a console-like session: the host creates the virtual display, manages HDR, and can blank physical monitors, while the client stays low-latency and can upscale a smaller stream with FSR.
+**Why this stack:** Vibeshine, Vibepollo, Apollo, or GameStream-enabled Punktfunk on the PC plus Artemide on Android (and Artemis Switch on the docked/handheld Switch) is the closest to a console-like session: the host manages display behavior, while the client stays low-latency and can upscale a smaller stream with FSR. Host capabilities vary; Artemis shows the detected integration in Host settings.
 
 ---
 
@@ -187,6 +208,8 @@ The Performance page exposes live streaming and renderer information:
 | Benchmark JSON / CSV | ✅ Integrated | Includes Switch runtime metadata when services are available |
 | Apollo capability detection | 🟡 Partial | Conservative detection with Sunshine-safe fallback |
 | Apollo virtual display / commands / clipboard | ✅ Gated | Available when the host advertises capability / permissions |
+| Vibeshine integration | ✅ Capability-gated | Precise FPS and advertised virtual-display launch fields; no assumed Apollo clipboard access |
+| Punktfunk integration | ✅ GameStream plane | Product/version probe, host-managed display model, `:47992` console; native protocol/admin APIs excluded |
 | French Artemis UI | ✅ Integrated | Settings, overlay tabs, and Performance UI use Borealis i18n |
 | CI / Release CD | ✅ Integrated | Unit, sanitizer, i18n, release-contract, Switch NRO publish |
 
@@ -197,10 +220,10 @@ The Performance page exposes live streaming and renderer information:
 ### Architecture
 
 ```text
-Vibepollo / Apollo / Sunshine host
+Vibeshine / Vibepollo / Apollo / Sunshine / Punktfunk host
         │
-        │ Moonlight GameStream
-        │ + verified Apollo extensions when available
+        │ Moonlight/GameStream compatibility plane
+        │ + verified host capabilities when available
         ▼
 ┌──────────────────────── Artemis Switch ────────────────────────┐
 │ MoonlightSession                                               │
@@ -392,6 +415,8 @@ Sunshine and standard Moonlight/GameStream behavior remain the compatibility bas
 |---|---|---|
 | [XITRIX/Moonlight-Switch](https://github.com/XITRIX/Moonlight-Switch) | Upstream Switch client | Base |
 | [LizardByte/Sunshine](https://github.com/LizardByte/Sunshine) | Standard GameStream host | Host |
+| [Nonary/Vibeshine](https://github.com/Nonary/vibeshine) | Sunshine-fork host (display automation / virtual display) | Host |
+| [Punktfunk](https://punktfunk.unom.io/) | Native-first host with opt-in Moonlight/GameStream compatibility | Host |
 | [ClassicOldSong/Apollo](https://github.com/ClassicOldSong/Apollo) | Sunshine-fork host (gated extensions) | Host |
 | [Nonary/Vibepollo](https://github.com/Nonary/Vibepollo) | Apollo-fork host (virtual display / HDR) | Host |
 | [moonlight-stream](https://github.com/moonlight-stream) | Moonlight ecosystem | Protocol |
@@ -404,6 +429,7 @@ Sunshine and standard Moonlight/GameStream behavior remain the compatibility bas
 - Full-range output still benefits from visual verification across host resolutions.
 - Console-motion fallback remains disabled until libnx console sensor vectors are mapped safely.
 - Apollo virtual-display, server-command, and clipboard operations are capability-gated (shown when the host advertises them).
+- Punktfunk's native QUIC protocol and authenticated host administration APIs are outside Artemis Switch's scope; enable its GameStream plane before connecting.
 - Benchmark scoring still needs tuning from real Switch measurements.
 
 See [`docs/ARTEMIS_SWITCH_INTEGRATION_PLAN.md`](docs/ARTEMIS_SWITCH_INTEGRATION_PLAN.md) for release acceptance criteria.
@@ -425,6 +451,8 @@ Artemis Switch is a fork of [Moonlight-Switch](https://github.com/XITRIX/Moonlig
 | [derflacco/moonlight-android](https://github.com/derflacco/moonlight-android) | Artemide Android client (ULL, FSR presets) | Client |
 | [qiin2333/moonlight-vplus](https://github.com/qiin2333/moonlight-vplus) | Moonlight V+ Android client (alternative) | Client |
 | [LizardByte/Sunshine](https://github.com/LizardByte/Sunshine) | Standard GameStream host | Host |
+| [Nonary/Vibeshine](https://github.com/Nonary/vibeshine) | Sunshine-fork host; compatible with Artemis Switch through Moonlight/GameStream | Host |
+| [Punktfunk](https://punktfunk.unom.io/) | Native-first host; compatible through its opt-in GameStream plane | Host |
 | [moonlight-stream](https://github.com/moonlight-stream) | Moonlight ecosystem / protocol | Protocol |
 | [Rock88/moonlight-nx](https://github.com/rock88/moonlight-nx) | Moonlight-NX streaming foundations | Legacy |
 
@@ -432,7 +460,8 @@ Artemis Switch is a fork of [Moonlight-Switch](https://github.com/XITRIX/Moonlig
 
 - **XITRIX** — Moonlight-Switch author and original codebase
 - **ClassicOldSong** — Apollo host and Artemis (Moonlight Noir) client
-- **Nonary** — Vibepollo host (virtual display / HDR; best results in testing)
+- **Nonary** — Vibeshine and Vibepollo hosts (display automation, virtual display, and HDR features)
+- **Punktfunk contributors** — GameStream compatibility, host-managed virtual displays, and public host documentation
 - **derflacco** — Artemide Android client (ULL, FSR Performance / Balanced / Quality)
 - **Rock88** / Moonlight-NX — streaming foundations reused in Moonlight-Switch
 - **Natinusala** / **Xfangfang** — Borealis (including later ports)

@@ -2,7 +2,7 @@
 
 Native Moonlight-compatible game streaming for Nintendo Switch / Horizon OS.
 
-Artemis Switch is a fork of [Moonlight-Switch](https://github.com/XITRIX/Moonlight-Switch) focused on Switch video presentation, stream profiles, overlay controls, and Apollo host features.
+Artemis Switch is a fork of [Moonlight-Switch](https://github.com/XITRIX/Moonlight-Switch) focused on Switch video presentation, stream profiles, overlay controls, and capability-aware Sunshine, Apollo, Vibeshine, and Punktfunk integration.
 
 ```{toctree}
 :hidden:
@@ -34,7 +34,7 @@ credits
 
 ## Where to start
 
-1. Install Vibepollo, Apollo, or Sunshine on the host PC.
+1. Install Vibeshine, Vibepollo, Apollo, Sunshine, or Punktfunk on the host PC. Punktfunk requires its opt-in GameStream plane.
 2. Copy `Artemis-Switch.nro` to `sdmc:/switch/Artemis-Switch/`.
 3. Launch Homebrew Menu with **title redirection** (full RAM).
 4. Pair the host, pick a [stream profile](profiles.md), start a game.

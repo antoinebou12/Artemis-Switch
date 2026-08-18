@@ -706,8 +706,8 @@ void StreamingView::applyVirtualDisplay(
     const artemis::apollo::ApolloHostOptions& requested) {
     const auto server = GameStreamClient::instance().server_data(host);
     const auto options = artemis::apollo::validateApolloHostOptions(requested);
-    if (!server.isApollo()) {
-        showError("artemis/overlay/apollo_only"_i18n);
+    if (!server.supportsExtendedLaunchOptions()) {
+        showError("artemis/overlay/virtual_display_host_only"_i18n);
         return;
     }
     if (options.target != artemis::apollo::VirtualDisplayTarget::Off &&

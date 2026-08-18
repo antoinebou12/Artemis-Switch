@@ -9,8 +9,10 @@ Artemis Switch is a fork. Credit **XITRIX/Moonlight-Switch** first, then Apollo,
 | **[XITRIX/Moonlight-Switch](https://github.com/XITRIX/Moonlight-Switch)** | Upstream Switch client (Borealis UI, Moonlight transport, NVDEC/deko3d). **Primary credit.** |
 | [moonlight-stream](https://github.com/moonlight-stream) | Moonlight / GameStream protocol family |
 | [Nonary/Vibepollo](https://github.com/Nonary/Vibepollo) | Recommended host in testing (virtual display / HDR) |
+| [Nonary/Vibeshine](https://github.com/Nonary/vibeshine) | Sunshine-compatible host with advertised virtual-display launch support |
 | [ClassicOldSong/Apollo](https://github.com/ClassicOldSong/Apollo) | Virtual-display host; server commands / clipboard |
 | [LizardByte/Sunshine](https://github.com/LizardByte/Sunshine) | Compatibility baseline host |
+| [Punktfunk](https://punktfunk.unom.io/) | Native-first host with opt-in GameStream compatibility and host-managed virtual displays |
 
 ## Clients and UX inspiration
 

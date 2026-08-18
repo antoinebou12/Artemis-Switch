@@ -35,6 +35,9 @@ struct HTTPRequestOptions {
     std::string contentType;
     size_t maxResponseBytes = 4 * 1024 * 1024;
     bool sensitive = false;
+    bool suppressErrors = false;
+    long connectTimeoutMs = 0;
+    long totalTimeoutMs = 0;
 };
 
 struct HTTPResponseInfo {

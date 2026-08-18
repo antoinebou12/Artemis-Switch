@@ -27,6 +27,7 @@
 #include "features/video/DisplayTransformStore.hpp"
 #include "features/video/ZoomPanStore.hpp"
 #include "features/video/ZoomPanState.hpp"
+#include "host/GameStreamHostCapabilities.hpp"
 #include "streaming/InputManager.hpp"
 #include "Limelight.h"
 #include "libgamestream/client.h"
@@ -545,12 +546,8 @@ QuickTab::QuickTab(StreamingView* streamView) : streamView(streamView) {
 
     const auto server =
         GameStreamClient::instance().server_data(streamView->getHost());
-    constexpr uint32_t serverCommandPermission = 0x00100000;
     const bool commandsAllowed =
-        server.isApollo() &&
-        (!server.hasApolloPermissionField ||
-         (server.permission & serverCommandPermission) != 0) &&
-        !server.serverCommands.empty();
+        artemis::host::detectServerCapabilities(server).serverCommands;
 
     auto wireMatchedCommand = [this, commandsAllowed](
                                   DetailCell* cell,
@@ -596,18 +593,15 @@ QuickTab::QuickTab(StreamingView* streamView) : streamView(streamView) {
     quickServerCommands->setText("artemis/overlay/server_commands"_i18n);
     quickServerCommands->setDetailText(
         commandsAllowed ? "artemis/overlay/server_commands_hint"_i18n
-                        : "artemis/overlay/apollo_only"_i18n);
+                        : "artemis/overlay/command_not_advertised"_i18n);
     quickServerCommands->registerClickAction([this](View*) {
         const auto host =
             GameStreamClient::instance().server_data(this->streamView->getHost());
-        constexpr uint32_t permission = 0x00100000;
         const bool allowed =
-            host.isApollo() &&
-            (!host.hasApolloPermissionField ||
-             (host.permission & permission) != 0) &&
-            !host.serverCommands.empty();
+            artemis::host::detectServerCapabilities(host).serverCommands;
         if (!allowed) {
-            auto* dialog = new Dialog("artemis/overlay/apollo_only"_i18n);
+            auto* dialog =
+                new Dialog("artemis/overlay/command_not_advertised"_i18n);
             dialog->addButton("common/close"_i18n, [] {});
             dialog->open();
             return true;
@@ -749,10 +743,12 @@ OptionsTab::OptionsTab(StreamingView* streamView) : streamView(streamView) {
         });
 
     const auto server = GameStreamClient::instance().server_data(streamView->getHost());
+    const bool clipboardAvailable =
+        artemis::host::detectServerCapabilities(server).clipboardSync;
     optionsClipboard->setText("artemis/overlay/clipboard"_i18n);
-    optionsClipboard->setDetailText(server.isApollo()
+    optionsClipboard->setDetailText(clipboardAvailable
                                         ? "artemis/overlay/fetch_edit_paste"_i18n
-                                        : "artemis/overlay/apollo_only"_i18n);
+                                        : "artemis/overlay/command_not_advertised"_i18n);
     optionsClipboard->registerClickAction([this](View*) {
         openClipboardPanel();
         return true;
@@ -1080,8 +1076,9 @@ upscalingButton->removeFromSuperView(true);
 
 void OptionsTab::openClipboardPanel() {
     const auto server = GameStreamClient::instance().server_data(streamView->getHost());
-    if (!server.isApollo()) {
-        auto* dialog = new Dialog("artemis/overlay/apollo_only"_i18n);
+    if (!artemis::host::detectServerCapabilities(server).clipboardSync) {
+        auto* dialog =
+            new Dialog("artemis/overlay/command_not_advertised"_i18n);
         dialog->addButton("common/close"_i18n, [] {});
         dialog->open();
         return;
@@ -1089,10 +1086,8 @@ void OptionsTab::openClipboardPanel() {
 
     constexpr uint32_t clipboardSet = 0x00010000;
     constexpr uint32_t clipboardRead = 0x00020000;
-    const bool canRead = !server.hasApolloPermissionField ||
-                         (server.permission & clipboardRead) != 0;
-    const bool canSet = !server.hasApolloPermissionField ||
-                        (server.permission & clipboardSet) != 0;
+    const bool canRead = (server.permission & clipboardRead) != 0;
+    const bool canSet = (server.permission & clipboardSet) != 0;
     std::string message = "artemis/overlay/clipboard_panel"_i18n;
     message += "\n\n";
     message += clipboardText.empty()

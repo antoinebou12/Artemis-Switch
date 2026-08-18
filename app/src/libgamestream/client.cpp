@@ -25,6 +25,7 @@
 #include "../features/host/HostAddressParse.hpp"
 #include "../features/stream/FrameRateOptions.hpp"
 #include "../host/GameStreamHostCapabilities.hpp"
+#include "../host/HostIdentityProbe.hpp"
 #include <Limelight.h>
 #include <borealis/core/logger.hpp>
 #include <errno.h>
@@ -69,6 +70,25 @@ bool _SERVER_DATA::isSunshine() const {
 bool _SERVER_DATA::isApollo() const {
     return artemis::host::detectServerCapabilities(*this).kind ==
            artemis::host::HostKind::Apollo;
+}
+
+bool _SERVER_DATA::isVibeshine() const {
+    return artemis::host::detectServerCapabilities(*this).kind ==
+           artemis::host::HostKind::Vibeshine;
+}
+
+bool _SERVER_DATA::isPunktfunk() const {
+    return artemis::host::detectServerCapabilities(*this).kind ==
+           artemis::host::HostKind::Punktfunk;
+}
+
+bool _SERVER_DATA::supportsExtendedLaunchOptions() const {
+    return artemis::host::detectServerCapabilities(*this)
+        .extendedLaunchOptions;
+}
+
+bool _SERVER_DATA::supportsPreciseRefreshRate() const {
+    return artemis::host::detectServerCapabilities(*this).preciseRefreshRate;
 }
 
 static int load_serverinfo(PSERVER_DATA server, bool https) {
@@ -533,14 +553,14 @@ int gs_start_app(PSERVER_DATA server, STREAM_CONFIGURATION* config, int appId,
     Data data;
 
     std::string apolloQuery;
-    if (apolloOptions && server->isApollo()) {
+    if (apolloOptions && server->supportsExtendedLaunchOptions()) {
         if (apolloOptions->virtualDisplay) {
             if (!server->virtualDisplayCapable) {
-                gs_set_error("Apollo virtual display is not supported by this host");
+                gs_set_error("Virtual display launch control is not supported by this host");
                 return GS_NOT_SUPPORTED_4K;
             }
             if (!server->virtualDisplayDriverReady) {
-                gs_set_error("Apollo virtual display driver is not ready; install or enable the driver on the host");
+                gs_set_error("The host virtual display driver is not ready; install or enable it on the host");
                 return GS_WRONG_STATE;
             }
             apolloQuery += "&virtualDisplay=1";
@@ -566,11 +586,11 @@ int gs_start_app(PSERVER_DATA server, STREAM_CONFIGURATION* config, int appId,
         int mask = config->audioConfiguration == AUDIO_CONFIGURATION_STEREO
                        ? CHANNEL_MASK_STEREO
                        : CHANNEL_MASK_51_SURROUND;
-        const bool apolloHost = server->isApollo();
+        const bool preciseRefreshHost = server->supportsPreciseRefreshRate();
         int fps = artemis::stream::launchModeFpsValue(
-            config->fps, config->clientRefreshRateX100, apolloHost);
+            config->fps, config->clientRefreshRateX100, preciseRefreshHost);
         // GFE SOPS path: keep integer fps <= 60. Apollo millihertz modes skip this.
-        if (!apolloHost && sops && config->fps > 60)
+        if (!preciseRefreshHost && sops && config->fps > 60)
             fps = 60;
         snprintf(url, sizeof(url),
                  "https://%s:%u/"
@@ -652,7 +672,8 @@ constexpr size_t ApolloClipboardLimit = 64 * 1024;
 }
 
 int gs_clipboard_get(PSERVER_DATA server, std::string* text, long* httpStatus) {
-    if (!server || !text || !server->isApollo()) {
+    if (!server || !text ||
+        !artemis::host::detectServerCapabilities(*server).clipboardSync) {
         gs_set_error("Clipboard is unsupported by this host");
         return GS_NOT_SUPPORTED_4K;
     }
@@ -679,7 +700,8 @@ int gs_clipboard_get(PSERVER_DATA server, std::string* text, long* httpStatus) {
 
 int gs_clipboard_set(PSERVER_DATA server, const std::string& text,
                      long* httpStatus) {
-    if (!server || !server->isApollo()) {
+    if (!server ||
+        !artemis::host::detectServerCapabilities(*server).clipboardSync) {
         gs_set_error("Clipboard is unsupported by this host");
         return GS_NOT_SUPPORTED_4K;
     }
@@ -739,6 +761,28 @@ int gs_init(PSERVER_DATA server, const std::string address) {
     server->httpsPort = 0; /* Populated by load_server_status() */
 
     int result = load_server_status(server);
+    if (result == GS_OK) {
+        artemis::host::HostMetadata metadata;
+        metadata.appVersion = server->serverInfoAppVersion;
+        metadata.gfeVersion = server->serverInfoGfeVersion;
+        metadata.gsVersion = server->gsVersion;
+        const auto metadataCapabilities =
+            artemis::host::HostCapabilityPolicy::detect(metadata);
+        server->hostIdentity = artemis::host::HostCapabilityPolicy::identityFor(
+            metadataCapabilities.kind);
+
+        if (metadataCapabilities.kind == artemis::host::HostKind::Sunshine) {
+            if (auto probed = artemis::host::probeHostIdentity(
+                    server->address, server->virtualDisplayCapable)) {
+                server->hostIdentity = *probed;
+            } else if (server->hasApolloPermissionField ||
+                       !server->serverCommands.empty()) {
+                server->hostIdentity =
+                    artemis::host::HostCapabilityPolicy::identityFor(
+                        artemis::host::HostKind::Apollo);
+            }
+        }
+    }
     server->serverInfo.serverInfoAppVersion =
         server->serverInfoAppVersion.c_str();
     server->serverInfo.serverInfoGfeVersion =

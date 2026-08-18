@@ -34,6 +34,7 @@ class AppListView : public Box {
     Host host;
     std::string hostProfileKey;
     View* hintView = nullptr;
+    DetailCell* hostIntegration = nullptr;
     DetailCell* webConfig = nullptr;
     DetailCell* streamProfile = nullptr;
     DetailCell* appSearch = nullptr;
@@ -50,6 +51,8 @@ class AppListView : public Box {
     bool inputBlocked = false;
     bool streamWasActive = false;
     bool pendingPostStreamRefresh = false;
+    artemis::host::HostIdentity detectedHostIdentity;
+    std::string detectedHostAddress;
     LoadingOverlay* loader = nullptr;
     void blockInput(bool block);
 
@@ -66,4 +69,5 @@ class AppListView : public Box {
     void updateFavoriteAction(AppCell* cell, Host host, const AppInfo& app);
     void refreshStreamProfileLabel();
     void refreshWebConfigVisibility();
+    void refreshHostIntegration(const SERVER_DATA& server);
 };

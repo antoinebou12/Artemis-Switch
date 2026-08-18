@@ -10,6 +10,8 @@
 #include "main_tabs_view.hpp"
 #include "MoonlightSession.hpp"
 #include "features/ui/QrCodeView.hpp"
+#include "host/GameStreamHostCapabilities.hpp"
+#include "host/HostIdentityProbe.hpp"
 #include "streaming/HostProfileKey.hpp"
 #include "streaming/HostStreamProfileUi.hpp"
 #include "streaming/ProfileEditorDialog.hpp"
@@ -100,18 +102,32 @@ AppListView::AppListView(const Host& host) : Box(Axis::ROW), host(host) {
     hostContainer->setGrow(1.0f);
     hostContainer->setVisibility(Visibility::GONE);
 
+    hostIntegration = new DetailCell();
+    hostIntegration->setText("host/integration"_i18n);
+    hostIntegration->setDetailText("host/integration_detecting"_i18n);
+    hostIntegration->title->setSingleLine(true);
+    hostIntegration->detail->setSingleLine(true);
+    hostContainer->addView(hostIntegration);
+
     webConfig = new DetailCell();
     webConfig->setText("host/web_config"_i18n);
     webConfig->setDetailText("host/web_config_hint"_i18n);
     webConfig->title->setSingleLine(true);
     webConfig->detail->setSingleLine(true);
     webConfig->registerClickAction([this](View*) {
-        const std::string address = this->host.preferred_address();
+        std::string address = detectedHostAddress;
+        if (address.empty())
+            address = this->host.preferred_address();
         if (address.empty()) {
             showError("host/web_config_no_address"_i18n);
             return true;
         }
-        const std::string url = "https://" + address + ":47990/";
+        auto identity = detectedHostIdentity;
+        if (identity.kind == artemis::host::HostKind::Unknown)
+            identity = artemis::host::HostCapabilityPolicy::identityFor(
+                artemis::host::HostKind::Sunshine);
+        const std::string url =
+            artemis::host::hostConsoleUrl(address, identity);
         brls::sync([url] {
             artemis::ui::showUrlQrDialog("host/web_config"_i18n, url);
         });
@@ -341,6 +357,50 @@ void AppListView::refreshWebConfigVisibility() {
                                  : Visibility::GONE);
 }
 
+void AppListView::refreshHostIntegration(const SERVER_DATA& server) {
+    if (!hostIntegration)
+        return;
+
+    detectedHostAddress = GameStreamClient::instance().active_address(host);
+    detectedHostIdentity = server.hostIdentity;
+    const auto capabilities = artemis::host::detectServerCapabilities(server);
+    if (detectedHostIdentity.kind == artemis::host::HostKind::Unknown)
+        detectedHostIdentity =
+            artemis::host::HostCapabilityPolicy::identityFor(capabilities.kind);
+
+    std::string product = detectedHostIdentity.product;
+    if (!detectedHostIdentity.version.empty())
+        product += " " + detectedHostIdentity.version;
+
+    std::vector<std::string> features;
+    features.push_back("host/feature_gamestream"_i18n);
+    if (capabilities.preciseRefreshRate)
+        features.push_back("host/feature_precise_refresh"_i18n);
+    if (capabilities.virtualDisplay)
+        features.push_back("host/feature_client_virtual_display"_i18n);
+    if (capabilities.hostManagedVirtualDisplay)
+        features.push_back("host/feature_host_virtual_display"_i18n);
+
+    std::string detail = product;
+    for (const auto& feature : features)
+        detail += " · " + feature;
+    hostIntegration->setDetailText(detail);
+
+    if (webConfig) {
+        switch (detectedHostIdentity.kind) {
+            case artemis::host::HostKind::Vibeshine:
+                webConfig->setDetailText("host/web_config_vibeshine_hint"_i18n);
+                break;
+            case artemis::host::HostKind::Punktfunk:
+                webConfig->setDetailText("host/web_config_punktfunk_hint"_i18n);
+                break;
+            default:
+                webConfig->setDetailText("host/web_config_hint"_i18n);
+                break;
+        }
+    }
+}
+
 void AppListView::blockInput(bool block) {
     if (block && !inputBlocked) {
         inputBlocked = block;
@@ -414,6 +474,7 @@ void AppListView::updateAppList() {
             ASYNC_RELEASE
 
             if (result.isSuccess()) {
+                refreshHostIntegration(result.value());
                 hostProfileKey = artemis::streaming::host_profile_key(
                     this->host, result.value().mac);
                 refreshStreamProfileLabel();

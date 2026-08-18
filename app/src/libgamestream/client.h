@@ -21,6 +21,7 @@
 
 #include "Data.hpp"
 #include "xml.h"
+#include "../host/HostCapabilities.hpp"
 #include <Limelight.h>
 #include <stdbool.h>
 #include <cstdint>
@@ -50,7 +51,12 @@ typedef struct _SERVER_DATA {
     uint32_t permission = 0;
     bool hasApolloPermissionField = false;
     std::vector<std::string> serverCommands;
+    artemis::host::HostIdentity hostIdentity;
     bool isApollo() const;
+    bool isVibeshine() const;
+    bool isPunktfunk() const;
+    bool supportsExtendedLaunchOptions() const;
+    bool supportsPreciseRefreshRate() const;
     bool isSunshine() const;
 } SERVER_DATA, *PSERVER_DATA;
 

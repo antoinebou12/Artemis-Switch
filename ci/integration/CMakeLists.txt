@@ -70,6 +70,22 @@ add_artemis_test(host_keyboard_shortcuts_test
     tests/host_keyboard_shortcuts_test.cpp
     app/src/features/input/HostKeyboardShortcuts.cpp
     app/src/features/input)
+target_include_directories(host_keyboard_shortcuts_test PRIVATE
+    "${REPO_ROOT}/app/src/utils")
+
+add_executable(host_identity_probe_test
+    "${REPO_ROOT}/tests/host_identity_probe_test.cpp"
+    "${REPO_ROOT}/app/src/host/HostIdentityProbe.cpp"
+    "${REPO_ROOT}/app/src/host/HostCapabilities.cpp"
+    "${REPO_ROOT}/app/src/features/host/HostAddressParse.cpp"
+)
+target_include_directories(host_identity_probe_test PRIVATE
+    "${REPO_ROOT}/app/src/host"
+    "${REPO_ROOT}/app/src/features/host"
+    "${REPO_ROOT}/app/src/crypto"
+    "${REPO_ROOT}/app/src/libgamestream")
+target_compile_features(host_identity_probe_test PRIVATE cxx_std_20)
+add_test(NAME host_identity_probe_test COMMAND host_identity_probe_test)
 
 add_artemis_test(quick_stream_menu_test
     tests/quick_stream_menu_test.cpp

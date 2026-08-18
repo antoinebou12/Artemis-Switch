@@ -32,19 +32,78 @@ HostCapabilities HostCapabilityPolicy::apollo() {
     HostCapabilities c;
     c.kind = HostKind::Apollo;
     c.standardGameStream = true;
+    c.extendedLaunchOptions = true;
+    c.preciseRefreshRate = true;
     c.virtualDisplay = true;
-    c.serverCommands = true;
-    c.clipboardSync = true;
-    c.inputOnly = true;
     c.detectionReason = "explicit Apollo identity";
     return c;
 }
 
+HostCapabilities HostCapabilityPolicy::vibeshine() {
+    HostCapabilities c;
+    c.kind = HostKind::Vibeshine;
+    c.standardGameStream = true;
+    c.extendedLaunchOptions = true;
+    c.preciseRefreshRate = true;
+    c.detectionReason = "explicit Vibeshine identity";
+    return c;
+}
+
+HostCapabilities HostCapabilityPolicy::punktfunk() {
+    HostCapabilities c;
+    c.kind = HostKind::Punktfunk;
+    c.standardGameStream = true;
+    c.hostManagedVirtualDisplay = true;
+    c.detectionReason = "Punktfunk health probe";
+    return c;
+}
+
+HostIdentity HostCapabilityPolicy::identityFor(HostKind kind) {
+    HostIdentity identity;
+    identity.kind = kind;
+    switch (kind) {
+        case HostKind::Sunshine:
+            identity.product = "Sunshine-compatible";
+            break;
+        case HostKind::Apollo:
+            identity.product = "Apollo";
+            break;
+        case HostKind::Vibeshine:
+            identity.product = "Vibeshine";
+            break;
+        case HostKind::Punktfunk:
+            identity.product = "Punktfunk";
+            identity.webConsolePort = 47992;
+            break;
+        case HostKind::Unknown:
+            identity.product = "GameStream host";
+            break;
+    }
+    return identity;
+}
+
 HostCapabilities HostCapabilityPolicy::detect(const HostMetadata& metadata) {
+    const bool explicitVibeshine =
+        contains(metadata.appVersion, "vibeshine") ||
+        contains(metadata.gfeVersion, "vibeshine") ||
+        contains(metadata.gsVersion, "vibeshine") ||
+        extension(metadata.advertisedExtensions, "vibeshine");
+    if (explicitVibeshine)
+        return vibeshine();
+
+    const bool explicitPunktfunk =
+        contains(metadata.appVersion, "punktfunk") ||
+        contains(metadata.gfeVersion, "punktfunk") ||
+        contains(metadata.gsVersion, "punktfunk") ||
+        extension(metadata.advertisedExtensions, "punktfunk");
+    if (explicitPunktfunk)
+        return punktfunk();
+
     const bool explicitApollo =
         contains(metadata.appVersion, "apollo") ||
         contains(metadata.gfeVersion, "apollo") ||
         contains(metadata.gsVersion, "apollo") ||
+        contains(metadata.gsVersion, "vibepollo") ||
         extension(metadata.advertisedExtensions, "apollo");
 
     HostCapabilities result = explicitApollo ? apollo() : standardSunshine();
@@ -66,7 +125,8 @@ HostCapabilities HostCapabilityPolicy::detect(const HostMetadata& metadata) {
     return result;
 }
 
-HostCapabilities HostCapabilityPolicy::fromApolloServerInfo(
+HostCapabilities HostCapabilityPolicy::fromServerInfo(
+    HostKind identity,
     bool virtualDisplayCapable, bool virtualDisplayDriverReady,
     bool permissionAdvertised, uint32_t permissions,
     std::vector<std::string> serverCommands,
@@ -75,23 +135,42 @@ HostCapabilities HostCapabilityPolicy::fromApolloServerInfo(
     constexpr uint32_t clipboardRead = 0x00020000;
     constexpr uint32_t serverCommand = 0x00100000;
     HostCapabilities result;
-    const bool apolloFieldPresent = virtualDisplayCapable ||
-        virtualDisplayDriverReady || permissionAdvertised ||
-        !serverCommands.empty() || currentAppHasUuid;
-    if (!apolloFieldPresent) return standardSunshine();
+    switch (identity) {
+        case HostKind::Apollo: result = apollo(); break;
+        case HostKind::Vibeshine: result = vibeshine(); break;
+        case HostKind::Punktfunk: result = punktfunk(); break;
+        case HostKind::Sunshine:
+        case HostKind::Unknown: result = standardSunshine(); break;
+    }
 
-    result.kind = HostKind::Apollo;
-    result.virtualDisplay = virtualDisplayCapable;
+    // Permission and command fields are Apollo-specific evidence. Virtual
+    // display and app UUID fields are also advertised by Vibeshine, so they
+    // must not grant Apollo clipboard access on their own.
+    if (result.kind == HostKind::Sunshine &&
+        (permissionAdvertised || !serverCommands.empty())) {
+        result = apollo();
+    }
+
+    if (virtualDisplayCapable) {
+        result.virtualDisplay = true;
+        result.extendedLaunchOptions = true;
+        result.preciseRefreshRate = true;
+    }
     result.virtualDisplayDriverReady = virtualDisplayDriverReady;
     result.permissionAdvertised = permissionAdvertised;
     result.permissions = permissions;
     result.serverCommandList = std::move(serverCommands);
-    result.serverCommands = !result.serverCommandList.empty() &&
+    result.serverCommands = result.kind == HostKind::Apollo &&
+        !result.serverCommandList.empty() &&
         (!permissionAdvertised || (permissions & serverCommand) != 0);
-    result.clipboardSync = !permissionAdvertised ||
+    result.clipboardSync = result.kind == HostKind::Apollo &&
+        permissionAdvertised &&
         (permissions & (clipboardSet | clipboardRead)) != 0;
-    result.inputOnly = true;
-    result.detectionReason = "Apollo server-info extension fields";
+    result.inputOnly = result.kind == HostKind::Apollo && currentAppHasUuid;
+    if (result.kind == HostKind::Apollo)
+        result.detectionReason = "Apollo identity or server-info fields";
+    else if (result.kind == HostKind::Vibeshine)
+        result.detectionReason = "Vibeshine identity with server-info fields";
     return result;
 }
 

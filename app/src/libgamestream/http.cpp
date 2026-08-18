@@ -139,6 +139,11 @@ int http_request(const std::string& url, Data* data,
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, http_data);
     curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
     curl_easy_setopt(curl, CURLOPT_TIMEOUT, timeout);
+    if (options.connectTimeoutMs > 0)
+        curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT_MS,
+                         options.connectTimeoutMs);
+    if (options.totalTimeoutMs > 0)
+        curl_easy_setopt(curl, CURLOPT_TIMEOUT_MS, options.totalTimeoutMs);
     curl_easy_setopt(curl, CURLOPT_FAILONERROR, 0L);
 
     curl_slist* headers = nullptr;
@@ -164,9 +169,12 @@ int http_request(const std::string& url, Data* data,
 
     if (res != CURLE_OK) {
         const bool tooLarge = http_data->tooLarge;
-        gs_set_error(tooLarge ? "HTTP response exceeded configured limit"
-                                         : curl_easy_strerror(res));
-        brls::Logger::error("Curl: error: {}", gs_error().c_str());
+        const char* message = tooLarge
+            ? "HTTP response exceeded configured limit"
+            : curl_easy_strerror(res);
+        if (!options.suppressErrors)
+            gs_set_error(message);
+        brls::Logger::error("Curl: error: {}", message);
         free(http_data->memory);
         free(http_data);
         if (headers) curl_slist_free_all(headers);
@@ -198,7 +206,9 @@ int http_request(const std::string& url, Data* data,
     freeCurl(curl);
 
     if (status < 200 || status >= 300) {
-        gs_set_error("HTTP request failed with status " + std::to_string(status));
+        if (!options.suppressErrors)
+            gs_set_error("HTTP request failed with status " +
+                         std::to_string(status));
         return GS_ERROR;
     }
     return GS_OK;

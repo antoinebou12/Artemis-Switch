@@ -1,6 +1,7 @@
 #include "GameStreamClient.hpp"
 #include "Settings.hpp"
 #include "WakeOnLanManager.hpp"
+#include "host/HostIdentityProbe.hpp"
 #include <borealis.hpp>
 #include <algorithm>
 #include <atomic>
@@ -158,6 +159,10 @@ bool connect_to_addresses_sync(const std::vector<std::string>& addresses,
         }
 
         error = gs_error();
+        if (auto identity = artemis::host::probePunktfunkIdentity(address);
+            identity && identity->kind == artemis::host::HostKind::Punktfunk) {
+            error = artemis::host::punktfunkGameStreamRequiredError();
+        }
     }
 
     return false;
