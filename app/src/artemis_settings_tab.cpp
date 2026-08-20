@@ -336,38 +336,49 @@ ArtemisSettingsTab::ArtemisSettingsTab() {
 #endif
 
 #if defined(__SWITCH__) && defined(ENABLE_WIREGUARD)
-    wireguardEnabled->init(
-        "settings/wireguard_enabled"_i18n,
-        Settings::instance().wireguard_enabled(), [this](bool value) {
-            Settings::instance().set_wireguard_enabled(value);
-            if (value)
-                WireGuardManager::instance().enable_from_settings();
-            else
-                WireGuardManager::instance().disable();
-            wireguardStatus->setDetailText(
-                WireGuardManager::instance().status_text());
-        });
-    wireguardConfigPath->setText("settings/wireguard_config_path"_i18n);
-    {
-        const std::string path = Settings::instance().wireguard_config_path();
-        const std::string fallback = "sdmc:/switch/Artemis-Switch/wg0.conf";
-        const std::string shown = path.empty() ? fallback : path;
+    // Only persist "enabled" once the tunnel actually came up. Previously the
+    // setting was written first, so a failed enable left the switch on and the
+    // feature enabled across restarts while nothing was tunnelled.
+    auto applyWireguardEnabled = [this](bool value) {
+        bool effective = false;
+        if (value) {
+            effective = WireGuardManager::instance().enable_from_settings();
+        } else {
+            WireGuardManager::instance().disable();
+        }
+        Settings::instance().set_wireguard_enabled(effective);
+        Settings::instance().save();
+        wireguardStatus->setDetailText(
+            WireGuardManager::instance().status_text());
+        if (value && !effective) {
+            // Put the switch back where the truth is.
+            wireguardEnabled->setOn(false, true);
+        }
+    };
+
+    wireguardEnabled->init("settings/wireguard_enabled"_i18n,
+                           Settings::instance().wireguard_enabled(),
+                           applyWireguardEnabled);
+
+    auto showConfigPath = [this](const std::string& path) {
+        const std::string shown =
+            path.empty() ? WireGuardManager::default_config_path() : path;
         wireguardConfigPath->setDetailText(
             shown.size() <= 40
                 ? shown
                 : shown.substr(0, 18) + "…" + shown.substr(shown.size() - 18));
-    }
-    wireguardConfigPath->registerClickAction([this](View*) {
+    };
+
+    wireguardConfigPath->setText("settings/wireguard_config_path"_i18n);
+    showConfigPath(Settings::instance().wireguard_config_path());
+    wireguardConfigPath->registerClickAction([this, showConfigPath](View*) {
         const std::string current =
             Settings::instance().wireguard_config_path();
         Application::getPlatform()->getImeManager()->openForText(
-            [this](const std::string& text) {
+            [this, showConfigPath](const std::string& text) {
                 Settings::instance().set_wireguard_config_path(text);
-                wireguardConfigPath->setDetailText(
-                    text.size() <= 40
-                        ? text
-                        : text.substr(0, 18) + "…" +
-                              text.substr(text.size() - 18));
+                Settings::instance().save();
+                showConfigPath(text);
                 if (Settings::instance().wireguard_enabled()) {
                     WireGuardManager::instance().enable_from_settings();
                     wireguardStatus->setDetailText(
@@ -375,7 +386,7 @@ ArtemisSettingsTab::ArtemisSettingsTab() {
                 }
             },
             "settings/wireguard_config_path_title"_i18n, "", 120,
-            current.empty() ? "sdmc:/switch/Artemis-Switch/wg0.conf" : current,
+            current.empty() ? WireGuardManager::default_config_path() : current,
             0);
         return true;
     });
