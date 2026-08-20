@@ -30,7 +30,6 @@
             <brls:DetailCell id="options_clipboard"/>
 
             <brls:Header title="@i18n/artemis/overlay/artemis_settings" paddingTop="60"/>
-            <brls:DetailCell id="options_display"/>
             <brls:BooleanCell id="options_low_latency_pacing"/>
             <brls:BooleanCell id="options_full_range"/>
             <brls:BooleanCell id="options_volume_amp"/>

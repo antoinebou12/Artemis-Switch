@@ -26,6 +26,10 @@ def flatten(value, prefix=""):
 def referenced_artemis_keys():
     keys = set()
     cpp_pattern = re.compile(r'"(artemis/[A-Za-z0-9_./-]+)"_i18n')
+    # Some keys are returned as plain strings and resolved later via
+    # brls::getStr (e.g. wireguard_problem_i18n_key), so they never appear with
+    # the _i18n literal. Catch those too or they can rot unnoticed.
+    cpp_runtime_pattern = re.compile(r'return "(artemis/[A-Za-z0-9_./-]+)";')
     xml_pattern = re.compile(r'@i18n/(artemis/[A-Za-z0-9_./-]+)')
 
     for root in SCAN_ROOTS:
@@ -34,14 +38,29 @@ def referenced_artemis_keys():
                 continue
             text = path.read_text(encoding="utf-8", errors="strict")
             keys.update(cpp_pattern.findall(text))
+            keys.update(cpp_runtime_pattern.findall(text))
             keys.update(xml_pattern.findall(text))
     return keys
+
+
+def no_duplicate_keys(pairs):
+    """json.loads silently keeps the last of duplicated keys, so a copy-pasted
+    entry can shadow a real translation without any test noticing."""
+    seen = set()
+    for key, _ in pairs:
+        assert key not in seen, f"duplicate key: {key}"
+        seen.add(key)
+    return dict(pairs)
 
 
 def main():
     locale_keys = {}
     for locale, path in LOCALES.items():
-        data = json.loads(path.read_text(encoding="utf-8"))
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"),
+                              object_pairs_hook=no_duplicate_keys)
+        except AssertionError as exc:
+            raise AssertionError(f"{locale}: {exc}") from None
         flattened = flatten(data)
         locale_keys[locale] = {key for key in flattened if key.startswith("artemis/")}
         empty = [key for key in locale_keys[locale] if flattened[key] == ""]

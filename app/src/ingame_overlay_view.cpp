@@ -366,16 +366,15 @@ public:
     }
 };
 
+// Content of the in-stream Display tab. The tab frame owns the width and the
+// tab label already names the section, so there is no fixed panel width and no
+// title header -- both were artefacts of this being a pushed activity.
 class DisplayOptionsPanel final : public brls::Box {
 public:
     DisplayOptionsPanel() : brls::Box(brls::Axis::COLUMN) {
-        setWidth(720);
+        setGrow(1);
         setPadding(24, 28, 24, 28);
         setAlignItems(brls::AlignItems::STRETCH);
-
-        auto* title = new brls::Header();
-        title->setTitle("artemis/overlay/display_options"_i18n);
-        addView(title);
 
         auto* rotation = new brls::DetailCell();
         rotation->setText("artemis/overlay/rotation"_i18n);
@@ -512,6 +511,14 @@ IngameOverlay::IngameOverlay(StreamingView* streamView)
     this->inflateFromXMLRes("xml/views/ingame_overlay/overlay.xml");
 
     if (auto* tabs = dynamic_cast<TabFrame*>(applet->getContentView())) {
+        // Display sits between Options and Performance. These controls used to
+        // be three presses deep behind an Options row that pushed an activity;
+        // mid-stream, rotation and scale are things you reach for immediately.
+        tabs->addTab("artemis/overlay/display"_i18n, []() {
+            auto* scroll = new ScrollingFrame();
+            scroll->setContentView(new DisplayOptionsPanel());
+            return scroll;
+        });
         if (Settings::instance().show_performance_tab()) {
             tabs->addTab("artemis/overlay/performance"_i18n,
                          [streamView]() { return new PerformanceTab(streamView); });
@@ -916,18 +923,6 @@ OptionsTab::OptionsTab(StreamingView* streamView) : streamView(streamView) {
         return true;
     });
 
-    optionsDisplay->setText("artemis/overlay/display_options"_i18n);
-    optionsDisplay->setDetailText("artemis/overlay/display_options_hint"_i18n);
-    optionsDisplay->registerClickAction([](View*) {
-        auto* panel = new DisplayOptionsPanel();
-        auto* scroll = new ScrollingFrame();
-        scroll->setContentView(panel);
-        auto* frame = new AppletFrame(scroll);
-        frame->setTitle("artemis/overlay/display_options"_i18n);
-        Application::pushActivity(new Activity(frame));
-        return true;
-    });
-
     optionsLowLatencyPacing->init(
         "artemis/settings/low_latency_pacing"_i18n,
         Settings::instance().low_latency_pacing(), [](bool value) {
@@ -1090,8 +1085,12 @@ OptionsTab::OptionsTab(StreamingView* streamView) : streamView(streamView) {
         upscalingModeButton->removeFromSuperView(true);
         rcasButton->removeFromSuperView(true);
     } else {
+        // Matches the Settings tab: dithering only masks upscaler banding, and
+        // the renderer ignores it while upscaling is off.
         auto updateDitheringControls = [this](bool enabled) {
-            updateStrengthControl(ditheringButton, enabled,
+            const bool upscalingOn = Settings::instance().upscaling();
+            ditheringButton->setEnabled(upscalingOn);
+            updateStrengthControl(ditheringButton, upscalingOn && enabled,
                                   getDitheringStrengthText(
                                       Settings::instance().dithering_strength()));
         };
@@ -1132,6 +1131,17 @@ upscalingButton->removeFromSuperView(true);
                 Settings::instance().set_upscaling_mode((UpscalingMode)
                     artemis::video::upscaling_mode_from_selector(value, true));
             });
+#elif defined(PLATFORM_SWITCH)
+        upscalingModeButton->init(
+            "settings/upscaling"_i18n,
+            {"hints/off"_i18n, "FSR1", "SGSR1", "NIS"},
+            artemis::video::switch_upscaling_selector_index(
+                static_cast<int>(Settings::instance().upscaling_mode())),
+            [updateDitheringControls](int value) {
+                Settings::instance().set_upscaling_mode(static_cast<UpscalingMode>(
+                    artemis::video::switch_upscaling_mode_from_selector(value)));
+                updateDitheringControls(Settings::instance().dithering());
+            });
 #else
         constexpr bool kMetalFxChoices = false;
         upscalingModeButton->init(
@@ -1139,9 +1149,10 @@ upscalingButton->removeFromSuperView(true);
             {"hints/off"_i18n, "FSR1"},
             artemis::video::upscaling_selector_index(
                 (int)Settings::instance().upscaling_mode(), kMetalFxChoices),
-            [](int value) {
+            [updateDitheringControls](int value) {
                 Settings::instance().set_upscaling_mode((UpscalingMode)
                     artemis::video::upscaling_mode_from_selector(value, false));
+                updateDitheringControls(Settings::instance().dithering());
             });
 #endif
         rcasButton->init(

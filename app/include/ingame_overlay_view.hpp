@@ -89,7 +89,6 @@ class OptionsTab : public brls::Box {
     BRLS_BIND(brls::DetailCell, optionsControllers, "options_controllers");
     BRLS_BIND(brls::Header, hostIntegrationHeader, "host_integration_header");
     BRLS_BIND(brls::DetailCell, optionsClipboard, "options_clipboard");
-    BRLS_BIND(brls::DetailCell, optionsDisplay, "options_display");
     BRLS_BIND(brls::BooleanCell, optionsLowLatencyPacing, "options_low_latency_pacing");
     BRLS_BIND(brls::BooleanCell, optionsFullRange, "options_full_range");
     BRLS_BIND(brls::BooleanCell, optionsVolumeAmp, "options_volume_amp");
