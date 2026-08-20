@@ -74,7 +74,7 @@ environment variables when needed:
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `PSV_BUILD_DIR` | `build/psvita` | CMake build and artifact directory |
-| `PSV_IP` | `192.168.1.209` | Vita address |
+| `PSV_IP` | (required) | Vita address, e.g. `192.168.1.50` |
 | `PSV_TITLE_ID` | `MNTL00000` | Installed application title ID |
 | `PSV_FTP_PORT` | `1337` | vitacompanion FTP port |
 | `PSV_COMMAND_PORT` | `1338` | vitacompanion command port |

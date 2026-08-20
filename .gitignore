@@ -6,3 +6,16 @@ dist/
 vcpkg_installed
 .psv-logs/
 docs/_build/
+
+# Editor / agent scratch
+.cursor/
+
+# Runtime state copied back from the SD card. These carry host names, LAN
+# addresses, MACs and pairing certificates, so keep them unstageable even
+# when they land outside dist/.
+settings.json
+!.vscode/settings.json
+profile.json
+artemis_*.json
+*.pem
+*.key

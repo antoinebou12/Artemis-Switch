@@ -18,11 +18,11 @@ int main() {
 
     assert(normalize_mac_key("AA:BB:CC:DD:EE:FF") == "aabbccddeeff");
     assert(normalize_mac_key("aa-bb-cc-dd-ee-ff") == "aabbccddeeff");
-    assert(normalize_mac_key("60:ff:9e:09:9f:ba") ==
-           normalize_mac_key("60:FF:9E:09:9F:BA"));
+    assert(normalize_mac_key("02:1a:2b:3c:4d:5e") ==
+           normalize_mac_key("02:1A:2B:3C:4D:5E"));
 
-    assert(normalize_host_display_name("  ANTOINEPC ") == "antoinepc");
-    assert(hosts_share_display_name("ANTOINEPC", " antoinepc "));
+    assert(normalize_host_display_name("  GAMINGPC ") == "gamingpc");
+    assert(hosts_share_display_name("GAMINGPC", " gamingpc "));
     assert(!hosts_share_display_name("", ""));
 
     assert(stable_host_profile_key("AA:BB:CC:DD:EE:FF",

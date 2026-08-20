@@ -6,7 +6,7 @@ PSV_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PSV_PROJECT_ROOT="$(cd "${PSV_SCRIPT_DIR}/.." && pwd)"
 PSV_BUILD_DIR="${PSV_BUILD_DIR:-${PSV_PROJECT_ROOT}/build/psvita}"
 PSV_BUILD_TYPE="${PSV_BUILD_TYPE:-Release}"
-PSV_IP="${PSV_IP:-192.168.1.209}"
+PSV_IP="${PSV_IP:-}"
 PSV_TITLE_ID="${PSV_TITLE_ID:-MNTL00000}"
 PSV_FTP_PORT="${PSV_FTP_PORT:-1337}"
 PSV_COMMAND_PORT="${PSV_COMMAND_PORT:-1338}"
@@ -18,6 +18,14 @@ PSV_TRANSFER_TIMEOUT="${PSV_TRANSFER_TIMEOUT:-180}"
 PSV_DEPLOY_RESOURCES="${PSV_DEPLOY_RESOURCES:-0}"
 PSV_LOG_DIR="${PSV_LOG_DIR:-${PSV_PROJECT_ROOT}/.psv-logs}"
 PSV_HEALTH_MARKER="VITA_HEALTH: READY"
+
+# No default: the Vita address is site-specific, so make the caller supply it
+# rather than baking one developer's DHCP lease into the repo.
+if [ -z "${PSV_IP}" ]; then
+    echo "PSV_IP is required, e.g. PSV_IP=192.168.1.50 $0 ..." >&2
+    exit 2
+fi
+
 PSV_FTP_BASE="ftp://${PSV_IP}:${PSV_FTP_PORT}"
 
 PSV_LOGGER_PID=""
