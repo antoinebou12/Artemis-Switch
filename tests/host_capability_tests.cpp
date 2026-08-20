@@ -107,7 +107,8 @@ int main() {
     // Version identity without field noise.
     HostMetadata vibepolloLike;
     vibepolloLike.gsVersion = "Vibepollo 1.0";
-    assert(HostCapabilityPolicy::detect(vibepolloLike).kind == HostKind::Apollo);
+    assert(HostCapabilityPolicy::detect(vibepolloLike).kind ==
+           HostKind::Vibepollo);
 
     HostMetadata vibeshineMetadata;
     vibeshineMetadata.gsVersion = "Vibeshine 1.18";
@@ -122,6 +123,95 @@ int main() {
     HostMetadata apolloToken;
     apolloToken.gsVersion = "Apollo-fork";
     assert(HostCapabilityPolicy::detect(apolloToken).kind == HostKind::Apollo);
+
+    // --- Vibepollo -------------------------------------------------------
+    const auto vibepollo = HostCapabilityPolicy::vibepollo();
+    assert(vibepollo.kind == HostKind::Vibepollo);
+    assert(vibepollo.standardGameStream);
+    assert(vibepollo.gamepadInput);
+    assert(vibepollo.extendedLaunchOptions);
+    assert(vibepollo.preciseRefreshRate);
+    assert(vibepollo.virtualDisplay);
+
+    assert(isApolloFamily(HostKind::Apollo));
+    assert(isApolloFamily(HostKind::Vibepollo));
+    assert(!isApolloFamily(HostKind::Sunshine));
+    assert(!isApolloFamily(HostKind::Vibeshine));
+    assert(!isApolloFamily(HostKind::Punktfunk));
+
+    // Detected from every version field, not only gsVersion.
+    for (int field = 0; field < 3; ++field) {
+        HostMetadata m;
+        if (field == 0) m.appVersion = "Vibepollo 1.2.3";
+        if (field == 1) m.gfeVersion = "vibepollo/1.2.3";
+        if (field == 2) m.gsVersion = "VIBEPOLLO";
+        assert(HostCapabilityPolicy::detect(m).kind == HostKind::Vibepollo);
+    }
+
+    // Apollo-gated extensions must survive the family split.
+    const auto vibepolloFields = HostCapabilityPolicy::fromServerInfo(
+        HostKind::Vibepollo, true, true, true,
+        0x00010000 | 0x00100000, {"restart", "reset-display"}, true);
+    assert(vibepolloFields.kind == HostKind::Vibepollo);
+    assert(vibepolloFields.serverCommands);
+    assert(vibepolloFields.clipboardSync);
+    assert(vibepolloFields.inputOnly);
+    assert(vibepolloFields.virtualDisplay);
+    assert(vibepolloFields.virtualDisplayDriverReady);
+
+    // An extension list narrows Vibepollo the same way it narrows Apollo.
+    HostMetadata vibepolloExtensions;
+    vibepolloExtensions.appVersion = "Vibepollo";
+    vibepolloExtensions.advertisedExtensions = "virtual-display,clipboard";
+    const auto vibepolloPartial =
+        HostCapabilityPolicy::detect(vibepolloExtensions);
+    assert(vibepolloPartial.kind == HostKind::Vibepollo);
+    assert(vibepolloPartial.virtualDisplay);
+    assert(vibepolloPartial.clipboardSync);
+    assert(!vibepolloPartial.serverCommands);
+
+    // --- Newer Sunshine-class hosts --------------------------------------
+    struct { const char* version; HostKind kind; } plainForks[] = {
+        {"Polaris 0.4", HostKind::Polaris},
+        {"Solar-Flare 1.0", HostKind::SolarFlare},
+        {"SolarFlare 1.0", HostKind::SolarFlare},
+        {"foundation-sunshine 2026.1", HostKind::FoundationSunshine},
+    };
+    for (const auto& fork : plainForks) {
+        HostMetadata m;
+        m.gsVersion = fork.version;
+        const auto detected = HostCapabilityPolicy::detect(m);
+        assert(detected.kind == fork.kind);
+        assert(detected.standardGameStream);
+        assert(detected.gamepadInput);
+        assert(!detected.extendedLaunchOptions);
+        assert(!detected.virtualDisplay);
+        assert(!detected.clipboardSync);
+        assert(!detected.serverCommands);
+    }
+
+    // They are not Apollo, so Apollo-only fields stay off even when present.
+    const auto polarisFields = HostCapabilityPolicy::fromServerInfo(
+        HostKind::Polaris, false, false, true, 0x00110000,
+        {"restart"}, true);
+    assert(polarisFields.kind == HostKind::Polaris);
+    assert(!polarisFields.serverCommands);
+    assert(!polarisFields.clipboardSync);
+    assert(!polarisFields.inputOnly);
+
+    // Web console ports and product names.
+    assert(HostCapabilityPolicy::identityFor(HostKind::Vibepollo).product ==
+           "Vibepollo");
+    assert(HostCapabilityPolicy::identityFor(HostKind::Vibepollo)
+               .webConsolePort == 47990);
+    assert(HostCapabilityPolicy::identityFor(HostKind::Polaris).product ==
+           "Polaris");
+    assert(HostCapabilityPolicy::identityFor(HostKind::SolarFlare).product ==
+           "Solar Flare");
+    assert(HostCapabilityPolicy::identityFor(HostKind::FoundationSunshine)
+               .product == "Foundation Sunshine");
+    assert(HostCapabilityPolicy::identityFor(HostKind::Punktfunk)
+               .webConsolePort == 47992);
 
     return 0;
 }

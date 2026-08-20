@@ -24,6 +24,7 @@ short KeyboardCodes[_VK_KEY_MAX]
     0x74, 0x75, 0x76, 0x77, 0x78, 0x79, 0x7A, 0x7B, 0x09, 0x2E,
     0xBA, 0xBF, 0xC0, 0xDB, 0xDC, 0xDD, 0xDE, 0xBD, 0xBB, 0x28,
     0x25, 0x27, 0x26, 0x14,
+    0xE2, // VK_OEM_102
 };
 
 std::chrono::high_resolution_clock::time_point rumbleLastButtonClicked;
@@ -159,8 +160,13 @@ void ButtonView::applyTitle() {
         mappedKey = selectedLang.keyMapper[key];
     }
 
-    bool shifted = keysState[VK_RSHIFT];
-    charLabel->setText(selectedLang.localization[mappedKey][shifted]);
+    // AltGr wins over Shift when the layout defines a glyph for it.
+    int level = keysState[VK_RSHIFT] ? KEYBOARD_LABEL_SHIFT : KEYBOARD_LABEL_BASE;
+    if (keysState[VK_RMENU] &&
+        !selectedLang.localization[mappedKey][KEYBOARD_LABEL_ALTGR].empty())
+        level = KEYBOARD_LABEL_ALTGR;
+
+    charLabel->setText(selectedLang.localization[mappedKey][level]);
 }
 
 void ButtonView::setKey(KeyboardKeys key) {
@@ -302,6 +308,10 @@ KeyboardState KeyboardView::getKeyboardState() {
 }
 
 short KeyboardView::getKeyCode(KeyboardKeys key) {
+    // The locale keyMapper is a *label* remap: the button drawn as "z" on the
+    // German layout still carries VK_KEY_Y, which is exactly what a host set to
+    // German renders as "z". The raw code is therefore already the code to
+    // send -- do not remap it again here.
     return KeyboardCodes[key];
 }
 

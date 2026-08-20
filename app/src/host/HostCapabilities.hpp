@@ -6,7 +6,21 @@
 
 namespace artemis::host {
 
-enum class HostKind { Unknown, Sunshine, Apollo, Vibeshine, Punktfunk };
+enum class HostKind {
+    Unknown,
+    Sunshine,
+    Apollo,
+    Vibeshine,
+    Punktfunk,
+    Vibepollo,
+    Polaris,
+    SolarFlare,
+    FoundationSunshine
+};
+
+// Apollo and its forks share the same gated extensions (permissions, server
+// commands, clipboard, input-only). Gate on the family, never on Apollo alone.
+bool isApolloFamily(HostKind kind);
 
 struct HostIdentity {
     HostKind kind = HostKind::Unknown;
@@ -46,6 +60,10 @@ public:
     static HostCapabilities apollo();
     static HostCapabilities vibeshine();
     static HostCapabilities punktfunk();
+    static HostCapabilities vibepollo();
+    static HostCapabilities polaris();
+    static HostCapabilities solarFlare();
+    static HostCapabilities foundationSunshine();
     static HostIdentity identityFor(HostKind kind);
     static HostCapabilities detect(const HostMetadata& metadata);
     static HostCapabilities fromServerInfo(

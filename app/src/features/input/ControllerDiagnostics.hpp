@@ -35,6 +35,8 @@ struct ControllerDiagnosticSnapshot {
     uint16_t lastRumbleLow = 0;
     uint16_t lastRumbleHigh = 0;
     uint64_t lastRumbleAtMs = 0;
+    uint8_t batteryState = 0;      // LI_BATTERY_STATE_UNKNOWN
+    uint8_t batteryPercentage = 0xFF; // LI_BATTERY_PERCENTAGE_UNKNOWN
 };
 
 class ControllerDiagnostics {
@@ -49,6 +51,7 @@ public:
     void recordMotion(int slot, bool gyro, float x, float y, float z,
                       bool handheldFallback, uint64_t nowMs);
     void recordRumble(int slot, uint16_t low, uint16_t high, uint64_t nowMs);
+    void recordBattery(int slot, uint8_t state, uint8_t percentage);
     void disconnectFrom(int firstSlot);
     [[nodiscard]] ControllerDiagnosticSnapshot snapshot(int slot) const;
     void reset();

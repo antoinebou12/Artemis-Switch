@@ -19,6 +19,7 @@
 #include "features/video/UpscalingModeSelect.hpp"
 #include "video/VideoScaleStore.hpp"
 #include "features/input/ControllerTopology.hpp"
+#include "features/input/ControllerBattery.hpp"
 #include "features/input/ControllerDiagnostics.hpp"
 #include "features/input/InputSettingsStore.hpp"
 #include "features/input/HostKeyboardShortcuts.hpp"
@@ -206,6 +207,24 @@ private:
         });
     }
 
+    static std::string batteryText(uint8_t state, uint8_t percentage) {
+        if (state == artemis::input::BatteryStateUnknown ||
+            percentage == artemis::input::BatteryPercentageUnknown)
+            return "artemis/overlay/battery_unknown"_i18n;
+
+        std::string label = std::to_string(static_cast<int>(percentage)) + "%";
+        switch (state) {
+            case artemis::input::BatteryStateCharging:
+                return label + " · " + "artemis/overlay/battery_charging"_i18n;
+            case artemis::input::BatteryStateFull:
+                return label + " · " + "artemis/overlay/battery_full"_i18n;
+            case artemis::input::BatteryStateNotPresent:
+                return "artemis/overlay/battery_absent"_i18n;
+            default:
+                return label;
+        }
+    }
+
     void refresh() {
         const auto value =
             artemis::input::ControllerDiagnostics::instance().snapshot(
@@ -237,7 +256,9 @@ private:
                     : "artemis/overlay/controller_motion"_i18n)
             << '\n';
         out << "artemis/overlay/last_rumble"_i18n << ": "
-            << value.lastRumbleLow << " / " << value.lastRumbleHigh;
+            << value.lastRumbleLow << " / " << value.lastRumbleHigh << '\n';
+        out << "artemis/overlay/battery"_i18n << ": "
+            << batteryText(value.batteryState, value.batteryPercentage);
         live->setText(out.str());
     }
 

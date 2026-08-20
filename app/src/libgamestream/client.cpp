@@ -68,8 +68,15 @@ bool _SERVER_DATA::isSunshine() const {
 }
 
 bool _SERVER_DATA::isApollo() const {
+    // True for the whole Apollo family so that Apollo-gated launch options and
+    // UI keep working on forks such as Vibepollo.
+    return artemis::host::isApolloFamily(
+        artemis::host::detectServerCapabilities(*this).kind);
+}
+
+bool _SERVER_DATA::isVibepollo() const {
     return artemis::host::detectServerCapabilities(*this).kind ==
-           artemis::host::HostKind::Apollo;
+           artemis::host::HostKind::Vibepollo;
 }
 
 bool _SERVER_DATA::isVibeshine() const {

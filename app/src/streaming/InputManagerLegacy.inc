@@ -440,6 +440,48 @@ GamepadState MoonlightInputManager::getControllerState(int controllerNum,
     return gamepadState;
 }
 
+void MoonlightInputManager::handleControllerBattery(int slot, uint64_t nowMs) {
+    if (slot < 0 || slot >= GAMEPADS_MAX)
+        return;
+
+    artemis::input::BatteryReading reading;
+#ifdef __SWITCH__
+    // Slot 0 is the handheld/primary pad; the rest map onto Player 2..N.
+    const HidNpadIdType npadId = slot == 0
+        ? (appletGetOperationMode() == AppletOperationMode_Handheld
+               ? HidNpadIdType_Handheld
+               : HidNpadIdType_No1)
+        : static_cast<HidNpadIdType>(HidNpadIdType_No1 + slot);
+
+    HidPowerInfo info = {};
+    hidGetNpadPowerInfoSingle(npadId, &info);
+
+    // A Joy-Con pair carries two batteries. Report the lower one so the host
+    // shows the half that will run out first.
+    if ((hidGetNpadStyleSet(npadId) & HidNpadStyleTag_NpadJoyDual) != 0) {
+        HidPowerInfo left = {};
+        HidPowerInfo right = {};
+        hidGetNpadPowerInfoSplit(npadId, &left, &right);
+        info = left.battery_level <= right.battery_level ? left : right;
+    }
+
+    // The caller only reaches connected slots, so treat the pad as present.
+    reading = artemis::input::fromNpad(info.battery_level, info.is_powered,
+                                       info.is_charging, true);
+#endif
+
+    if (!artemis::input::shouldResend(lastBatteryReadings[slot], reading,
+                                      lastBatterySendMs[slot], nowMs))
+        return;
+
+    lastBatteryReadings[slot] = reading;
+    lastBatterySendMs[slot] = nowMs;
+    LiSendControllerBatteryEvent(static_cast<uint8_t>(slot), reading.state,
+                                 reading.percentage);
+    artemis::input::ControllerDiagnostics::instance().recordBattery(
+        slot, reading.state, reading.percentage);
+}
+
 void MoonlightInputManager::handleControllers(bool specialKey) {
     const int reportedControllers = brls::Application::getPlatform()
                                         ->getInputManager()
@@ -465,6 +507,8 @@ void MoonlightInputManager::handleControllers(bool specialKey) {
                 releasedState.leftStickX, releasedState.leftStickY,
                 releasedState.rightStickX, releasedState.rightStickY);
             lastGamepadStates[i] = {};
+            lastBatteryReadings[i] = {};
+            lastBatterySendMs[i] = 0;
         }
 
         for (int i = lastControllerCount; i < controllersCount; ++i) {
@@ -473,7 +517,10 @@ void MoonlightInputManager::handleControllers(bool specialKey) {
                 mappedControllersCount);
             LiSendControllerArrivalEvent(
                 i, mappedControllersCount, LI_CTYPE_UNKNOWN, 0,
-                LI_CCAP_RUMBLE | LI_CCAP_ACCEL | LI_CCAP_GYRO);
+                LI_CCAP_RUMBLE | LI_CCAP_ACCEL | LI_CCAP_GYRO |
+                    LI_CCAP_BATTERY_STATE);
+            lastBatteryReadings[i] = {};
+            lastBatterySendMs[i] = 0;
         }
     }
 
@@ -504,6 +551,8 @@ void MoonlightInputManager::handleControllers(bool specialKey) {
                     gamepadState.rightStickX, gamepadState.rightStickY) != 0)
                 brls::Logger::info("StreamingView: error sending input data");
         }
+
+        handleControllerBattery(i, steadyNowMs());
     }
 
     artemis::input::ControllerDiagnostics::instance().disconnectFrom(

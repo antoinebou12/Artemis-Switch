@@ -61,6 +61,9 @@ Hosts and clients are separate. Pick a **server** on the PC, then a **client** o
 | **[Punktfunk](https://punktfunk.unom.io/)** | Native-first host with an opt-in Moonlight/GameStream plane. It creates a virtual display matching the resolution and FPS requested by Artemis. |
 | **[Apollo](https://github.com/ClassicOldSong/Apollo)** | Strong virtual-display host (SudoVDA). Same GameStream path; use the web UI for display options. |
 | [Sunshine](https://github.com/LizardByte/Sunshine) | Compatibility baseline. Works with every Moonlight client; no Apollo-style virtual display extras. |
+| [Foundation-Sunshine](https://github.com/AlkaidLab/foundation-sunshine) | Sunshine fork (HDR, audio, encoder changes). Detected by name; treated as standard GameStream. |
+| [Polaris](https://github.com/papi-ux/polaris) | Linux-focused host. Detected by name; treated as standard GameStream. |
+| [Solar Flare](https://github.com/vindeckyy/Solar-Flare) | Linux/Android-focused host. Detected by name; treated as standard GameStream. |
 
 > [!TIP]
 > **Using Vibeshine?** Pair Artemis Switch with the Vibeshine PC just like any other Moonlight-compatible client. Select the host in Artemis Switch, complete the PIN pairing in Vibeshine's web UI, and manage virtual displays, HDR, and other host-side options from Vibeshine.
@@ -207,7 +210,11 @@ The Performance page exposes live streaming and renderer information:
 | Benchmark runtime | ✅ Integrated | Live sampling, P50/P95/P99, frame-queue faults, stability score |
 | Benchmark JSON / CSV | ✅ Integrated | Includes Switch runtime metadata when services are available |
 | Apollo capability detection | 🟡 Partial | Conservative detection with Sunshine-safe fallback |
-| Apollo virtual display / commands / clipboard | ✅ Gated | Available when the host advertises capability / permissions |
+| Apollo virtual display / commands / clipboard | ✅ Gated | Available when the host advertises capability / permissions; applies to Apollo and Vibepollo alike |
+| Vibepollo integration | ✅ Distinct identity | Detected as its own host kind, inherits every Apollo-gated extension |
+| Polaris / Solar Flare / Foundation-Sunshine | 🟡 Named only | Detected and labelled; no fork-specific extensions claimed |
+| Controller battery reporting | ✅ Integrated | Per-pad `LiSendControllerBatteryEvent`, lower Joy-Con of a pair, 30 s throttle |
+| Non-US keyboard layouts | ✅ Integrated | AltGr layer for de/fr/es plus the ISO key left of Z, so `\|`, `@`, `\` and `~` are reachable |
 | Vibeshine integration | ✅ Capability-gated | Precise FPS and advertised virtual-display launch fields; no assumed Apollo clipboard access |
 | Punktfunk integration | ✅ GameStream plane | Product/version probe, host-managed display model, `:47992` console; native protocol/admin APIs excluded |
 | French Artemis UI | ✅ Integrated | Settings, overlay tabs, and Performance UI use Borealis i18n |

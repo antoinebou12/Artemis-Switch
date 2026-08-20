@@ -73,6 +73,11 @@ add_artemis_test(controller_topology_test
     app/src/features/input/ControllerTopology.cpp
     app/src/features/input)
 
+add_artemis_test(controller_battery_test
+    tests/controller_battery_test.cpp
+    app/src/features/input/ControllerBattery.cpp
+    app/src/features/input)
+
 add_artemis_test(host_keyboard_shortcuts_test
     tests/host_keyboard_shortcuts_test.cpp
     app/src/features/input/HostKeyboardShortcuts.cpp

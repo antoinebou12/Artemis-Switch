@@ -20,12 +20,20 @@ enum KeyboardKeys
     VK_F5, VK_F6, VK_F7, VK_F8, VK_F9, VK_F10, VK_F11, VK_F12, VK_TAB, VK_DELETE,
     VK_OEM_1, VK_OEM_2, VK_OEM_3, VK_OEM_4, VK_OEM_5, VK_OEM_6, VK_OEM_7, VK_OEM_MINUS, VK_OEM_PLUS, VK_DOWN,
     VK_LEFT, VK_RIGHT, VK_UP, VK_CAPITAL,
+    // ISO-only key left of Z on non-US keyboards. It carries `<`/`>`/`|` on
+    // de-de and `<`/`>` on fr-fr, and has no US equivalent.
+    VK_OEM_102,
     _VK_KEY_MAX
 };
 
+// Label columns: 0 = base, 1 = Shift, 2 = AltGr. An empty AltGr entry means the
+// key has no AltGr glyph on that layout and keeps its base label.
+enum KeyboardLabelLevel { KEYBOARD_LABEL_BASE = 0, KEYBOARD_LABEL_SHIFT = 1,
+                          KEYBOARD_LABEL_ALTGR = 2, KEYBOARD_LABEL_COUNT = 3 };
+
 struct KeyboardLocale {
     std::string name;
-    std::string localization[_VK_KEY_MAX][2];
+    std::string localization[_VK_KEY_MAX][KEYBOARD_LABEL_COUNT];
     std::map<KeyboardKeys, KeyboardKeys> keyMapper;
 };
 
@@ -88,6 +96,7 @@ class KeyboardView : public brls::Box {
     ButtonView* createLocaleSelectorButton(float width);
     static void changeLang(int lang);
     static void createLocales();
+    static void applyIsoAndAltGrLabels();
     inline static std::vector<KeyboardLocale> locales;
 
     friend class ButtonView;

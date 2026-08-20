@@ -75,6 +75,17 @@ void ControllerDiagnostics::recordRumble(int slot, uint16_t low, uint16_t high,
     value.lastRumbleAtMs = nowMs;
 }
 
+void ControllerDiagnostics::recordBattery(int slot, uint8_t state,
+                                          uint8_t percentage) {
+    if (slot < 0 || slot >= MAX_SLOTS)
+        return;
+    std::scoped_lock lock(m_mutex);
+    auto& value = m_slots[slot].snapshot;
+    value.slot = slot;
+    value.batteryState = state;
+    value.batteryPercentage = percentage;
+}
+
 void ControllerDiagnostics::disconnectFrom(int firstSlot) {
     std::scoped_lock lock(m_mutex);
     for (int slot = std::clamp(firstSlot, 0, MAX_SLOTS); slot < MAX_SLOTS;

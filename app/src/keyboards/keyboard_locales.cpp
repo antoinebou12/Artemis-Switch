@@ -188,4 +188,61 @@ void KeyboardView::createLocales() {
     chineseIme.localization[VK_SPACE][0] = "空格";
     chineseIme.localization[VK_RETURN][0] = "回车";
     locales.push_back(std::move(chineseIme));
+
+    applyIsoAndAltGrLabels();
+}
+
+// The ISO key left of Z and the AltGr layer are the two things a US-shaped
+// layout table cannot express, so they are filled in per locale here rather
+// than widening every initializer above.
+void KeyboardView::applyIsoAndAltGrLabels() {
+    for (auto& locale : locales) {
+        // Universal ISO legend; hosts on US-ANSI simply have no such key.
+        locale.localization[VK_OEM_102][KEYBOARD_LABEL_BASE] = "<";
+        locale.localization[VK_OEM_102][KEYBOARD_LABEL_SHIFT] = ">";
+    }
+
+    const auto find = [](const char* name) -> KeyboardLocale* {
+        for (auto& locale : locales)
+            if (locale.name == name)
+                return &locale;
+        return nullptr;
+    };
+
+    if (auto* german = find("Deutsch")) {
+        // de-de AltGr layer, including the glyphs that were unreachable before:
+        // | (AltGr+<), @ (AltGr+Q), \ (AltGr+ß), ~ (AltGr++).
+        german->localization[VK_OEM_102][KEYBOARD_LABEL_ALTGR] = "|";
+        german->localization[VK_KEY_Q][KEYBOARD_LABEL_ALTGR] = "@";
+        german->localization[VK_OEM_MINUS][KEYBOARD_LABEL_ALTGR] = "\\";
+        german->localization[VK_OEM_PLUS][KEYBOARD_LABEL_ALTGR] = "~";
+        german->localization[VK_KEY_E][KEYBOARD_LABEL_ALTGR] = "€";
+        german->localization[VK_KEY_7][KEYBOARD_LABEL_ALTGR] = "{";
+        german->localization[VK_KEY_8][KEYBOARD_LABEL_ALTGR] = "[";
+        german->localization[VK_KEY_9][KEYBOARD_LABEL_ALTGR] = "]";
+        german->localization[VK_KEY_0][KEYBOARD_LABEL_ALTGR] = "}";
+        german->localization[VK_KEY_M][KEYBOARD_LABEL_ALTGR] = "µ";
+    }
+
+    if (auto* french = find("Français")) {
+        french->localization[VK_KEY_E][KEYBOARD_LABEL_ALTGR] = "€";
+        french->localization[VK_KEY_0][KEYBOARD_LABEL_ALTGR] = "@";
+        french->localization[VK_KEY_3][KEYBOARD_LABEL_ALTGR] = "#";
+        french->localization[VK_KEY_4][KEYBOARD_LABEL_ALTGR] = "{";
+        french->localization[VK_KEY_5][KEYBOARD_LABEL_ALTGR] = "[";
+        french->localization[VK_KEY_6][KEYBOARD_LABEL_ALTGR] = "|";
+        french->localization[VK_KEY_8][KEYBOARD_LABEL_ALTGR] = "\\";
+        french->localization[VK_KEY_9][KEYBOARD_LABEL_ALTGR] = "^";
+        french->localization[VK_OEM_MINUS][KEYBOARD_LABEL_ALTGR] = "]";
+        french->localization[VK_OEM_PLUS][KEYBOARD_LABEL_ALTGR] = "}";
+    }
+
+    if (auto* spanish = find("Español")) {
+        spanish->localization[VK_OEM_102][KEYBOARD_LABEL_ALTGR] = "|";
+        spanish->localization[VK_KEY_E][KEYBOARD_LABEL_ALTGR] = "€";
+        spanish->localization[VK_KEY_1][KEYBOARD_LABEL_ALTGR] = "|";
+        spanish->localization[VK_KEY_2][KEYBOARD_LABEL_ALTGR] = "@";
+        spanish->localization[VK_KEY_3][KEYBOARD_LABEL_ALTGR] = "#";
+        spanish->localization[VK_OEM_3][KEYBOARD_LABEL_ALTGR] = "\\";
+    }
 }

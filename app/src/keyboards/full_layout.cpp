@@ -19,7 +19,9 @@ void KeyboardView::createFullLayout() {
     float baseButtonWidth = 74.0f;
     float tabButtonWidth = 120.0f;
     float returnButtonWidth = 138.0f;
-    float shiftButtonWidth = 179.0f;
+    // Row 5 carries one more key than the other rows (the ISO key left of Z),
+    // so the two Shift caps shrink to keep every row the same total width.
+    float shiftButtonWidth = 138.0f;
     float funcMargins = 15.0f;
 
     // ROW 1
@@ -113,7 +115,9 @@ void KeyboardView::createFullLayout() {
     Box* row5 = new Box(Axis::ROW);
     addView(row5);
 
-    std::vector<KeyboardKeys> row5Keys = { VK_KEY_Z, VK_KEY_X, VK_KEY_C, VK_KEY_V, VK_KEY_B, VK_KEY_N, VK_KEY_M, VK_OEM_COMMA, VK_OEM_PERIOD, VK_OEM_2 };
+    // VK_OEM_102 is the ISO key left of Z. It is dead on US-ANSI hosts but is
+    // the only way to reach `<`, `>` and (with AltGr) `|` on de-de/es-es.
+    std::vector<KeyboardKeys> row5Keys = { VK_OEM_102, VK_KEY_Z, VK_KEY_X, VK_KEY_C, VK_KEY_V, VK_KEY_B, VK_KEY_N, VK_KEY_M, VK_OEM_COMMA, VK_OEM_PERIOD, VK_OEM_2 };
 
     ButtonView* lshiftButton = new ButtonView(this);
     lshiftButton->setKey(VK_RSHIFT);
@@ -181,13 +185,16 @@ void KeyboardView::createFullLayout() {
     lwinButton->setWidth(menuButtonWidth);
     row6->addView(lwinButton);
 
-    ButtonView* laltButton = new ButtonView(this);
-    laltButton->setKey(VK_RMENU);
-    laltButton->triggerType = true;
-    laltButton->charLabel->setFontSize(21);
-    laltButton->setMargins(4, 4, 4, 4);
-    laltButton->setWidth(menuButtonWidth);
-    row6->addView(laltButton);
+    // Right Alt is AltGr on non-US host layouts. Firing shiftUpdated relabels
+    // every key to its AltGr glyph while the button is held.
+    ButtonView* altGrButton = new ButtonView(this);
+    altGrButton->setKey(VK_RMENU);
+    altGrButton->triggerType = true;
+    altGrButton->charLabel->setFontSize(21);
+    altGrButton->setMargins(4, 4, 4, 4);
+    altGrButton->setWidth(menuButtonWidth);
+    altGrButton->event = [] { KeyboardView::shiftUpdated.fire(); };
+    row6->addView(altGrButton);
 
     ButtonView* spaceButton = new ButtonView(this);
     spaceButton->setKey(VK_SPACE);

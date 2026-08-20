@@ -53,6 +53,7 @@ typedef struct _SERVER_DATA {
     std::vector<std::string> serverCommands;
     artemis::host::HostIdentity hostIdentity;
     bool isApollo() const;
+    bool isVibepollo() const;
     bool isVibeshine() const;
     bool isPunktfunk() const;
     bool supportsExtendedLaunchOptions() const;

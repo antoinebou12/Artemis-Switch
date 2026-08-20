@@ -9,6 +9,7 @@
 
 #include "Singleton.hpp"
 #include "keyboard_view.hpp"
+#include "../features/input/ControllerBattery.hpp"
 #include <borealis.hpp>
 #include <chrono>
 #include <optional>
@@ -75,6 +76,8 @@ class MoonlightInputManager : public Singleton<MoonlightInputManager> {
 
     RumbleValues rumbleCache[GAMEPADS_MAX];
     GamepadState lastGamepadStates[GAMEPADS_MAX];
+    artemis::input::BatteryReading lastBatteryReadings[GAMEPADS_MAX];
+    uint64_t lastBatterySendMs[GAMEPADS_MAX] = {};
     brls::ControllerButton mappingButtons[brls::_BUTTON_MAX];
     std::optional<brls::PanGestureStatus> panStatus;
     std::map<uint32_t, bool> activeTouchIDs;
@@ -91,6 +94,7 @@ class MoonlightInputManager : public Singleton<MoonlightInputManager> {
     brls::ControllerState mapController(brls::ControllerState controller);
     static short glfwKeyToVKKey(brls::BrlsKeyboardScancode key);
     void sendRelativeMouseMove(brls::Point offset);
+    void handleControllerBattery(int slot, uint64_t nowMs);
     void handleDesktopMouseScroll(brls::Point scroll);
     void sendDesktopMouseScroll(brls::Point scroll);
 
