@@ -14,6 +14,7 @@ class BooleanSliderCell : public brls::RecyclerCell {
     void init(const std::string& title, bool isOn,
               const std::function<void(bool)>& callback);
     void setOn(bool on);
+    void setEnabled(bool enabled);
     void setValueText(const std::string& text);
     void setSliderVisibility(brls::Visibility visibility);
     void setProgress(float progress);

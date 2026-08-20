@@ -23,6 +23,11 @@ void BooleanSliderCell::setOn(bool on) {
     toggle->setOn(on, false);
 }
 
+void BooleanSliderCell::setEnabled(bool enabled) {
+    toggle->setEnabled(enabled);
+    slider->setFocusable(enabled);
+}
+
 void BooleanSliderCell::setValueText(const std::string& text) {
     valueText = text;
     updateTitle();

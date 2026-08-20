@@ -1,20 +1,27 @@
 #include "wg_nx.h"
 
-#include "SocketFdLock.hpp"
 #include "WireGuardConfig.hpp"
 
-#include <cstdlib>
-#include <cstring>
-#include <mutex>
-#include <string>
+// A real backend should take SocketFdLock::instance().guard() (see
+// SocketFdLock.hpp) around its handshake/UDP setup and teardown; the stub has
+// no sockets to protect, so it does not include it.
 
-// Weak stub backend so Switch builds succeed without vendoring wg-nx yet.
-// Replace by linking a real libwg_nx.a that exports the same symbols.
+// Stub backend so Switch builds succeed without vendoring wg-nx.
+//
+// This performs NO key exchange, opens NO socket, and tunnels NO traffic. It
+// only parses and validates the config so the settings UI can give real
+// feedback on the file. wg_nx_is_real_backend() returns false, and
+// WireGuardManager uses that to report "unavailable" rather than "running" --
+// an earlier version of this stub reported success and the UI happily claimed
+// a working tunnel.
+//
+// Replace by linking a real libwg_nx.a exporting the same symbols.
 
 struct WgNxTunnel {
     WireGuardConfig config;
-    bool running = false;
 };
+
+extern "C" int wg_nx_is_real_backend(void) { return 0; }
 
 extern "C" WgNxTunnel* wg_nx_tunnel_create(const char* conf_text) {
     if (!conf_text) {
@@ -23,6 +30,7 @@ extern "C" WgNxTunnel* wg_nx_tunnel_create(const char* conf_text) {
     auto* tunnel = new WgNxTunnel();
     tunnel->config = parse_wireguard_conf(conf_text);
     if (!tunnel->config.valid()) {
+        wireguard_scrub(tunnel->config.privateKey);
         delete tunnel;
         return nullptr;
     }
@@ -33,19 +41,14 @@ extern "C" int wg_nx_tunnel_start(WgNxTunnel* tunnel) {
     if (!tunnel) {
         return -1;
     }
-    auto lock = SocketFdLock::instance().guard();
-    // Stub: mark running after validating config. A real wg-nx build performs
-    // handshake/UDP here under the same SocketFdLock.
-    tunnel->running = true;
-    return 0;
+    // A real wg-nx build performs the handshake and UDP setup here, under the
+    // same SocketFdLock. There is nothing to start in the stub, and reporting
+    // success would be a lie, so refuse.
+    return -1;
 }
 
 extern "C" void wg_nx_tunnel_stop(WgNxTunnel* tunnel) {
-    if (!tunnel) {
-        return;
-    }
-    auto lock = SocketFdLock::instance().guard();
-    tunnel->running = false;
+    (void)tunnel;
 }
 
 extern "C" void wg_nx_tunnel_destroy(WgNxTunnel* tunnel) {
@@ -53,6 +56,11 @@ extern "C" void wg_nx_tunnel_destroy(WgNxTunnel* tunnel) {
         return;
     }
     wg_nx_tunnel_stop(tunnel);
+    // Do not leave the private key sitting in freed heap.
+    wireguard_scrub(tunnel->config.privateKey);
+    for (auto& peer : tunnel->config.peers) {
+        wireguard_scrub(peer.presharedKey);
+    }
     delete tunnel;
 }
 

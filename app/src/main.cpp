@@ -193,8 +193,11 @@ int main(int argc, char* argv[]) {
 #if defined(__SWITCH__) && defined(ENABLE_WIREGUARD)
     if (Settings::instance().wireguard_enabled()) {
         if (Settings::instance().wireguard_config_path().empty()) {
-            Settings::instance().set_wireguard_config_path(home + "/wg0.conf");
+            Settings::instance().set_wireguard_config_path(
+                WireGuardManager::default_config_path());
         }
+        // A failure here is reported through the VPN status row in settings;
+        // it must not block startup.
         WireGuardManager::instance().enable_from_settings();
     }
 #endif
