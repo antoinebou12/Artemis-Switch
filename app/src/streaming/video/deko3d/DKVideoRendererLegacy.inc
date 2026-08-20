@@ -329,9 +329,28 @@ bool DKVideoRenderer::shouldUseUpscaling() const {
 }
 
 #ifdef SUPPORT_UPSCALING
+namespace {
+// Dithering exists to mask the banding the upscaling pass introduces, and it
+// rides on the same offscreen render target, so it is only meaningful while an
+// upscaling mode is selected. With upscaling off it cost an extra target for a
+// barely visible effect.
+//
+// Both the live predicate and the change-detection predicate in
+// updateRenderState() must agree, and they had already drifted (the latter was
+// missing the strength term), so they share this one helper.
+bool ditheringRequestedFor(int frameWidth, int frameHeight, int screenWidth,
+                           int screenHeight) {
+    return Settings::instance().upscaling() &&
+           Settings::instance().dithering() &&
+           Settings::instance().dithering_strength() > 0.0f &&
+           frameWidth > 0 && frameHeight > 0 && screenWidth > 0 &&
+           screenHeight > 0;
+}
+} // namespace
+
 bool DKVideoRenderer::shouldUseDithering() const {
-    return Settings::instance().dithering() && Settings::instance().dithering_strength() > 0.0f && m_frame_width > 0 &&
-           m_frame_height > 0 && m_screen_width > 0 && m_screen_height > 0;
+    return ditheringRequestedFor(m_frame_width, m_frame_height, m_screen_width,
+                                 m_screen_height);
 }
 
 void DKVideoRenderer::updateDitheringConstants() {
@@ -1093,8 +1112,7 @@ void DKVideoRenderer::updateRenderState(int width, int height, AVFrame* frame) {
     const bool rotationChanged = m_artemis_rotation != rotation;
 #ifdef SUPPORT_UPSCALING
     const bool requestedDithering =
-        Settings::instance().dithering() && frame->width > 0 && frame->height > 0 &&
-        width > 0 && height > 0;
+        ditheringRequestedFor(frame->width, frame->height, width, height);
 #else
     const bool requestedDithering = false;
 #endif

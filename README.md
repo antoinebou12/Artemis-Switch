@@ -78,7 +78,7 @@ Hosts and clients are separate. Pick a **server** on the PC, then a **client** o
 | Pairing and app list | Moonlight/GameStream | Moonlight/GameStream (must be enabled) |
 | Requested resolution / FPS | Standard mode plus precise-FPS launch options | Standard GameStream mode; host matches the requested mode |
 | Virtual display | Client-requested through advertised Vibeshine launch fields | Host-managed automatically |
-| HDR | Host-advertised; requires a compatible capture/codec path | Host-advertised only when its 10-bit capture and encoder path is available |
+| HDR | Not requested by Artemis Switch — the handheld panel is not an HDR display | Not requested by Artemis Switch, for the same reason |
 | Mouse, keyboard, controllers | Standard GameStream input | Standard GameStream input |
 | Web console | `https://<host>:47990/` | `https://<host>:47992/` |
 

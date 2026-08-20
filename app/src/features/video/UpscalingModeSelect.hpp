@@ -7,6 +7,8 @@ enum UpscalingModeValue : int {
     UpscalingOff = 0,
     UpscalingMetalFx = 1,
     UpscalingFsr1 = 2,
+    UpscalingSgsr1 = 3,
+    UpscalingNis = 4,
 };
 
 // Apple (non-tvOS) exposes Off / MetalFX / FSR1. Switch and other FSR-only
@@ -24,6 +26,28 @@ inline int upscaling_mode_from_selector(int index, bool metal_fx_choices) {
         return UpscalingOff;
     }
     return index <= 0 ? UpscalingOff : UpscalingFsr1;
+}
+
+// Switch exposes every deko3d upscaler: Off / FSR1 / SGSR1 / NIS. The Settings
+// tab and the in-stream overlay both drive the same setting, so they must offer
+// the same list -- the overlay used to show only Off/FSR1, which silently
+// reset a profile's SGSR1 or NIS choice to FSR1 when touched mid-stream.
+inline int switch_upscaling_selector_index(int mode) {
+    switch (mode) {
+        case UpscalingFsr1: return 1;
+        case UpscalingSgsr1: return 2;
+        case UpscalingNis: return 3;
+        default: return 0;
+    }
+}
+
+inline int switch_upscaling_mode_from_selector(int index) {
+    switch (index) {
+        case 1: return UpscalingFsr1;
+        case 2: return UpscalingSgsr1;
+        case 3: return UpscalingNis;
+        default: return UpscalingOff;
+    }
 }
 
 inline bool upscaling_active(int mode) { return mode != UpscalingOff; }

@@ -809,9 +809,11 @@ elseif (USE_METAL_RENDERER)
     set(SUPPORT_HDR ON)
     add_definitions(-DUSE_METAL_RENDERER)
 elseif (USE_DEKO3D_RENDERER)
-    # Request HDR (10-bit HEVC/AV1) from the host. Recommended with Vibepollo;
-    # Switch presents tone-mapped when the display path is not native HDR.
-    set(SUPPORT_HDR ON)
+    # HDR is deliberately not enabled on Switch. The handheld panel is not an
+    # HDR display, so requesting 10-bit only pushed the host into an HDR mode
+    # and returned washed-out, tone-mapped output. Leaving SUPPORT_HDR unset
+    # makes Settings::request_hdr() return false, which keeps the Main10 bits
+    # out of the format mask and hides the Settings and profile-editor cells.
     add_definitions(-DUSE_DEKO3D_RENDERER)
 endif ()
 

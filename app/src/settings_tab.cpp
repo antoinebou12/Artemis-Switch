@@ -211,8 +211,13 @@ SettingsTab::SettingsTab() {
         upscalingMode->removeFromSuperView(true);
         rcas->removeFromSuperView(true);
     } else {
+        // Dithering only masks upscaler banding, and the renderer now ignores
+        // it while upscaling is off, so the cell follows the mode selector
+        // instead of sitting there looking live with no effect.
         auto updateDitheringControls = [this](bool enabled) {
-            updateStrengthControl(dithering, enabled,
+            const bool upscalingOn = Settings::instance().upscaling();
+            dithering->setEnabled(upscalingOn);
+            updateStrengthControl(dithering, upscalingOn && enabled,
                                   getDitheringStrengthText(
                                       Settings::instance().dithering_strength()));
         };
@@ -255,27 +260,15 @@ SettingsTab::SettingsTab() {
                     artemis::video::upscaling_mode_from_selector(value, true));
             });
 #elif defined(PLATFORM_SWITCH)
-        int selectedMode = static_cast<int>(Settings::instance().upscaling_mode());
-        // UI order: Off, FSR1, SGSR1, NIS (MetalFX index unused on Switch)
-        int uiIndex = 0;
-        if (selectedMode == UPSCALING_FSR1)
-            uiIndex = 1;
-        else if (selectedMode == UPSCALING_SGSR1)
-            uiIndex = 2;
-        else if (selectedMode == UPSCALING_NIS)
-            uiIndex = 3;
         upscalingMode->init(
             "settings/upscaling"_i18n,
-            {"hints/off"_i18n, "FSR1", "SGSR1", "NIS"}, uiIndex,
-            [](int value) {
-                UpscalingMode mode = UPSCALING_OFF;
-                if (value == 1)
-                    mode = UPSCALING_FSR1;
-                else if (value == 2)
-                    mode = UPSCALING_SGSR1;
-                else if (value == 3)
-                    mode = UPSCALING_NIS;
-                Settings::instance().set_upscaling_mode(mode);
+            {"hints/off"_i18n, "FSR1", "SGSR1", "NIS"},
+            artemis::video::switch_upscaling_selector_index(
+                static_cast<int>(Settings::instance().upscaling_mode())),
+            [updateDitheringControls](int value) {
+                Settings::instance().set_upscaling_mode(static_cast<UpscalingMode>(
+                    artemis::video::switch_upscaling_mode_from_selector(value)));
+                updateDitheringControls(Settings::instance().dithering());
             });
 #else
         constexpr bool kMetalFxChoices = false;
