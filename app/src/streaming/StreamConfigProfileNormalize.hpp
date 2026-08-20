@@ -56,6 +56,10 @@ inline int normalizeCustomDimension(int value, int fallback) {
     return value;
 }
 
+inline int normalizeVolume(int volume) {
+    return std::clamp(volume, 0, 100);
+}
+
 struct ProfileNormalizeInput {
     std::string name;
     int resolutionHeight = 720;

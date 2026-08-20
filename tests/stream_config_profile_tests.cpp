@@ -165,5 +165,14 @@ int main() {
     assert(rcas);
     assert(strength == 0.20f);
 
+    // Volume mirrors Settings::get_volume(), which is 0-100 -- unlike the
+    // in-stream overlay slider, a profile has no amplification headroom.
+    assert(normalizeVolume(50) == 50);
+    assert(normalizeVolume(0) == 0);
+    assert(normalizeVolume(100) == 100);
+    assert(normalizeVolume(-5) == 0);
+    assert(normalizeVolume(101) == 100);
+    assert(normalizeVolume(500) == 100);
+
     return 0;
 }

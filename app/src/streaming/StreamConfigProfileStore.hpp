@@ -55,17 +55,28 @@ struct StreamConfigProfile {
     bool forwardMotion = true;
     bool consoleMotionFallback = false;
 
-    // Audio / stream
+    // Hidden profiles stay on disk and keep their host bindings, but are left
+    // out of the pickers. This is the only durable way to suppress a seeded
+    // default: deleting one works until "Add missing defaults" re-adds it by
+    // name.
+    bool hidden = false;
+
+    // Audio
     StreamAudioConfiguration streamAudioConfiguration = STREAM_AUDIO_STEREO;
     bool playAudioOnPc = false;
-    bool sops = false;
-    bool terminateAppOnDisconnect = false;
 #ifdef __SWITCH__
     AudioBackend audioBackend = AUDREN;
 #else
     AudioBackend audioBackend = SDL;
 #endif
     bool volumeAmplification = false;
+    // 0-100, mirrors Settings::get_volume(). Was the one audio setting a
+    // profile could not carry.
+    int volume = 100;
+
+    // Stream / network
+    bool sops = false;
+    bool terminateAppOnDisconnect = false;
 
     // Keyboard
     KeyboardType keyboardType = COMPACT;
@@ -98,7 +109,7 @@ struct StreamConfigProfile {
 
 class StreamConfigProfileStore {
 public:
-    static constexpr int SchemaVersion = 13;
+    static constexpr int SchemaVersion = 14;
     static StreamConfigProfileStore& instance();
 
     const std::vector<StreamConfigProfile>& list();

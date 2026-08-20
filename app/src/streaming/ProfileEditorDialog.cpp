@@ -424,6 +424,8 @@ void openProfileEditor(const std::string& profileId,
             "artemis/settings/profile_name"_i18n, "", 40, draft->name, 0);
         return true;
     });
+    addBool(content, "artemis/settings/hide_profile"_i18n, draft->hidden,
+            [draft](bool v) { draft->hidden = v; });
 
     addHeader(content, "artemis/settings/profile_section_video"_i18n);
 
@@ -800,9 +802,7 @@ void openProfileEditor(const std::string& profileId,
         consoleCell->setEnabled(consoleFallbackSupported);
     }
 
-    addHeader(content, "artemis/settings/profile_section_stream"_i18n);
-    addBool(content, "settings/usops"_i18n, draft->sops,
-            [draft](bool v) { draft->sops = v; });
+    addHeader(content, "artemis/settings/profile_section_audio"_i18n);
     addBool(content, "settings/paop"_i18n, draft->playAudioOnPc,
             [draft](bool v) { draft->playAudioOnPc = v; });
     auto* audioCell =
@@ -825,6 +825,31 @@ void openProfileEditor(const std::string& profileId,
         brls::Application::pushActivity(new brls::Activity(dropdown));
         return true;
     });
+#ifdef __SWITCH__
+    draft->audioBackend = AUDREN;
+    addDetail(content, "settings/audio_backend"_i18n, "Audren")
+        ->setFocusable(false);
+#else
+    draft->audioBackend = SDL;
+    addDetail(content, "settings/audio_backend"_i18n, "SDL")->setFocusable(false);
+#endif
+    addBool(content, "settings/volume_amplification"_i18n,
+            draft->volumeAmplification,
+            [draft](bool v) { draft->volumeAmplification = v; });
+    addLabeledSlider(
+        content, "streaming/volume"_i18n,
+        fmt::format("{}%", std::clamp(draft->volume, 0, 100)),
+        std::clamp(draft->volume, 0, 100) / 100.0f, 12.0f,
+        [draft](float p, brls::Label* valueLabel) {
+            const int volume =
+                static_cast<int>(std::clamp(p, 0.0f, 1.0f) * 100.0f);
+            draft->volume = volume;
+            valueLabel->setText(fmt::format("{}%", volume));
+        });
+
+    addHeader(content, "artemis/settings/profile_section_stream"_i18n);
+    addBool(content, "settings/usops"_i18n, draft->sops,
+            [draft](bool v) { draft->sops = v; });
     addBool(content, "settings/terminate_app_on_disconnect"_i18n,
             draft->terminateAppOnDisconnect,
             [draft](bool v) { draft->terminateAppOnDisconnect = v; });
@@ -912,19 +937,6 @@ void openProfileEditor(const std::string& profileId,
             brls::Application::pushActivity(new brls::Activity(dropdown));
             return true;
         });
-
-#ifdef __SWITCH__
-    draft->audioBackend = AUDREN;
-    addDetail(content, "settings/audio_backend"_i18n, "Audren")
-        ->setFocusable(false);
-#else
-    draft->audioBackend = SDL;
-    addDetail(content, "settings/audio_backend"_i18n, "SDL")->setFocusable(false);
-#endif
-
-    addBool(content, "settings/volume_amplification"_i18n,
-            draft->volumeAmplification,
-            [draft](bool v) { draft->volumeAmplification = v; });
 
     addHeader(content, "artemis/settings/profile_section_controller"_i18n);
     {

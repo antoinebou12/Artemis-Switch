@@ -199,6 +199,9 @@ json_t* profileToJson(const StreamConfigProfile& profile) {
     json_object_set_new(item, "volume_amplification",
                         profile.volumeAmplification ? json_true()
                                                     : json_false());
+    json_object_set_new(item, "volume", json_integer(profile.volume));
+    json_object_set_new(item, "hidden",
+                        profile.hidden ? json_true() : json_false());
 
     json_object_set_new(item, "keyboard_type",
                         json_integer(static_cast<int>(profile.keyboardType)));
@@ -364,6 +367,13 @@ StreamConfigProfile profileFromJson(json_t* object) {
             json_integer_value(audioBackendInt));
     if (json_t* amp = json_object_get(object, "volume_amplification"))
         profile.volumeAmplification = jsonToBool(amp);
+    if (json_t* volume = json_object_get(object, "volume");
+        json_is_integer(volume)) {
+        const int value = static_cast<int>(json_integer_value(volume));
+        profile.volume = artemis::streaming::normalizeVolume(value);
+    }
+    if (json_t* hidden = json_object_get(object, "hidden"))
+        profile.hidden = jsonToBool(hidden);
 
     if (json_t* keyboardType = json_object_get(object, "keyboard_type");
         json_is_integer(keyboardType))
@@ -457,6 +467,7 @@ void applyProfileToSettings(const StreamConfigProfile& profile, bool persist) {
     settings.set_terminate_app_on_disconnect(profile.terminateAppOnDisconnect);
     settings.set_audio_backend(profile.audioBackend);
     settings.set_volume_amplification(profile.volumeAmplification);
+    settings.set_volume(profile.volume);
     settings.set_keyboard_type(profile.keyboardType);
     settings.set_keyboard_locale(profile.keyboardLocale);
     settings.set_keyboard_fingers(profile.keyboardFingers);
@@ -623,6 +634,7 @@ StreamConfigProfileStore::snapshotFromSettings(const std::string& name) {
     profile.terminateAppOnDisconnect = settings.terminate_app_on_disconnect();
     profile.audioBackend = settings.audio_backend();
     profile.volumeAmplification = settings.get_volume_amplification();
+    profile.volume = settings.get_volume();
     profile.keyboardType = settings.get_keyboard_type();
     profile.keyboardLocale = settings.get_keyboard_locale();
     profile.keyboardFingers = settings.get_keyboard_fingers();

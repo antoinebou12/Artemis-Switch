@@ -11,6 +11,8 @@
 #include "MoonlightSession.hpp"
 #include "features/ui/QrCodeView.hpp"
 #include "features/ui/AppLibraryPaging.hpp"
+#include "features/apollo/ApolloHostOptions.hpp"
+#include "features/apollo/ApolloHostOptionsStore.hpp"
 #include "host/GameStreamHostCapabilities.hpp"
 #include "host/HostIdentityProbe.hpp"
 #include "streaming/HostProfileKey.hpp"
@@ -21,7 +23,9 @@
 #include "streaming/StreamUiLifecycle.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cctype>
+#include <utility>
 #include <unordered_map>
 #include <vector>
 
@@ -35,6 +39,21 @@ std::string lowercaseCopy(std::string value) {
 
 bool hostActionsBlockedByActiveSession() {
     return MoonlightSession::activeSession() != nullptr;
+}
+
+const char* virtualDisplayTargetLabelKey(
+    artemis::apollo::VirtualDisplayTarget target) {
+    using artemis::apollo::VirtualDisplayTarget;
+    switch (target) {
+        case VirtualDisplayTarget::Off: return "artemis/overlay/vd_off";
+        case VirtualDisplayTarget::CurrentProfile: return "artemis/overlay/vd_current";
+        case VirtualDisplayTarget::Handheld: return "artemis/overlay/vd_handheld";
+        case VirtualDisplayTarget::Docked: return "artemis/overlay/vd_docked";
+        case VirtualDisplayTarget::PortraitHandheld: return "artemis/overlay/vd_portrait_handheld";
+        case VirtualDisplayTarget::PortraitDocked: return "artemis/overlay/vd_portrait_docked";
+        case VirtualDisplayTarget::Custom: return "artemis/overlay/vd_custom";
+    }
+    return "artemis/overlay/vd_off";
 }
 } // namespace
 
@@ -236,6 +255,89 @@ AppListView::AppListView(const Host& host) : Box(Axis::ROW), host(host) {
         });
     hostContainer->addView(streamProfile);
 
+    // Client-requested virtual display: fully modelled by ApolloHostOptions /
+    // ApolloHostOptionsStore / resolveVirtualDisplay already, just missing a
+    // control since 2aa0986/fac2d69 removed the old Host-tab UI. Only shown
+    // when the host actually advertises the capability -- streaming_view.cpp
+    // reads the same store at launch, so nothing else needs wiring.
+    virtualDisplay = new DetailCell();
+    virtualDisplay->setText("artemis/overlay/virtual_display"_i18n);
+    virtualDisplay->title->setSingleLine(true);
+    virtualDisplay->detail->setSingleLine(true);
+    virtualDisplay->setVisibility(Visibility::GONE);
+    refreshVirtualDisplayLabel();
+    virtualDisplay->registerClickAction([this](View*) {
+        if (hostActionsBlockedByActiveSession())
+            return true;
+        auto& store = artemis::apollo::ApolloHostOptionsStore::instance();
+        auto options = store.get(hostProfileKey);
+
+        static const std::pair<artemis::apollo::VirtualDisplayTarget,
+                               const char*>
+            kTargets[] = {
+                {artemis::apollo::VirtualDisplayTarget::Off,
+                 "artemis/overlay/vd_off"},
+                {artemis::apollo::VirtualDisplayTarget::CurrentProfile,
+                 "artemis/overlay/vd_current"},
+                {artemis::apollo::VirtualDisplayTarget::Handheld,
+                 "artemis/overlay/vd_handheld"},
+                {artemis::apollo::VirtualDisplayTarget::Docked,
+                 "artemis/overlay/vd_docked"},
+                {artemis::apollo::VirtualDisplayTarget::PortraitHandheld,
+                 "artemis/overlay/vd_portrait_handheld"},
+                {artemis::apollo::VirtualDisplayTarget::PortraitDocked,
+                 "artemis/overlay/vd_portrait_docked"},
+                {artemis::apollo::VirtualDisplayTarget::Custom,
+                 "artemis/overlay/vd_custom"},
+            };
+        std::vector<std::string> labels;
+        int selected = 0;
+        for (size_t i = 0; i < std::size(kTargets); ++i) {
+            labels.push_back(brls::getStr(kTargets[i].second));
+            if (kTargets[i].first == options.target)
+                selected = static_cast<int>(i);
+        }
+
+        auto* dropdown = new brls::Dropdown(
+            "artemis/overlay/virtual_display"_i18n, labels,
+            [this, options](int index) mutable {
+                if (index < 0 ||
+                    index >= static_cast<int>(std::size(kTargets)))
+                    return;
+                options.target = kTargets[static_cast<size_t>(index)].first;
+                if (options.target ==
+                    artemis::apollo::VirtualDisplayTarget::Custom) {
+                    Application::getPlatform()->getImeManager()->openForText(
+                        [this, options](const std::string& text) mutable {
+                            std::string error;
+                            if (!artemis::apollo::parseVirtualDisplaySpec(
+                                    text, options, &error)) {
+                                showError(error.empty()
+                                              ? "artemis/overlay/vd_custom_prompt"_i18n
+                                              : error);
+                                return;
+                            }
+                            options = artemis::apollo::validateApolloHostOptions(
+                                options);
+                            artemis::apollo::ApolloHostOptionsStore::instance()
+                                .set(hostProfileKey, options);
+                            refreshVirtualDisplayLabel();
+                        },
+                        "artemis/overlay/vd_custom"_i18n,
+                        "artemis/overlay/vd_custom_prompt"_i18n, 24, "", 0);
+                    return;
+                }
+                options = artemis::apollo::validateApolloHostOptions(options);
+                artemis::apollo::ApolloHostOptionsStore::instance().set(
+                    hostProfileKey, options);
+                refreshVirtualDisplayLabel();
+            },
+            selected);
+        Application::pushActivity(new Activity(dropdown));
+        return true;
+    });
+    hostContainer->addView(virtualDisplay);
+
     contentColumn->addView(hostContainer);
     addView(contentColumn);
 
@@ -383,6 +485,15 @@ void AppListView::refreshWebConfigVisibility() {
                                  : Visibility::GONE);
 }
 
+void AppListView::refreshVirtualDisplayLabel() {
+    if (!virtualDisplay)
+        return;
+    const auto options =
+        artemis::apollo::ApolloHostOptionsStore::instance().get(hostProfileKey);
+    virtualDisplay->setDetailText(
+        brls::getStr(virtualDisplayTargetLabelKey(options.target)));
+}
+
 void AppListView::refreshHostIntegration(const SERVER_DATA& server) {
     if (!hostIntegration)
         return;
@@ -406,11 +517,29 @@ void AppListView::refreshHostIntegration(const SERVER_DATA& server) {
         features.push_back("host/feature_client_virtual_display"_i18n);
     if (capabilities.hostManagedVirtualDisplay)
         features.push_back("host/feature_host_virtual_display"_i18n);
+    if (capabilities.serverCommands && !server.serverCommands.empty()) {
+        std::string names;
+        for (const auto& name : server.serverCommands) {
+            if (!names.empty())
+                names += ", ";
+            names += name;
+        }
+        features.push_back("host/feature_server_commands"_i18n + ": " + names);
+    }
 
     std::string detail = product;
     for (const auto& feature : features)
         detail += " · " + feature;
     hostIntegration->setDetailText(detail);
+
+    if (virtualDisplay) {
+        // Host-managed virtual display (Vibeshine/Punktfunk) sizes itself from
+        // the requested stream resolution; the client-side picker only applies
+        // to hosts that accept an explicit target (Apollo family).
+        virtualDisplay->setVisibility(
+            capabilities.virtualDisplay ? Visibility::VISIBLE : Visibility::GONE);
+        refreshVirtualDisplayLabel();
+    }
 
     if (webConfig) {
         switch (detectedHostIdentity.kind) {

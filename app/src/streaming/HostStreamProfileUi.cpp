@@ -133,6 +133,18 @@ void open_profile_actions_page(const StreamConfigProfile& profile,
             return true;
         });
 
+    addRow(column,
+          profile.hidden ? "artemis/settings/show_profile"_i18n
+                         : "artemis/settings/hide_profile"_i18n)
+        ->registerClickAction([profile, hostKey, onChanged](brls::View*) {
+            auto& store = StreamConfigProfileStore::instance();
+            auto updated = profile;
+            updated.hidden = !updated.hidden;
+            store.update(updated);
+            reopenProfileList(ProfileListKind::Manage, hostKey, onChanged, 2);
+            return true;
+        });
+
     addRow(column, "common/remove"_i18n)
         ->registerClickAction([profileId, hostKey, onChanged](brls::View*) {
             // Pop dialog (auto) + actions + manage after confirm.
@@ -205,7 +217,12 @@ void open_host_profile_picker(const std::string& hostKey,
         });
 
     for (const auto& profile : profiles) {
+        // A profile that is currently selected for this host stays visible
+        // even if hidden, so hiding one never leaves a host silently pointed
+        // at a profile the picker cannot show.
         const bool selected = !currentId.empty() && profile.id == currentId;
+        if (profile.hidden && !selected)
+            continue;
         auto* row =
             addRow(column, profile.name, selected ? "hints/on"_i18n : "");
         wireQuickProfileActions(row, profile.id, hostKey,
@@ -253,12 +270,17 @@ void open_manage_host_profile(const std::string& hostKey,
     }
 
     for (const auto& profile : profiles) {
-        auto* row = addRow(
-            column, profile.name,
-            fmt::format("{}p {}fps", profile.resolutionHeight, profile.fps));
+        const std::string detail =
+            profile.hidden
+                ? fmt::format("{}p {}fps · {}", profile.resolutionHeight,
+                              profile.fps,
+                              "artemis/settings/profile_hidden"_i18n)
+                : fmt::format("{}p {}fps", profile.resolutionHeight,
+                              profile.fps);
+        auto* row = addRow(column, profile.name, detail);
         wireQuickProfileActions(row, profile.id, hostKey,
                                 ProfileListKind::Manage, onChanged);
-        // A opens Edit / Duplicate / Remove.
+        // A opens Edit / Duplicate / Hide / Remove.
         row->registerClickAction([profile, hostKey, onChanged](brls::View*) {
             open_profile_actions_page(profile, hostKey, onChanged);
             return true;

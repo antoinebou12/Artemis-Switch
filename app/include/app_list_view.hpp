@@ -37,6 +37,7 @@ class AppListView : public Box {
     DetailCell* hostIntegration = nullptr;
     DetailCell* webConfig = nullptr;
     DetailCell* streamProfile = nullptr;
+    DetailCell* virtualDisplay = nullptr;
     DetailCell* appSearch = nullptr;
     DetailCell* loadMoreApps = nullptr;
     Sidebar* sidebar = nullptr;
@@ -78,4 +79,5 @@ class AppListView : public Box {
     void refreshStreamProfileLabel();
     void refreshWebConfigVisibility();
     void refreshHostIntegration(const SERVER_DATA& server);
+    void refreshVirtualDisplayLabel();
 };
