@@ -12,6 +12,7 @@
 #include "remote_access_provider_id.hpp"
 #endif
 #include "DiscoverManager.hpp"
+#include "NetBirdManager.hpp"
 #include "helper.hpp"
 #include "main_tabs_view.hpp"
 #include "features/host/HostAddressParse.hpp"
@@ -209,6 +210,36 @@ void AddHostTab::findHost() {
     searchBox->clearViews();
     searchHeader->setTitle("add_host/search"_i18n);
     loader->setVisibility(brls::Visibility::VISIBLE);
+
+#if defined(__SWITCH__)
+    // NetBird login/sync can block while the relay is established, so discover
+    // mesh peers off the UI thread. Each result keeps the real 100.x address as
+    // a named endpoint. NetBirdManager's gs_init wrapper transparently starts
+    // the localhost TCP/UDP proxy when the user connects to that peer.
+    {
+        ASYNC_RETAIN
+        brls::async([ASYNC_TOKEN, generation] {
+            std::vector<Host> netbirdHosts;
+            for (const auto& peer : NetBirdManager::instance().peers()) {
+                Host host;
+                host.address = peer.address;
+                host.hostname = peer.name;
+                host.endpoints.push_back({"NetBird", peer.address, 10});
+                netbirdHosts.push_back(std::move(host));
+            }
+
+            brls::sync([ASYNC_TOKEN, generation,
+                        netbirdHosts = std::move(netbirdHosts)]() mutable {
+                ASYNC_RELEASE
+                if (generation != searchGeneration) {
+                    return;
+                }
+                appendSearchHosts(netbirdHosts);
+            });
+        });
+    }
+#endif
+
     ASYNC_RETAIN
 #if defined(PLATFORM_IOS) || defined(PLATFORM_TVOS) || defined(PLATFORM_VISIONOS)
     darwin_mdns_start(
