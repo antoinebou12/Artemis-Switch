@@ -76,6 +76,12 @@ foreach (_patch IN LISTS _netbird_patches)
     endif ()
 endforeach ()
 
+# Current NetBird clients negotiate a common exact relay instance through the
+# Signal stream. The pinned Switch PoC predates that behavior, so apply the
+# compatibility rewrites to the staged sources after normal patching.
+include("${CMAKE_CURRENT_LIST_DIR}/NetBirdCurrentRelayCompat.cmake")
+artemis_apply_netbird_current_relay_compat("${NETBIRD_STAGE}")
+
 find_program(_make_exe NAMES make gmake REQUIRED)
 
 include(ProcessorCount)
