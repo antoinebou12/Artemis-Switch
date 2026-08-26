@@ -11,24 +11,26 @@ RemoteAccessSelectionResult
 applyRemoteAccessSelection(RemoteAccessProviderId provider) {
     auto& settings = Settings::instance();
 
-    // Clear the effective state first: if the provider fails to start, nothing
-    // should claim to be connected across a restart.
-    settings.set_remote_access_provider(RemoteAccessProviderId::Off);
+    // Record the choice BEFORE starting. Each provider's start() reads this
+    // field to confirm it is the selected one, so clearing it first made every
+    // start refuse with "start ignored because another provider is selected"
+    // -- neither provider could ever come up.
+    settings.set_remote_access_provider(provider);
+    // Tracks whether a tunnel is actually up, not what the user picked, so it
+    // stays false until a start succeeds.
     settings.set_wireguard_enabled(false);
+    // Persist the choice before the blocking start, so it survives the app
+    // dying mid-connect.
+    settings.save();
 
     auto result = RemoteAccessManager::instance().selectAndStartProvider(
         remoteAccessProviderRuntimeId(provider));
 
-    if (provider == RemoteAccessProviderId::Off) {
-        settings.save();
-        return result;
-    }
-    if (!result.started)
-        return result;
-
-    settings.set_remote_access_provider(provider);
-    if (provider == RemoteAccessProviderId::WireGuard)
+    if (result.started && provider == RemoteAccessProviderId::WireGuard) {
         settings.set_wireguard_enabled(true);
+    }
+    // A failed start keeps the provider selected on purpose: the settings rows
+    // for it stay visible so the configuration can be corrected and retried.
     settings.save();
     return result;
 }

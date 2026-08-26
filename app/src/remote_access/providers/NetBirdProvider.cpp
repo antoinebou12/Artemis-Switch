@@ -63,14 +63,22 @@ bool NetBirdProvider::start() {
 
     const std::string server = Settings::instance().netbird_server();
     const std::string setupKey = Settings::instance().netbird_setup_key();
+    // Log these: without them a misconfigured start looks identical to a silent
+    // failure in vpn.log, since nothing else is written before the login.
     if (server.empty()) {
         lastError_ = "artemis/settings/netbird_missing_server";
+        vpn_log(VpnFileLogger::Severity::Error, "no management server configured");
         return false;
     }
     if (setupKey.empty()) {
         lastError_ = "artemis/settings/netbird_missing_setup_key";
+        vpn_log(VpnFileLogger::Severity::Error, "no setup key configured");
         return false;
     }
+    // Never log the key; its length is enough to tell a loaded key from a
+    // truncated or empty one.
+    vpn_log(VpnFileLogger::Severity::Info,
+            "setup key present (" + std::to_string(setupKey.size()) + " chars)");
 
     // Never log the setup key itself.
     brls::Logger::info("NetBird: logging in to {}", server);

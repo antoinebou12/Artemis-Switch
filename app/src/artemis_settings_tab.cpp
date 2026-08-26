@@ -441,14 +441,11 @@ ArtemisSettingsTab::ArtemisSettingsTab() {
 
             applyRemoteAccessSelectionAsync(
                 provider, alive_,
-                [this, provider,
-                 previous](const RemoteAccessSelectionResult& result) {
-                    // Show the rows for whichever provider is selected even if
-                    // it failed to start: the user needs them to fix the
-                    // configuration, so the selection stays put.
+                [this](const RemoteAccessSelectionResult& result) {
+                    // applyRemoteAccessSelection already leaves the provider
+                    // selected on failure, so the rows for it stay visible and
+                    // the configuration can be corrected and retried.
                     if (!result.started) {
-                        Settings::instance().set_remote_access_provider(provider);
-                        Settings::instance().save();
                         brls::Application::notify(
                             result.status.empty()
                                 ? "settings/remote_access_failed"_i18n
