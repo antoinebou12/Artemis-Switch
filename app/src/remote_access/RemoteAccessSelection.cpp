@@ -33,6 +33,50 @@ applyRemoteAccessSelection(RemoteAccessProviderId provider) {
     return result;
 }
 
+void disconnectRemoteAccess() {
+    // Deliberately does not touch remote_access_provider: the user picked that
+    // provider, and disconnecting is a transport action, not a change of mind.
+    RemoteAccessManager::instance().stopActiveProvider();
+    Settings::instance().set_wireguard_enabled(false);
+    Settings::instance().save();
+}
+
+namespace {
+
+// Runs `work` on a worker thread behind a modal dialog, then `finish` on the UI
+// thread once the dialog has finished closing.
+//
+// The dialog is closed via close(cb) rather than close() followed by more
+// statements: the follow-up has to run after the close animation completes, or
+// it races the activity stack.
+void runBehindLoadingDialog(const std::string& message,
+                            std::shared_ptr<std::atomic<bool>> alive,
+                            std::function<void()> work,
+                            std::function<void()> finish) {
+    brls::Dialog* loading = createLoadingDialog(message);
+    loading->setCancelable(false);
+    loading->open();
+
+    brls::async([alive, work, finish, loading]() {
+        if (work) {
+            work();
+        }
+        brls::sync([alive, finish, loading]() {
+            loading->close([alive, finish]() {
+                // The view that asked for this may be gone by now.
+                if (alive && !alive->load()) {
+                    return;
+                }
+                if (finish) {
+                    finish();
+                }
+            });
+        });
+    });
+}
+
+} // namespace
+
 void applyRemoteAccessSelectionAsync(
     RemoteAccessProviderId provider,
     std::shared_ptr<std::atomic<bool>> alive,
@@ -40,24 +84,24 @@ void applyRemoteAccessSelectionAsync(
     // netbird_init() is a full network login, and netbird_shutdown() joins the
     // relay, WireGuard, keepalive and proxy threads. Either one on the UI thread
     // freezes the app for as long as it takes.
+    auto result = std::make_shared<RemoteAccessSelectionResult>();
     const bool connecting = provider != RemoteAccessProviderId::Off;
-    brls::Dialog* loading = createLoadingDialog(
-        connecting ? "settings/remote_access_connecting"_i18n
-                   : "settings/remote_access_disconnecting"_i18n);
-    loading->setCancelable(false);
-    loading->open();
 
-    brls::async([provider, alive, onDone, loading]() {
-        const auto result = applyRemoteAccessSelection(provider);
-        brls::sync([alive, onDone, loading, result]() {
-            loading->close();
-            // The view that asked for this may be gone by now.
-            if (alive && !alive->load()) {
-                return;
-            }
+    runBehindLoadingDialog(
+        connecting ? "settings/remote_access_connecting"_i18n
+                   : "settings/remote_access_disconnecting"_i18n,
+        alive,
+        [provider, result]() { *result = applyRemoteAccessSelection(provider); },
+        [onDone, result]() {
             if (onDone) {
-                onDone(result);
+                onDone(*result);
             }
         });
-    });
+}
+
+void disconnectRemoteAccessAsync(std::shared_ptr<std::atomic<bool>> alive,
+                                 std::function<void()> onDone) {
+    runBehindLoadingDialog("settings/remote_access_disconnecting"_i18n, alive,
+                           []() { disconnectRemoteAccess(); },
+                           std::move(onDone));
 }

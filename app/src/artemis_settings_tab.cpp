@@ -412,23 +412,49 @@ ArtemisSettingsTab::ArtemisSettingsTab() {
         "settings/remote_access_provider"_i18n,
         {"settings/remote_access_off"_i18n, "settings/wireguard"_i18n,
          "settings/netbird"_i18n},
-        static_cast<int>(currentProvider), [this](int selected) {
+        static_cast<int>(currentProvider),
+        // The value callback only updates the cell's own text. Applying the
+        // choice here would push the loading dialog while Dropdown is still
+        // mid-selection: it fires this callback and THEN calls popActivity,
+        // which would pop the dialog and strand the dropdown on screen.
+        [](int) {},
+        // Fires once the dropdown has finished popping, so it is safe to open
+        // a dialog from here.
+        [this](int selected) {
             const auto provider = providerFromSelectorIndex(selected);
+            const auto previous = Settings::instance().remote_access_provider();
+            if (provider == previous &&
+                !RemoteAccessManager::instance().activeProviderId().empty()) {
+                return;
+            }
+
+            if (provider == RemoteAccessProviderId::Off) {
+                // Off is a real preference change, so record it and tear the
+                // tunnel down.
+                Settings::instance().set_remote_access_provider(
+                    RemoteAccessProviderId::Off);
+                Settings::instance().save();
+                disconnectRemoteAccessAsync(
+                    alive_, [this]() { refreshRemoteAccessRows(); });
+                return;
+            }
+
             applyRemoteAccessSelectionAsync(
                 provider, alive_,
-                [this, provider](const RemoteAccessSelectionResult& result) {
-                    // Show the rows for whichever provider is now selected,
-                    // even if it failed to start: the user needs them to fix
-                    // the configuration.
-                    refreshRemoteAccessRows();
-
-                    if (provider != RemoteAccessProviderId::Off &&
-                        !result.started) {
+                [this, provider,
+                 previous](const RemoteAccessSelectionResult& result) {
+                    // Show the rows for whichever provider is selected even if
+                    // it failed to start: the user needs them to fix the
+                    // configuration, so the selection stays put.
+                    if (!result.started) {
+                        Settings::instance().set_remote_access_provider(provider);
+                        Settings::instance().save();
                         brls::Application::notify(
                             result.status.empty()
                                 ? "settings/remote_access_failed"_i18n
                                 : brls::getStr(result.status));
                     }
+                    refreshRemoteAccessRows();
                 });
         });
 
@@ -502,23 +528,23 @@ ArtemisSettingsTab::ArtemisSettingsTab() {
     // Explicit connect/disconnect. Without it the only way to retry a failed
     // tunnel was to reselect the provider.
     remoteAccessAction->registerClickAction([this](View*) {
-        auto& settings = Settings::instance();
-        const auto provider = settings.remote_access_provider();
-        if (provider == RemoteAccessProviderId::Off)
+        const auto provider = Settings::instance().remote_access_provider();
+        if (provider == RemoteAccessProviderId::Off) {
             return true;
+        }
 
-        auto& manager = RemoteAccessManager::instance();
-        const bool connected = !manager.activeProviderId().empty();
-        // Disconnecting is expressed as selecting Off so both directions go
-        // through the same async path; the stored provider is restored below.
+        // Disconnect leaves the chosen provider alone: it is a transport
+        // action, so reconnecting later must not need the setting again.
+        if (!RemoteAccessManager::instance().activeProviderId().empty()) {
+            disconnectRemoteAccessAsync(alive_,
+                                        [this]() { refreshRemoteAccessRows(); });
+            return true;
+        }
+
         applyRemoteAccessSelectionAsync(
-            connected ? RemoteAccessProviderId::Off : provider, alive_,
-            [this, connected, provider](const RemoteAccessSelectionResult& result) {
-                if (connected) {
-                    // Off was a transport action, not a preference change.
-                    Settings::instance().set_remote_access_provider(provider);
-                    Settings::instance().save();
-                } else if (!result.started) {
+            provider, alive_,
+            [this](const RemoteAccessSelectionResult& result) {
+                if (!result.started) {
                     brls::Application::notify(
                         result.status.empty()
                             ? "settings/remote_access_failed"_i18n
@@ -645,6 +671,10 @@ void ArtemisSettingsTab::refreshRemoteAccessRows() {
                                   : brls::Visibility::GONE);
     };
 
+    // Keep the cell showing what is actually stored. Silent, so re-syncing
+    // never re-fires the selection handler.
+    remoteAccessProvider->setSelection(static_cast<int>(provider), true);
+
     show(wireguardConfigPath, visible.wireGuard);
     show(netbirdServer, visible.netBird);
     show(netbirdSetupKey, visible.netBird);
@@ -747,8 +777,11 @@ void ArtemisSettingsTab::editNetBirdSetupKey() {
         }
     };
 
+    // Every branch below pushes another activity (file browser or IME), so the
+    // work belongs in the dismiss callback: Dropdown fires its value callback
+    // and only then calls popActivity, which would pop whatever we pushed.
     auto* dropdown = new brls::Dropdown(
-        "settings/netbird_setup_key"_i18n, options,
+        "settings/netbird_setup_key"_i18n, options, [](int) {}, 0,
         [this, applyKey, hasKey](int index) {
             if (index == 0) {
                 artemis::streaming::openFileBrowser(
@@ -781,8 +814,7 @@ void ArtemisSettingsTab::editNetBirdSetupKey() {
             }
             if (hasKey && index == 2)
                 applyKey("");
-        },
-        0);
+        });
     brls::Application::pushActivity(new brls::Activity(dropdown));
 #endif
 }

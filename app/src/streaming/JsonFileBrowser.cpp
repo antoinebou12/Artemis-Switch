@@ -106,8 +106,14 @@ void browseAt(const std::string& directory, JsonFileBrowserMode mode,
     for (const auto& file : files)
         options.push_back(file);
 
+    // Everything this handler does -- descending into a folder, opening the
+    // filename IME, or handing the path to onPicked -- ends up pushing another
+    // activity. Dropdown fires its value callback and only THEN calls
+    // popActivity, so acting there pops the activity we just pushed and leaves
+    // the dropdown stranded on screen. dismissCb runs after the pop completes,
+    // which is the only safe place to do this.
     auto* dropdown = new brls::Dropdown(
-        title, options,
+        title, options, [](int) {}, 0,
         [directory, mode, extensions, title, onPicked, folders,
          files](int index) {
             if (index < 0)
@@ -149,8 +155,7 @@ void browseAt(const std::string& directory, JsonFileBrowserMode mode,
                 if (onPicked)
                     onPicked(path.string());
             }
-        },
-        0);
+        });
     brls::Application::pushActivity(new brls::Activity(dropdown));
 }
 
