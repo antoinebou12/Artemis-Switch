@@ -33,6 +33,49 @@ foreach (_dir include source)
 endforeach ()
 file(COPY "${NETBIRD_SRC}/library/wg-nx" DESTINATION "${NETBIRD_STAGE}/library")
 
+# Artemis fixes for the pinned backend. The submodule stays clean; patches are
+# applied to the staged copy, exactly like the borealis and common-C patches.
+set(_netbird_patches
+    "${CMAKE_CURRENT_LIST_DIR}/../patches/netbird-switch-relay-use-after-free.patch")
+
+find_program(_git_exe NAMES git REQUIRED)
+execute_process(
+    COMMAND "${_git_exe}" init --quiet
+    WORKING_DIRECTORY "${NETBIRD_STAGE}"
+    RESULT_VARIABLE _git_init)
+if (NOT _git_init EQUAL 0)
+    message(FATAL_ERROR "Failed to initialize NetBird patch workspace")
+endif ()
+
+foreach (_patch IN LISTS _netbird_patches)
+    get_filename_component(_patch_name "${_patch}" NAME)
+    execute_process(
+        COMMAND "${_git_exe}" apply --check "${_patch}"
+        WORKING_DIRECTORY "${NETBIRD_STAGE}"
+        RESULT_VARIABLE _patch_check
+        OUTPUT_QUIET ERROR_QUIET)
+    if (_patch_check EQUAL 0)
+        execute_process(
+            COMMAND "${_git_exe}" apply "${_patch}"
+            WORKING_DIRECTORY "${NETBIRD_STAGE}"
+            RESULT_VARIABLE _patch_result)
+        if (NOT _patch_result EQUAL 0)
+            message(FATAL_ERROR "Failed to apply NetBird patch ${_patch_name}")
+        endif ()
+        message(STATUS "Applied NetBird patch ${_patch_name}")
+    else ()
+        execute_process(
+            COMMAND "${_git_exe}" apply --reverse --check "${_patch}"
+            WORKING_DIRECTORY "${NETBIRD_STAGE}"
+            RESULT_VARIABLE _already_applied
+            OUTPUT_QUIET ERROR_QUIET)
+        if (NOT _already_applied EQUAL 0)
+            message(FATAL_ERROR
+                    "NetBird patch ${_patch_name} no longer applies to the pinned submodule")
+        endif ()
+    endif ()
+endforeach ()
+
 find_program(_make_exe NAMES make gmake REQUIRED)
 
 include(ProcessorCount)

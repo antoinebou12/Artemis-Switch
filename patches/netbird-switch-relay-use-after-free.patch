@@ -1,0 +1,22 @@
+diff --git a/source/netbird_login.c b/source/netbird_login.c
+index d647ec9..205a9b3 100644
+--- a/source/netbird_login.c
++++ b/source/netbird_login.c
+@@ -239,8 +239,6 @@ static bool login_internal(const char *host, uint16_t port, const char *setup_ke
+         size_t mv; pb_find(pc, pc_len, 7, PB_VARINT, &mv);
+         r->mtu = mv ? (int)mv : 1420;
+     }
+-    free(dec);
+-    
+     // Parse NetbirdConfig (LoginResponse field 1) for relay info
+     {
+         size_t ncl; const uint8_t *nc = pb_find(dec, dl, 1, PB_LENDELIM, &ncl);
+@@ -285,6 +283,8 @@ static bool login_internal(const char *host, uint16_t port, const char *setup_ke
+         }
+     }
+     
++    free(dec);
++
+     wg_key_to_base64(r->peer_private_key, sizeof(r->peer_private_key), wg_priv);
+     wg_key_to_base64(r->peer_public_key, sizeof(r->peer_public_key), wg_pub);
+     memcpy(r->server_pk, server_pk, 32);
