@@ -414,18 +414,22 @@ ArtemisSettingsTab::ArtemisSettingsTab() {
          "settings/netbird"_i18n},
         static_cast<int>(currentProvider), [this](int selected) {
             const auto provider = providerFromSelectorIndex(selected);
-            const auto result = applyRemoteAccessSelection(provider);
+            applyRemoteAccessSelectionAsync(
+                provider, alive_,
+                [this, provider](const RemoteAccessSelectionResult& result) {
+                    // Show the rows for whichever provider is now selected,
+                    // even if it failed to start: the user needs them to fix
+                    // the configuration.
+                    refreshRemoteAccessRows();
 
-            // Show the rows for whichever provider is now selected, even if it
-            // failed to start: the user needs them to fix the configuration.
-            refreshRemoteAccessRows();
-
-            if (provider != RemoteAccessProviderId::Off && !result.started) {
-                brls::Application::notify(
-                    result.status.empty()
-                        ? "settings/remote_access_failed"_i18n
-                        : brls::getStr(result.status));
-            }
+                    if (provider != RemoteAccessProviderId::Off &&
+                        !result.started) {
+                        brls::Application::notify(
+                            result.status.empty()
+                                ? "settings/remote_access_failed"_i18n
+                                : brls::getStr(result.status));
+                    }
+                });
         });
 
     auto showConfigPath = [this](const std::string& path) {
@@ -455,9 +459,11 @@ ArtemisSettingsTab::ArtemisSettingsTab() {
                 // toggling the provider off and on again.
                 if (Settings::instance().remote_access_provider() ==
                     RemoteAccessProviderId::WireGuard) {
-                    applyRemoteAccessSelection(
-                        RemoteAccessProviderId::WireGuard);
-                    refreshRemoteAccessRows();
+                    applyRemoteAccessSelectionAsync(
+                        RemoteAccessProviderId::WireGuard, alive_,
+                        [this](const RemoteAccessSelectionResult&) {
+                            refreshRemoteAccessRows();
+                        });
                 }
             });
         return true;
@@ -502,18 +508,24 @@ ArtemisSettingsTab::ArtemisSettingsTab() {
             return true;
 
         auto& manager = RemoteAccessManager::instance();
-        if (manager.activeProviderId().empty()) {
-            const auto result = applyRemoteAccessSelection(provider);
-            if (!result.started) {
-                brls::Application::notify(
-                    result.status.empty()
-                        ? "settings/remote_access_failed"_i18n
-                        : brls::getStr(result.status));
-            }
-        } else {
-            manager.stopActiveProvider();
-        }
-        refreshRemoteAccessRows();
+        const bool connected = !manager.activeProviderId().empty();
+        // Disconnecting is expressed as selecting Off so both directions go
+        // through the same async path; the stored provider is restored below.
+        applyRemoteAccessSelectionAsync(
+            connected ? RemoteAccessProviderId::Off : provider, alive_,
+            [this, connected, provider](const RemoteAccessSelectionResult& result) {
+                if (connected) {
+                    // Off was a transport action, not a preference change.
+                    Settings::instance().set_remote_access_provider(provider);
+                    Settings::instance().save();
+                } else if (!result.started) {
+                    brls::Application::notify(
+                        result.status.empty()
+                            ? "settings/remote_access_failed"_i18n
+                            : brls::getStr(result.status));
+                }
+                refreshRemoteAccessRows();
+            });
         return true;
     });
 
@@ -566,6 +578,9 @@ ArtemisSettingsTab::ArtemisSettingsTab() {
 
 ArtemisSettingsTab::~ArtemisSettingsTab() {
 #if defined(__SWITCH__) && (defined(ENABLE_NETBIRD) || defined(ENABLE_WIREGUARD))
+    // Any async continuation still in flight checks this before touching the
+    // bound rows.
+    alive_->store(false);
     // Stop before the bound rows go away; the task captures `this`.
     if (remoteAccessStatusTask_) {
         remoteAccessStatusTask_->stop();
@@ -724,8 +739,11 @@ void ArtemisSettingsTab::editNetBirdSetupKey() {
         // provider.
         if (Settings::instance().remote_access_provider() ==
             RemoteAccessProviderId::NetBird) {
-            applyRemoteAccessSelection(RemoteAccessProviderId::NetBird);
-            refreshRemoteAccessRows();
+            applyRemoteAccessSelectionAsync(
+                RemoteAccessProviderId::NetBird, alive_,
+                [this](const RemoteAccessSelectionResult&) {
+                    refreshRemoteAccessRows();
+                });
         }
     };
 

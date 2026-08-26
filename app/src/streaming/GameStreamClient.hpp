@@ -11,6 +11,8 @@
 
 #pragma once
 
+#include "remote_access/RemoteRouteLease.hpp"
+
 template <typename T> struct GSResult {
   public:
     static GSResult success(T value) { return result(value, "", true); }
@@ -134,5 +136,11 @@ class GameStreamClient : public Singleton<GameStreamClient> {
 
     std::map<std::string, SERVER_DATA> m_server_data;
     std::map<std::string, std::string> m_active_addresses;
+
+    // Live tunnel routes, keyed the same way as m_active_addresses. A NetBird
+    // session runs entirely through a local proxy, and pairing, the app list,
+    // launch and the stream all use it -- so the lease has to live as long as
+    // the connection does, not just the initial handshake.
+    std::map<std::string, RemoteRouteLease> m_active_routes;
     STREAM_CONFIGURATION m_config;
 };

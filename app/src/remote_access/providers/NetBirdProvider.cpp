@@ -22,6 +22,10 @@ namespace {
 // relay covers the video/audio/control ports on its own.
 constexpr uint16_t kGameStreamPort = 47989;
 
+// Short enough that probing a whole mesh stays quick, long enough to survive a
+// relayed round trip. Matches the reference integration.
+constexpr int kPeerProbeTimeoutMs = 300;
+
 std::string vpn_log_path() {
     return Settings::instance().working_dir() + "/vpn.log";
 }
@@ -88,6 +92,10 @@ bool NetBirdProvider::start() {
     started_ = true;
     brls::Logger::info("NetBird: connected, tunnel address {}", localAddress());
     vpn_log(VpnFileLogger::Severity::Info, "connected, tunnel address " + localAddress());
+
+    // start() is already on a worker thread, so seed the peer cache here rather
+    // than making the first peers() caller pay for it.
+    refreshPeers();
     return true;
 #endif
 }
@@ -118,6 +126,11 @@ void NetBirdProvider::stop() {
 
     activePeer_.clear();
     started_ = false;
+
+    {
+        std::lock_guard<std::mutex> lock(peersMutex_);
+        cachedPeers_.clear();
+    }
 #endif
 }
 
@@ -151,35 +164,55 @@ std::string NetBirdProvider::localAddress() const {
 }
 
 std::vector<RemoteAccessPeer> NetBirdProvider::peers() const {
-    std::vector<RemoteAccessPeer> out;
+    // Cache read only. Probing every peer takes a network round trip each, so
+    // it must never happen on whatever thread is asking for the list -- the
+    // settings status ticker calls this once a second.
+    std::lock_guard<std::mutex> lock(peersMutex_);
+    return cachedPeers_;
+}
+
+void NetBirdProvider::refreshPeers() {
+    std::vector<RemoteAccessPeer> refreshed;
 #if defined(__SWITCH__) && defined(ENABLE_NETBIRD)
-    if (!started_ || !netbird_is_ready()) {
-        return out;
-    }
+    if (started_ && netbird_is_ready()) {
+        const int count = netbird_get_peer_count();
+        refreshed.reserve(static_cast<size_t>(std::max(count, 0)));
+        for (int i = 0; i < count; ++i) {
+            char ip[64]{};
+            char name[256]{};
+            if (!netbird_get_peer(i, ip, sizeof(ip), name, sizeof(name))) {
+                continue;
+            }
 
-    const int count = netbird_get_peer_count();
-    out.reserve(static_cast<size_t>(std::max(count, 0)));
-    for (int i = 0; i < count; ++i) {
-        char ip[64]{};
-        char name[256]{};
-        if (!netbird_get_peer(i, ip, sizeof(ip), name, sizeof(name))) {
-            continue;
+            RemoteAccessPeer peer;
+            peer.providerId = "netbird";
+            peer.peerId = ip;
+            peer.name = name[0] ? name : ip;
+            // The real mesh address. Callers keep this as host identity and
+            // only stream through 127.0.0.1 once a route is active.
+            peer.address = ip;
+            // Only advertise peers that actually answer on the GameStream
+            // port, so a NAS or phone on the mesh is not offered as a host.
+            // BLOCKING: this is why refreshPeers() may not run on the UI thread.
+            peer.online =
+                netbird_peer_reachable(ip, kGameStreamPort, kPeerProbeTimeoutMs) == 1;
+            refreshed.push_back(std::move(peer));
         }
-
-        RemoteAccessPeer peer;
-        peer.providerId = "netbird";
-        peer.peerId = ip;
-        peer.name = name[0] ? name : ip;
-        // The real mesh address. Callers keep this as host identity and only
-        // stream through 127.0.0.1 once a route is active.
-        peer.address = ip;
-        // Only advertise peers that actually answer on the GameStream port, so
-        // a NAS or phone on the mesh does not show up as a streaming host.
-        peer.online = netbird_peer_reachable(ip, kGameStreamPort, 400) == 1;
-        out.push_back(std::move(peer));
     }
 #endif
-    return out;
+    std::lock_guard<std::mutex> lock(peersMutex_);
+    cachedPeers_ = std::move(refreshed);
+}
+
+bool NetBirdProvider::isKnownPeer(const std::string& address) const {
+    if (address.empty()) {
+        return false;
+    }
+    std::lock_guard<std::mutex> lock(peersMutex_);
+    return std::any_of(cachedPeers_.begin(), cachedPeers_.end(),
+                       [&address](const RemoteAccessPeer& peer) {
+                           return peer.address == address;
+                       });
 }
 
 bool NetBirdProvider::activateRoute(const std::string& peerId) {

@@ -6,6 +6,11 @@
 //
 
 #include "add_host_tab.hpp"
+
+#if defined(__SWITCH__) && (defined(ENABLE_NETBIRD) || defined(ENABLE_WIREGUARD))
+#include "remote_access/RemoteAccessManager.hpp"
+#include "remote_access_provider_id.hpp"
+#endif
 #include "DiscoverManager.hpp"
 #include "helper.hpp"
 #include "main_tabs_view.hpp"
@@ -96,6 +101,7 @@ void AddHostTab::fillSearchBox(const GSResult<std::vector<Host>>& hostsRes) {
 
     if (hostsRes.isSuccess()) {
         appendSearchHosts(hostsRes.value());
+        appendRemoteAccessPeers();
     } else {
         loader->setVisibility(brls::Visibility::GONE);
         searchHeader->setTitle("add_host/search"_i18n + " - " +
@@ -120,6 +126,64 @@ void AddHostTab::appendSearchHosts(const std::vector<Host>& hosts) {
         });
         searchBox->addView(hostButton);
     }
+}
+
+void AddHostTab::appendRemoteAccessPeers() {
+#if defined(__SWITCH__) && (defined(ENABLE_NETBIRD) || defined(ENABLE_WIREGUARD))
+    auto& manager = RemoteAccessManager::instance();
+    const auto providerId = manager.activeProviderId();
+    if (providerId.empty()) {
+        return;
+    }
+
+    auto* provider = manager.provider(providerId);
+    if (!provider) {
+        return;
+    }
+
+    // peers() is a cache read. Refreshing it costs one probe per peer, so do
+    // that off the UI thread and only then build the rows.
+    const std::string providerName = provider->name();
+    brls::async([this, provider, providerName, guard = alive]() {
+        if (!guard->load()) {
+            return;
+        }
+        provider->refreshPeers();
+        auto peers = provider->peers();
+
+        brls::sync([this, guard, peers, providerName]() {
+            if (!guard->load()) {
+                return;
+            }
+
+            std::vector<Host> hosts;
+            for (const auto& peer : peers) {
+                // Everything on the mesh answers ping; only things running
+                // Sunshine/Apollo answer on the GameStream port. Offering a NAS
+                // as a streaming host would just produce a confusing failure.
+                if (!peer.online || peer.address.empty()) {
+                    continue;
+                }
+
+                Host host;
+                host.hostname = peer.name.empty() ? peer.address : peer.name;
+                // Keep the real mesh address as identity. The tunnel route
+                // swaps in loopback at connect time, so the saved host still
+                // shows where it actually lives.
+                host.address = peer.address;
+                HostEndpoint endpoint;
+                endpoint.label = providerName;
+                endpoint.address = peer.address;
+                // Priority 2 keeps LAN (0) and manual remote (1) ahead of the
+                // tunnel, so home streaming never detours through the VPN.
+                endpoint.priority = 2;
+                host.endpoints.push_back(std::move(endpoint));
+                hosts.push_back(std::move(host));
+            }
+            appendSearchHosts(hosts);
+        });
+    });
+#endif
 }
 
 bool AddHostTab::searchBoxIpExists(const std::string& ip) {
@@ -248,6 +312,8 @@ void AddHostTab::startSearching() {
 }
 
 AddHostTab::~AddHostTab() {
+    // An in-flight peer probe must not append rows to a destroyed view.
+    alive->store(false);
     stopSearchHost();
 #ifdef MULTICAST_DISABLED
     DiscoverManager::instance().pause();

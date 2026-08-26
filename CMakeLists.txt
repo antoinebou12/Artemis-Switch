@@ -7,7 +7,8 @@ set(ARTEMIS_BOREALIS_PATCHES
     ${CMAKE_CURRENT_SOURCE_DIR}/patches/borealis-handheld-motion-source.patch
     ${CMAKE_CURRENT_SOURCE_DIR}/patches/borealis-split-swap-ab-xy.patch
     ${CMAKE_CURRENT_SOURCE_DIR}/patches/borealis-clear-vibration-zero.patch
-    ${CMAKE_CURRENT_SOURCE_DIR}/patches/borealis-docked-native-1080.patch)
+    ${CMAKE_CURRENT_SOURCE_DIR}/patches/borealis-docked-native-1080.patch
+    ${CMAKE_CURRENT_SOURCE_DIR}/patches/borealis-bsd-session-pool.patch)
 
 # The source submodule stays pinned and clean. Apply Artemis Borealis patches to
 # a build-directory copy, just like the common-C protocol patch.
@@ -373,6 +374,7 @@ elseif (PLATFORM_SWITCH)
             app/src/vpn/WireGuardManager.cpp
             app/src/remote_access/RemoteAccessManager.cpp
             app/src/remote_access/RemoteAccessSelection.cpp
+            app/src/remote_access/RemoteRouting.cpp
             app/src/remote_access/TunnelCore.cpp
             app/src/remote_access/VpnConfigPreview.cpp
             app/src/remote_access/NetBirdStaticConfig.cpp

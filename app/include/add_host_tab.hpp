@@ -14,6 +14,9 @@
 #include "Settings.hpp"
 #include "GameStreamClient.hpp"
 
+#include <atomic>
+#include <memory>
+
 class AddHostTab : public brls::Box
 {
   public:
@@ -36,6 +39,16 @@ class AddHostTab : public brls::Box
     std::vector<std::string> extraEndpoints;
 
     bool searchBoxIpExists(const std::string& ip);
+
+    // Adds streamable peers from the active remote-access provider to the
+    // search results. Probing each peer costs a network round trip, so the work
+    // happens on a worker thread; `alive` guards the hop back.
+    void appendRemoteAccessPeers();
+
+    // Cleared in the destructor so an in-flight peer probe cannot touch the
+    // view after it is gone.
+    std::shared_ptr<std::atomic<bool>> alive =
+        std::make_shared<std::atomic<bool>>(true);
     
     BRLS_BIND(brls::InputCell, hostIP, "hostIP");
     BRLS_BIND(brls::DetailCell, addEndpoint, "add_endpoint");

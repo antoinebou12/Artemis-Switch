@@ -1,0 +1,20 @@
+diff --git a/src/PlatformSockets.c b/src/PlatformSockets.c
+index cec96f3..20c7d5d 100644
+--- a/src/PlatformSockets.c
++++ b/src/PlatformSockets.c
+@@ -659,6 +659,15 @@ static bool isPrivateNetworkAddressV4(struct sockaddr_in* address, bool matchCGN
+     else if ((addr & 0xFFFF0000) == 0xA9FE0000) {
+         return true;
+     }
++    // 127.0.0.0/8 (loopback)
++    //
++    // An in-app userspace VPN reaches the host through a proxy bound to
++    // loopback, so the socket really is local even though the host itself is
++    // remote. Without this, the connection is classified as remote and the
++    // host withholds the settings it only offers for local streaming.
++    else if ((addr & 0xFF000000) == 0x7F000000) {
++        return true;
++    }
+     // 100.64.0.0/10
+     else if (matchCGN && (addr & 0xFFC00000) == 0x64400000) {
+         return true;

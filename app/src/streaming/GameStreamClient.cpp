@@ -1,4 +1,6 @@
 #include "GameStreamClient.hpp"
+
+#include "remote_access/RemoteRouting.hpp"
 #include "Settings.hpp"
 #include "WakeOnLanManager.hpp"
 #include "features/input/ControllerTopology.hpp"
@@ -133,7 +135,8 @@ std::string ipv4_port_suffix(const std::string& address) {
 bool connect_to_addresses_sync(const std::vector<std::string>& addresses,
                                std::string& connectedAddress,
                                SERVER_DATA& connectedServer,
-                               std::string& error) {
+                               std::string& error,
+                               RemoteRouteLease& lease) {
     if (std::none_of(addresses.begin(), addresses.end(),
                      [](const std::string& address) {
                          return !address.empty();
@@ -151,11 +154,22 @@ bool connect_to_addresses_sync(const std::vector<std::string>& addresses,
             continue;
         }
 
+        // Addresses are tried in priority order, so a reachable LAN address wins
+        // before any tunnel route is ever considered.
+        RemoteRouteLease candidateLease =
+            artemis::remote::acquireRouteFor(address);
+        const std::string dialAddress =
+            artemis::remote::connectAddressFor(candidateLease, address);
+
         SERVER_DATA serverData{};
-        const int status = gs_init(&serverData, address);
+        const int status = gs_init(&serverData, dialAddress);
         if (status == GS_OK) {
+            // Keep the real address as the host's identity; only the transport
+            // is loopback. The cached SERVER_DATA already carries the proxied
+            // address for subsequent requests.
             connectedAddress = address;
             connectedServer = serverData;
+            lease = std::move(candidateLease);
             return true;
         }
 
@@ -575,12 +589,14 @@ void GameStreamClient::wake_up_host(const Host& host,
         SERVER_DATA connectedServer{};
 
         for (int attempt = 0; attempt < WAKE_POLL_ATTEMPTS; attempt++) {
+            RemoteRouteLease lease;
             if (connect_to_addresses_sync(host.connection_addresses(),
                                           connectedAddress, connectedServer,
-                                          error)) {
+                                          error, lease)) {
                 auto& client = GameStreamClient::instance();
                 client.cache_server_data(connectedAddress, connectedServer);
                 client.m_active_addresses[host_key(host)] = connectedAddress;
+                client.m_active_routes[host_key(host)] = std::move(lease);
 
                 brls::sync([callback] {
                     callback(GSResult<bool>::success(true));
@@ -625,11 +641,14 @@ void GameStreamClient::connect_to_addresses(
         std::string connectedAddress;
         std::string error;
         SERVER_DATA connectedServer{};
+        // Held here until ownership moves to m_active_routes below; if the
+        // connect fails the lease destructs and stops the proxy.
+        auto lease = std::make_shared<RemoteRouteLease>();
         connect_to_addresses_sync(addresses, connectedAddress, connectedServer,
-                                  error);
+                                  error, *lease);
 
         brls::sync([this, callback, activeKey, connectedAddress,
-                    connectedServer, error] {
+                    connectedServer, error, lease] {
             if (connectedAddress.empty()) {
                 callback(GSResult<SERVER_DATA>::failure(error));
                 return;
@@ -638,6 +657,10 @@ void GameStreamClient::connect_to_addresses(
             cache_server_data(connectedAddress, connectedServer);
             if (!activeKey.empty()) {
                 m_active_addresses[activeKey] = connectedAddress;
+                // Keep the proxy up for the whole session. Assigning over an
+                // existing entry releases the previous peer's route, which is
+                // what makes switching hosts work.
+                m_active_routes[activeKey] = std::move(*lease);
             }
 
             callback(

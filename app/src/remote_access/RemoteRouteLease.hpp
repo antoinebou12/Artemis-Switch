@@ -11,7 +11,7 @@ public:
         : mgr_(&mgr), providerId_(providerId), peerId_(peerId), targetAddress_(std::move(targetAddress)), connectAddress_(std::move(connectAddress)), active_(false)
     {
         if (!providerId_.empty()) {
-            active_ = mgr_.activateRoute(providerId_, peerId_);
+            active_ = mgr_->activateRoute(providerId_, peerId_);
         } else {
             active_ = true;
         }

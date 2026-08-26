@@ -36,6 +36,10 @@ public:
     virtual std::string localAddress() const = 0;
     virtual std::vector<RemoteAccessPeer> peers() const = 0;
 
+    // BLOCKING for providers that probe the network. Never call from the UI
+    // thread. Default is a no-op for providers with no peer directory.
+    virtual void refreshPeers() {}
+
     virtual bool activateRoute(const std::string& peerId) = 0;
     virtual void deactivateRoute(const std::string& peerId) = 0;
 };

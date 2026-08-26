@@ -536,6 +536,8 @@
         "remote_access_status": "Remote Access Status",
         "remote_access_prefer_lan": "Prefer LAN",
         "remote_access_connect": "Connect now",
+        "remote_access_connecting": "Connecting to VPN...",
+        "remote_access_disconnecting": "Disconnecting from VPN...",
         "remote_access_disconnect": "Disconnect",
         "remote_access_vpn_address": "VPN address",
         "remote_access_unassigned": "Not assigned",

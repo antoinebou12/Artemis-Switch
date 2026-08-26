@@ -2,6 +2,9 @@
 
 #include <borealis.hpp>
 
+#include <atomic>
+#include <memory>
+
 class ArtemisSettingsTab : public brls::Box {
 public:
     ArtemisSettingsTab();
@@ -64,4 +67,10 @@ private:
     // Connecting is asynchronous, so the status rows are polled while this tab
     // is on screen rather than being written once at construction.
     brls::RepeatingTask* remoteAccessStatusTask_ = nullptr;
+
+    // Cleared in the destructor. Every async continuation checks this before
+    // touching the bound rows, so closing the tab mid-connect cannot write into
+    // freed memory.
+    std::shared_ptr<std::atomic<bool>> alive_ =
+        std::make_shared<std::atomic<bool>>(true);
 };
