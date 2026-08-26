@@ -34,9 +34,12 @@ it never means the feature was left out of the build.
                  Sunshine / Apollo
 ```
 
-Moonlight itself always connects to `127.0.0.1`. The proxy carries that traffic
-through lwIP and WireGuard to the remote peer. The peer's real mesh address
-stays as host identity — it is never overwritten with `127.0.0.1`.
+When a session is routed through the tunnel, Moonlight connects to `127.0.0.1`
+and the proxy carries that traffic through lwIP and WireGuard to the peer. A
+LAN-reachable host is dialled directly and never touches the proxy — see
+[How a remote stream is routed](#how-a-remote-stream-is-routed). Either way the
+peer's real mesh address stays as host identity; it is never overwritten with
+`127.0.0.1`.
 
 ## Build
 
@@ -135,6 +138,59 @@ At runtime, the Remote Access status row appends "Unavailable (stub build)"
 whenever `wg_nx_is_real_backend()` is false, so a broken build cannot be
 mistaken for a working one.
 
+## How a remote stream is routed
+
+`GameStreamClient` walks the host's endpoints in priority order (LAN 0, manual
+remote 1, NetBird 2). For each candidate, `artemis::remote::acquireRouteFor()`
+checks whether the address is a peer from authenticated NetBird sync:
+
+- **Not a peer** (LAN, direct WAN) — no lease, dial the address unchanged.
+- **A peer** — start that peer's TCP/UDP proxies and dial `127.0.0.1` instead.
+
+So LAN is always tried first and never detours through the tunnel. The lease
+lives in `m_active_routes` for the whole session, because pairing, the app list,
+launch and the stream all travel through the same proxy. Assigning over a key
+releases the previous peer's route, which is how host switching works.
+
+The host keeps its **real mesh address as identity**; only the transport is
+loopback. (The reference integration stores `127.0.0.1` as the address, which
+collapses every peer onto one cache key and needs a `host_key()` special case.)
+
+### Why Moonlight needs adapting for a loopback proxy
+
+Three things change once traffic goes through the proxy, all applied only when
+the session is actually proxied:
+
+| Adaptation | Why |
+| --- | --- |
+| `serverinfo` forced to plain HTTP | TLS to the host does not complete through the relay |
+| Long HTTP timeout | The tunnel adds 100–300 ms per round trip; the LAN-tuned timeout expires first |
+| `sessionUrl0` host rewritten to loopback | The host reports *its own* overlay address, and moonlight-common-c prefers that URL — without the rewrite RTSP bypasses the proxy and the stream dies right after pairing |
+
+### Dependency patches
+
+Submodules stay on their upstream pins; these apply to build-directory copies.
+
+- **`borealis-bsd-session-pool.patch`** — `num_bsd_sessions` 12 → 16 (applet
+  2 → 6). Every blocking bsd call holds a session for its full duration, and
+  NetBird adds ~10 threads doing concurrent socket I/O on top of curl and
+  Moonlight. 12 sits at the exhaustion edge, and an exhausted pool does not fail
+  gracefully: `bsdSend` blocks while the caller holds the lwIP lock, deadlocking
+  the app.
+- **`moonlight-common-c-loopback-private.patch`** — treat 127.0.0.0/8 as
+  private, so a proxied session is not classified as remote and the host does
+  not withhold its local-streaming settings.
+
+### Threading
+
+`netbird_init()` is a network login and `netbird_shutdown()` joins ~10 worker
+threads — both freeze the app if run on the UI thread. Connect and disconnect go
+through `applyRemoteAccessSelectionAsync()`: worker thread, modal loading
+dialog, result delivered back with `brls::sync`. Peer probing costs a round trip
+each, so `peers()` is a cache read and `refreshPeers()` (which probes) only ever
+runs on a worker. Every async continuation is guarded by a shared `alive` flag
+cleared in the owning view's destructor.
+
 ## Status
 
 Verified by build:
@@ -142,6 +198,9 @@ Verified by build:
 - Both providers compile into the Switch NRO and link against the real backend.
 - All real backend symbols are present; no stub object is linked.
 - `ENABLE_WIREGUARD=ON` with `ENABLE_NETBIRD=OFF` fails configure as intended.
+- Both dependency patches apply and are present in the build copies.
+- `acquireRouteFor()` has a caller in the streaming path, so the proxy is
+  actually started (it previously was not — `activateRoute()` was dead code).
 
 **Not yet verified on hardware.** The following still need a real Switch, a
 NetBird account and a Sunshine/Apollo host, and should not be claimed as
