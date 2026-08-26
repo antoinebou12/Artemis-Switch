@@ -43,12 +43,25 @@ private:
     BRLS_BIND(brls::DetailCell, wireguardConfigPath, "wireguard_config_path");
     BRLS_BIND(brls::DetailCell, netbirdServer, "netbird_server");
     BRLS_BIND(brls::DetailCell, netbirdSetupKey, "netbird_setup_key");
+    BRLS_BIND(brls::BooleanCell, remoteAccessPreferLan, "remote_access_prefer_lan");
     BRLS_BIND(brls::BooleanCell, remoteAccessAutoConnect, "remote_access_auto_connect");
+    BRLS_BIND(brls::DetailCell, remoteAccessAction, "remote_access_action");
+    BRLS_BIND(brls::Header, remoteAccessStatusHeader, "remote_access_status_header");
     BRLS_BIND(brls::DetailCell, wireguardStatus, "wireguard_status");
+    BRLS_BIND(brls::DetailCell, remoteAccessAddress, "remote_access_address");
+    BRLS_BIND(brls::DetailCell, remoteAccessPeers, "remote_access_peers");
+    BRLS_BIND(brls::DetailCell, remoteAccessError, "remote_access_error");
     BRLS_BIND(brls::DetailCell, remoteAccessBackends, "remote_access_backends");
 
   private:
     // Rows that only apply to one provider are hidden for the other, so the
     // list never offers a NetBird setup key next to a WireGuard config path.
     void refreshRemoteAccessRows();
+    // Status only (address, peers, error). Safe to call on a timer.
+    void refreshRemoteAccessStatus();
+    void editNetBirdSetupKey();
+
+    // Connecting is asynchronous, so the status rows are polled while this tab
+    // is on screen rather than being written once at construction.
+    brls::RepeatingTask* remoteAccessStatusTask_ = nullptr;
 };
