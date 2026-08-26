@@ -39,7 +39,16 @@ private:
     BRLS_BIND(brls::BooleanCell, rememberZoomPan, "remember_zoom_pan");
     BRLS_BIND(brls::DetailCell, resetZoomPan, "reset_zoom_pan");
 
-    BRLS_BIND(brls::BooleanCell, wireguardEnabled, "wireguard_enabled");
+    BRLS_BIND(brls::SelectorCell, remoteAccessProvider, "remote_access_provider");
     BRLS_BIND(brls::DetailCell, wireguardConfigPath, "wireguard_config_path");
+    BRLS_BIND(brls::DetailCell, netbirdServer, "netbird_server");
+    BRLS_BIND(brls::DetailCell, netbirdSetupKey, "netbird_setup_key");
+    BRLS_BIND(brls::BooleanCell, remoteAccessAutoConnect, "remote_access_auto_connect");
     BRLS_BIND(brls::DetailCell, wireguardStatus, "wireguard_status");
+    BRLS_BIND(brls::DetailCell, remoteAccessBackends, "remote_access_backends");
+
+  private:
+    // Rows that only apply to one provider are hidden for the other, so the
+    // list never offers a NetBird setup key next to a WireGuard config path.
+    void refreshRemoteAccessRows();
 };

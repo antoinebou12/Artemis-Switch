@@ -35,10 +35,14 @@
     <brls:BooleanCell id="forward_motion"/>
     <brls:BooleanCell id="console_motion_fallback"/>
 
-    <brls:Header title="@i18n/settings/vpn" paddingTop="60" lineTop="1px"/>
-    <brls:BooleanCell id="wireguard_enabled"/>
+    <brls:Header title="@i18n/settings/remote_access" paddingTop="60" lineTop="1px"/>
+    <brls:SelectorCell id="remote_access_provider"/>
     <brls:DetailCell id="wireguard_config_path"/>
+    <brls:DetailCell id="netbird_server"/>
+    <brls:DetailCell id="netbird_setup_key"/>
+    <brls:BooleanCell id="remote_access_auto_connect"/>
     <brls:DetailCell id="wireguard_status"/>
+    <brls:DetailCell id="remote_access_backends"/>
 
     <brls:Header title="@i18n/artemis/settings/notes" paddingTop="60" lineTop="1px"/>
     <brls:Label

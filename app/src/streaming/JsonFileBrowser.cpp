@@ -1,5 +1,6 @@
 #include "JsonFileBrowser.hpp"
 
+#include "FileBrowserPath.hpp"
 #include "Settings.hpp"
 
 #include <algorithm>
@@ -14,15 +15,9 @@ using namespace brls::literals;
 namespace artemis::streaming {
 namespace {
 
-bool endsWithJson(const std::string& name) {
-    if (name.size() < 5)
-        return false;
-    std::string lower = name;
-    std::transform(lower.begin(), lower.end(), lower.begin(),
-                   [](unsigned char c) {
-                       return static_cast<char>(std::tolower(c));
-                   });
-    return lower.size() >= 5 && lower.compare(lower.size() - 5, 5, ".json") == 0;
+const std::vector<std::string>& jsonOnly() {
+    static const std::vector<std::string> extensions{".json"};
+    return extensions;
 }
 
 std::string normalizeBrowseRoot(std::string path) {
@@ -49,25 +44,31 @@ std::string parentDirectory(const std::string& path) {
 }
 
 void browseAt(const std::string& directory, JsonFileBrowserMode mode,
+              const std::vector<std::string>& extensions,
+              const std::string& title,
               const std::function<void(const std::string&)>& onPicked);
 
 void openExportFilename(const std::string& directory,
+                        const std::vector<std::string>& extensions,
                         const std::function<void(const std::string&)>& onPicked) {
+    const std::string defaultName =
+        ensureFileExtension("profile_export", extensions);
     brls::Application::getPlatform()->getImeManager()->openForText(
-        [directory, onPicked](const std::string& text) {
-            std::string name = text.empty() ? "profile_export.json" : text;
-            if (!endsWithJson(name))
-                name += ".json";
+        [directory, extensions, defaultName,
+         onPicked](const std::string& text) {
+            std::string name = text.empty() ? defaultName : text;
+            name = ensureFileExtension(std::move(name), extensions);
             std::filesystem::path out =
                 std::filesystem::path(directory) / name;
             if (onPicked)
                 onPicked(out.string());
         },
-        "artemis/settings/export_filename"_i18n, "", 64,
-        "profile_export.json", 0);
+        "artemis/settings/export_filename"_i18n, "", 64, defaultName, 0);
 }
 
 void browseAt(const std::string& directory, JsonFileBrowserMode mode,
+              const std::vector<std::string>& extensions,
+              const std::string& title,
               const std::function<void(const std::string&)>& onPicked) {
     std::error_code ec;
     std::vector<std::string> folders;
@@ -86,7 +87,8 @@ void browseAt(const std::string& directory, JsonFileBrowserMode mode,
             if (entry.is_directory(ec)) {
                 folders.push_back(name);
             } else if (mode == JsonFileBrowserMode::Import &&
-                       entry.is_regular_file(ec) && endsWithJson(name)) {
+                       entry.is_regular_file(ec) &&
+                       fileMatchesExtensions(name, extensions)) {
                 files.push_back(name);
             }
         }
@@ -104,27 +106,24 @@ void browseAt(const std::string& directory, JsonFileBrowserMode mode,
     for (const auto& file : files)
         options.push_back(file);
 
-    const std::string title =
-        mode == JsonFileBrowserMode::Import
-            ? "artemis/settings/import_profiles"_i18n
-            : "artemis/settings/export_profiles"_i18n;
-
     auto* dropdown = new brls::Dropdown(
         title, options,
-        [directory, mode, onPicked, folders, files](int index) {
+        [directory, mode, extensions, title, onPicked, folders,
+         files](int index) {
             if (index < 0)
                 return;
 
             int cursor = 0;
             if (index == cursor) {
-                browseAt(parentDirectory(directory), mode, onPicked);
+                browseAt(parentDirectory(directory), mode, extensions, title,
+                         onPicked);
                 return;
             }
             ++cursor;
 
             if (mode == JsonFileBrowserMode::Export) {
                 if (index == cursor) {
-                    openExportFilename(directory, onPicked);
+                    openExportFilename(directory, extensions, onPicked);
                     return;
                 }
                 ++cursor;
@@ -136,7 +135,7 @@ void browseAt(const std::string& directory, JsonFileBrowserMode mode,
                 const auto& name =
                     folders[static_cast<size_t>(index - cursor)];
                 auto next = std::filesystem::path(directory) / name;
-                browseAt(next.string(), mode, onPicked);
+                browseAt(next.string(), mode, extensions, title, onPicked);
                 return;
             }
 
@@ -157,14 +156,25 @@ void browseAt(const std::string& directory, JsonFileBrowserMode mode,
 
 } // namespace
 
-void openJsonFileBrowser(
-    JsonFileBrowserMode mode,
+void openFileBrowser(
+    JsonFileBrowserMode mode, const std::vector<std::string>& extensions,
+    const std::string& title,
     const std::function<void(const std::string& path)>& onPicked) {
     std::string start = Settings::instance().working_dir();
     if (start.empty())
         start = "sdmc:/";
     start = normalizeBrowseRoot(start);
-    browseAt(start, mode, onPicked);
+    browseAt(start, mode, extensions, title, onPicked);
+}
+
+void openJsonFileBrowser(
+    JsonFileBrowserMode mode,
+    const std::function<void(const std::string& path)>& onPicked) {
+    openFileBrowser(mode, jsonOnly(),
+                    mode == JsonFileBrowserMode::Import
+                        ? "artemis/settings/import_profiles"_i18n
+                        : "artemis/settings/export_profiles"_i18n,
+                    onPicked);
 }
 
 } // namespace artemis::streaming
