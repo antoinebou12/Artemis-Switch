@@ -1,0 +1,31 @@
+diff --git a/library/lib/platforms/switch/switch_wrapper.c b/library/lib/platforms/switch/switch_wrapper.c
+index 83e154e8..df04567e 100644
+--- a/library/lib/platforms/switch/switch_wrapper.c
++++ b/library/lib/platforms/switch/switch_wrapper.c
+@@ -32,13 +32,24 @@ void userAppInit()
+     AppletType at        = appletGetAppletType();
+     if (at == AppletType_Application || at == AppletType_SystemApplication)
+     {
+-        cfg.num_bsd_sessions = 12; // default is 3
++        // Each blocking bsd call (recv/send/poll) occupies a session for its
++        // full duration. With in-app VPN enabled, NetBird adds roughly ten
++        // threads doing concurrent blocking socket I/O -- relay TLS read,
++        // signal read, the TCP proxy listeners, four UDP relays and a writer
++        // thread -- on top of libcurl and Moonlight's own streaming sockets.
++        //
++        // 12 sits right at the exhaustion edge for that workload, and an
++        // exhausted pool does not fail gracefully: bsdSend blocks while the
++        // caller still holds the lwIP lock, which deadlocks the whole app.
++        cfg.num_bsd_sessions = 16; // default is 3
+         cfg.sb_efficiency    = 8; // default is 4
+         socketInitialize(&cfg);
+     }
+     else
+     {
+-        cfg.num_bsd_sessions = 2;
++        // Applet mode is memory constrained, but 2 starves NetBird's threads
++        // outright.
++        cfg.num_bsd_sessions = 6;
+         cfg.sb_efficiency    = 1;
+         socketInitialize(&cfg);
+     }

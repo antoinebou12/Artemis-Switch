@@ -33,14 +33,39 @@ jobs:
           rm -rf ./resources/font
           dkp-pacman --noconfirm -R switch-enet || true
 
-          cmake -B build/switch -DCMAKE_BUILD_TYPE=Release -DPLATFORM_SWITCH=ON -DUSE_DEKO3D=ON || true
-          cmake -B build/switch -DCMAKE_BUILD_TYPE=Release -DPLATFORM_SWITCH=ON -DUSE_DEKO3D=ON
+          # These default to ON for Switch. CI states them explicitly because CI
+          # is the release contract for what ships in the NRO.
+          CMAKE_ARGS="-DCMAKE_BUILD_TYPE=Release -DPLATFORM_SWITCH=ON -DUSE_DEKO3D=ON             -DENABLE_WIREGUARD=ON -DENABLE_NETBIRD=ON -DARTEMIS_ALLOW_VPN_STUB=OFF"
+
+          cmake -B build/switch $CMAKE_ARGS || true
+          cmake -B build/switch $CMAKE_ARGS
           configure_rc=$?
 
           build_rc=$configure_rc
           if [ "$configure_rc" -eq 0 ]; then
             cmake --build build/switch --target Moonlight.nro --parallel 8
             build_rc=$?
+          fi
+
+          # A build that links the validate-only stub would still produce a
+          # working-looking NRO that cannot tunnel a single packet. Fail here
+          # instead of shipping it.
+          if [ "$build_rc" -eq 0 ] && [ -s build/switch/Moonlight.elf ]; then
+            echo "== Verifying real VPN backend symbols =="
+            NM=/opt/devkitpro/devkitA64/bin/aarch64-none-elf-nm
+            missing=0
+            for sym in netbird_init netbird_poll netbird_shutdown                        netbird_proxy_start netbird_proxy_start_udp                        netbird_get_peer netbird_is_ready                        wg_nx_tunnel_create wg_nx_tunnel_start wg_init wg_connect; do
+              if $NM build/switch/Moonlight.elf | grep -qE " [TtWw] $sym$"; then
+                echo "  ok      $sym"
+              else
+                echo "  MISSING $sym"
+                missing=1
+              fi
+            done
+            if [ "$missing" -ne 0 ]; then
+              echo "ERROR: real VPN backend symbols missing from Moonlight.elf"
+              build_rc=1
+            fi
           fi
 
           if [ "$build_rc" -eq 0 ] && [ -s build/switch/Moonlight.nro ]; then

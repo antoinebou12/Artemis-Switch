@@ -23,6 +23,39 @@
 #include "errors.h"
 #include "http.h"
 #include "../features/host/HostAddressParse.hpp"
+
+namespace {
+
+// True when this session is running through the in-app VPN's local proxy.
+//
+// The proxy terminates on loopback and bridges to the peer over lwIP/WireGuard,
+// which changes three things: TLS to the host does not complete through the
+// relay, round trips are far slower than on a LAN, and the address the host
+// reports for itself is meaningless to us.
+bool is_proxied_session(PSERVER_DATA server) {
+    return server != nullptr && server->serverInfo.address != nullptr &&
+           strcmp(server->serverInfo.address, "127.0.0.1") == 0;
+}
+
+// Replaces the host in an RTSP URL with loopback, preserving the scheme
+// (rtsp://, rtspenc://, rtspru://) and any explicit port.
+std::string rewrite_rtsp_host_to_loopback(const std::string& url) {
+    const auto schemeEnd = url.find("://");
+    if (schemeEnd == std::string::npos) {
+        return url;
+    }
+
+    const auto hostStart = schemeEnd + 3;
+    // The host part ends at the port, the path, or the end of the string.
+    auto hostEnd = url.find_first_of(":/", hostStart);
+    if (hostEnd == std::string::npos) {
+        hostEnd = url.size();
+    }
+
+    return url.substr(0, hostStart) + "127.0.0.1" + url.substr(hostEnd);
+}
+
+} // namespace
 #include "../features/stream/FrameRateOptions.hpp"
 #include "../host/GameStreamHostCapabilities.hpp"
 #include "../host/HostIdentityProbe.hpp"
@@ -113,13 +146,23 @@ static int load_serverinfo(PSERVER_DATA server, bool https) {
     // HTTPS request fails. We can't just use HTTP for everything because it
     // doesn't accurately tell us if we're paired.
 
+    // TLS to the host does not complete through the relay, so a proxied session
+    // always uses plain HTTP on the standard port.
+    const bool proxied = is_proxied_session(server);
+    const bool useHttps = https && !proxied;
+
     snprintf(url, sizeof(url), "%s://%s:%d/serverinfo?uniqueid=%s",
-             https ? "https" : "http", server->serverInfo.address,
-             https ? server->httpsPort : server->httpPort, unique_id.c_str());
+             useHttps ? "https" : "http", server->serverInfo.address,
+             useHttps ? server->httpsPort : server->httpPort,
+             unique_id.c_str());
 
     Data data;
 
-    if (http_request(url, &data, HTTPRequestTimeoutLow) != GS_OK) {
+    // The tunnel adds roughly 100-300 ms per round trip; the short timeout is
+    // tuned for a LAN and expires before a relayed request can finish.
+    if (http_request(url, &data,
+                     proxied ? HTTPRequestTimeoutLong : HTTPRequestTimeoutLow) !=
+        GS_OK) {
         ret = GS_IO_ERROR;
         goto cleanup;
     }
@@ -635,6 +678,14 @@ int gs_start_app(PSERVER_DATA server, STREAM_CONFIGURATION* config, int appId,
     }
 
     if (xml_search(data, "sessionUrl0", &result) == GS_OK) {
+        // The host reports its own address here. On a proxied session that
+        // address is not routable from the Switch, and moonlight-common-c
+        // prefers this URL over the one it would build itself -- so without
+        // rewriting it the RTSP handshake bypasses the proxy and the stream
+        // dies right after pairing.
+        if (is_proxied_session(server)) {
+            result = rewrite_rtsp_host_to_loopback(result);
+        }
         const std::string::size_type size = result.size();
         server->serverInfo.rtspSessionUrl = new char[size + 1];
         memcpy((void *) server->serverInfo.rtspSessionUrl, result.c_str(), size + 1);

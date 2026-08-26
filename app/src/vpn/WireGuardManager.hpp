@@ -38,6 +38,11 @@ class WireGuardManager : public Singleton<WireGuardManager> {
     [[nodiscard]] std::string tunnel_address() const;
     [[nodiscard]] std::string last_error() const;
 
+    // True when a real wg-nx tunnel is linked in, false for the validate-only
+    // stub. Surfaced in Remote Access diagnostics so a build that cannot move
+    // packets is impossible to mistake for a working one.
+    [[nodiscard]] static bool backend_is_real();
+
   private:
     // Guards every member below. status_ used to be atomic while the two
     // strings beside it were not, which bought nothing since status_text()

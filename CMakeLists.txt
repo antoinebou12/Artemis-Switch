@@ -7,7 +7,8 @@ set(ARTEMIS_BOREALIS_PATCHES
     ${CMAKE_CURRENT_SOURCE_DIR}/patches/borealis-handheld-motion-source.patch
     ${CMAKE_CURRENT_SOURCE_DIR}/patches/borealis-split-swap-ab-xy.patch
     ${CMAKE_CURRENT_SOURCE_DIR}/patches/borealis-clear-vibration-zero.patch
-    ${CMAKE_CURRENT_SOURCE_DIR}/patches/borealis-docked-native-1080.patch)
+    ${CMAKE_CURRENT_SOURCE_DIR}/patches/borealis-docked-native-1080.patch
+    ${CMAKE_CURRENT_SOURCE_DIR}/patches/borealis-bsd-session-pool.patch)
 
 # The source submodule stays pinned and clean. Apply Artemis Borealis patches to
 # a build-directory copy, just like the common-C protocol patch.
@@ -107,14 +108,41 @@ if (ENABLE_UPSCALING)
     endif ()
 endif ()
 
-option(ENABLE_WIREGUARD "Enable in-app WireGuard (wg-nx) support on Switch" OFF)
+if (PLATFORM_SWITCH)
+    option(ENABLE_WIREGUARD "Enable WireGuard support" ON)
+    option(ENABLE_NETBIRD "Enable NetBird VPN support" ON)
+else ()
+    set(ENABLE_WIREGUARD OFF)
+    set(ENABLE_NETBIRD OFF)
+endif ()
+
+if (ENABLE_WIREGUARD AND NOT PLATFORM_SWITCH)
+    message(FATAL_ERROR "ENABLE_WIREGUARD is only supported on Switch")
+endif ()
+if (ENABLE_NETBIRD AND NOT PLATFORM_SWITCH)
+    message(FATAL_ERROR "ENABLE_NETBIRD is only supported on Switch")
+endif ()
+
 if (ENABLE_WIREGUARD)
-    if (NOT PLATFORM_SWITCH)
-        message(FATAL_ERROR "ENABLE_WIREGUARD=ON is only supported on Switch")
-    endif ()
     message(STATUS "Use ENABLE_WIREGUARD")
     add_definitions(-DENABLE_WIREGUARD)
 endif ()
+
+if (ENABLE_NETBIRD)
+    message(STATUS "Use ENABLE_NETBIRD")
+    add_definitions(-DENABLE_NETBIRD)
+endif ()
+
+# Escape hatch for desktop/unit-test work only. A release NRO must contain a
+# real tunnel backend or fail to configure -- a build that silently cannot move
+# packets is worse than one that does not build.
+option(ARTEMIS_ALLOW_VPN_STUB
+    "Allow the non-functional WireGuard stub backend (development only)" OFF)
+
+# The vendored NetBird Makefile cannot cope with spaces in its own path, so its
+# sources are staged here before building. Keep this off any path with spaces.
+set(ARTEMIS_VPN_STAGE_ROOT "/tmp/artemis-vpn-build"
+    CACHE PATH "Space-free staging root for building the VPN backend")
 
 set(CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH} "${EXTERN_PATH}/cmake")
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${EXTERN_PATH}/cmake")
@@ -337,18 +365,77 @@ elseif (PLATFORM_SWITCH)
             ${BOREALIS_LIBRARY}/lib/platforms/switch/switch_wrapper.c
             app/src/switch/wrapper.c
             )
-    if (ENABLE_WIREGUARD)
+
+    # VPN support. Both providers are standard Switch features: they are always
+    # compiled in, and "Off" in the UI means "not connected", never "not built".
+    if (ENABLE_WIREGUARD OR ENABLE_NETBIRD)
         list(APPEND MAIN_SRC
             app/src/vpn/WireGuardConfig.cpp
             app/src/vpn/WireGuardManager.cpp
+            app/src/remote_access/RemoteAccessManager.cpp
+            app/src/remote_access/RemoteAccessSelection.cpp
+            app/src/remote_access/RemoteRouting.cpp
+            app/src/remote_access/TunnelCore.cpp
+            app/src/remote_access/VpnConfigPreview.cpp
+            app/src/remote_access/NetBirdStaticConfig.cpp
+            app/src/remote_access/providers/WireGuardProvider.cpp
+            app/src/remote_access/providers/NetBirdProvider.cpp
+            app/src/vpn/VpnFileLogger.cpp
         )
-        if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/switch/libwg_nx.a")
-            list(APPEND PLATFORM_LIBS
-                ${CMAKE_CURRENT_SOURCE_DIR}/lib/switch/libwg_nx.a)
-            message(STATUS "Linking external libwg_nx.a")
-        else ()
+    endif ()
+
+    if (ENABLE_NETBIRD)
+        set(NETBIRD_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/extern/netbird-switch")
+        if (NOT EXISTS "${NETBIRD_SOURCE_DIR}/include/netbird.h")
+            message(FATAL_ERROR
+                "NetBird submodule not initialized. Run:
+"
+                "  git submodule update --init --recursive extern/netbird-switch")
+        endif ()
+        if (NOT EXISTS "${NETBIRD_SOURCE_DIR}/library/wg-nx/library/lwip/src/include/lwip/netif.h")
+            message(FATAL_ERROR
+                "NetBird lwIP submodule missing. Run:
+"
+                "  git -C extern/netbird-switch/library/wg-nx submodule update --init library/lwip")
+        endif ()
+
+        # The upstream Makefile derives every path from $(CURDIR) and breaks on a
+        # source tree whose path contains spaces. Stage the sources into a
+        # space-free directory and build there, then consume the artifacts.
+        set(NETBIRD_STAGE_DIR "${ARTEMIS_VPN_STAGE_ROOT}/netbird-switch")
+        set(LIBNETBIRD_A "${NETBIRD_STAGE_DIR}/libnetbird.a")
+        set(HANDLE_FULL_O "${NETBIRD_STAGE_DIR}/handle_full.o")
+
+        # A fresh clone must not need a manual `cd extern/netbird-switch && ./build.sh`.
+        add_custom_command(
+            OUTPUT ${LIBNETBIRD_A} ${HANDLE_FULL_O}
+            COMMAND ${CMAKE_COMMAND}
+                    -DNETBIRD_SRC=${NETBIRD_SOURCE_DIR}
+                    -DNETBIRD_STAGE=${NETBIRD_STAGE_DIR}
+                    -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/NetBirdBackend.cmake
+            COMMENT "Building NetBird Switch backend (libnetbird.a + handle_full.o)"
+            VERBATIM)
+        add_custom_target(artemis_vpn_deps DEPENDS ${LIBNETBIRD_A} ${HANDLE_FULL_O})
+
+    endif ()
+
+    # Pick the WireGuard backend. wg_nx_real.cpp drives the same wg-nx/lwIP
+    # implementation that libnetbird.a is built on, so both providers share one
+    # tunnel stack. The stub validates a config but moves no packets, so it is
+    # never acceptable in a release NRO.
+    if (ENABLE_WIREGUARD)
+        if (ARTEMIS_ALLOW_VPN_STUB)
             list(APPEND MAIN_SRC app/src/vpn/wg_nx_stub.cpp)
-            message(STATUS "Using built-in wg-nx stub (drop lib/switch/libwg_nx.a for real tunnel)")
+            message(WARNING
+                "ARTEMIS_ALLOW_VPN_STUB=ON: WireGuard will validate configs but tunnel NO traffic. "
+                "Never ship this build.")
+        elseif (ENABLE_NETBIRD)
+            list(APPEND MAIN_SRC app/src/vpn/wg_nx_real.cpp)
+        else ()
+            message(FATAL_ERROR
+                "ENABLE_WIREGUARD=ON needs the real wg-nx backend, which ships with the "
+                "NetBird submodule. Enable ENABLE_NETBIRD, or set ARTEMIS_ALLOW_VPN_STUB=ON "
+                "for a non-shippable development build.")
         endif ()
     endif ()
 elseif (PLATFORM_PSV)
@@ -382,6 +469,22 @@ endif ()
 # building target
 program_target(${PROJECT_NAME} "${MAIN_SRC}")
 set_target_properties(${PROJECT_NAME} PROPERTIES CXX_STANDARD 20)
+
+if (ENABLE_NETBIRD)
+    target_include_directories(${PROJECT_NAME} PRIVATE
+        "${NETBIRD_SOURCE_DIR}/include"
+        "${NETBIRD_SOURCE_DIR}/library/wg-nx/include")
+    add_dependencies(${PROJECT_NAME} artemis_vpn_deps)
+
+    # Order matters. handle_full.o overrides newlib's fd management and MUST
+    # precede every toolchain library, or concurrent socket close/IO races
+    # crash in _socketGetFd / _read_r during proxy teardown and peer switching.
+    # This call runs before the target_link_libraries() further down, which is
+    # what puts these ahead of -lnx and friends on the link line.
+    target_link_libraries(${PROJECT_NAME} PRIVATE
+        "${HANDLE_FULL_O}"
+        "${LIBNETBIRD_A}")
+endif ()
 if (USE_SDL3)
     target_compile_definitions(${PROJECT_NAME} PRIVATE SDL_ENABLE_OLD_NAMES)
 endif ()

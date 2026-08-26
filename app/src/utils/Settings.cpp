@@ -469,6 +469,48 @@ void Settings::load() {
                 }
             }
 
+            if (json_t* remote_access_provider =
+                    json_object_get(settings, "remote_access_provider")) {
+                if (json_typeof(remote_access_provider) == JSON_INTEGER) {
+                    m_remote_access_provider = fromInt(static_cast<int>(
+                        json_integer_value(remote_access_provider)));
+                }
+            }
+
+            if (json_t* netbird_server =
+                    json_object_get(settings, "netbird_server")) {
+                if (json_typeof(netbird_server) == JSON_STRING) {
+                    m_netbird_server = json_string_value(netbird_server);
+                }
+            }
+
+            if (json_t* netbird_setup_key =
+                    json_object_get(settings, "netbird_setup_key")) {
+                if (json_typeof(netbird_setup_key) == JSON_STRING) {
+                    m_netbird_setup_key = json_string_value(netbird_setup_key);
+                }
+            }
+
+            if (json_t* netbird_config_path =
+                    json_object_get(settings, "netbird_config_path")) {
+                if (json_typeof(netbird_config_path) == JSON_STRING) {
+                    m_netbird_config_path =
+                        json_string_value(netbird_config_path);
+                }
+            }
+
+            if (json_t* remote_access_prefer_lan =
+                    json_object_get(settings, "remote_access_prefer_lan")) {
+                m_remote_access_prefer_lan =
+                    json_typeof(remote_access_prefer_lan) == JSON_TRUE;
+            }
+
+            if (json_t* remote_access_auto_connect =
+                    json_object_get(settings, "remote_access_auto_connect")) {
+                m_remote_access_auto_connect =
+                    json_typeof(remote_access_auto_connect) == JSON_TRUE;
+            }
+
             if (json_t* show_host_web_config =
                     json_object_get(settings, "show_host_web_config")) {
                 m_show_host_web_config =
@@ -811,6 +853,18 @@ void Settings::save() {
                                 m_wireguard_enabled ? json_true() : json_false());
             json_object_set_new(settings, "wireguard_config_path",
                                 json_string(m_wireguard_config_path.c_str()));
+            json_object_set_new(settings, "remote_access_provider",
+                                json_integer(static_cast<int>(m_remote_access_provider)));
+            json_object_set_new(settings, "netbird_server",
+                                json_string(m_netbird_server.c_str()));
+            json_object_set_new(settings, "netbird_setup_key",
+                                json_string(m_netbird_setup_key.c_str()));
+            json_object_set_new(settings, "netbird_config_path",
+                                json_string(m_netbird_config_path.c_str()));
+            json_object_set_new(settings, "remote_access_prefer_lan",
+                                m_remote_access_prefer_lan ? json_true() : json_false());
+            json_object_set_new(settings, "remote_access_auto_connect",
+                                m_remote_access_auto_connect ? json_true() : json_false());
             json_object_set_new(settings, "show_host_web_config",
                                 m_show_host_web_config ? json_true()
                                                        : json_false());

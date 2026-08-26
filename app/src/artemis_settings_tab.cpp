@@ -32,8 +32,76 @@
 #define ARTEMIS_HAS_ZOOM_PAN 0
 #endif
 
-#if defined(__SWITCH__) && defined(ENABLE_WIREGUARD)
+#if defined(__SWITCH__) && (defined(ENABLE_NETBIRD) || defined(ENABLE_WIREGUARD))
+#include "remote_access/RemoteAccessManager.hpp"
+#include "remote_access/RemoteAccessSelection.hpp"
+#include "remote_access_provider_id.hpp"
+#include "streaming/JsonFileBrowser.hpp"
 #include "vpn/WireGuardManager.hpp"
+#endif
+
+#if defined(__SWITCH__) && (defined(ENABLE_NETBIRD) || defined(ENABLE_WIREGUARD))
+#include <borealis/core/task.hpp>
+#include <fstream>
+
+namespace {
+
+// Reads a NetBird setup key out of a file so it never has to be typed on the
+// on-screen keyboard. Accepts either a bare key on its own line or a
+// "setup_key = VALUE" / "key: VALUE" line, which is how netbird.conf-style
+// files store it. Comment and blank lines are skipped.
+std::string readSetupKeyFile(const std::string& path) {
+    std::ifstream file(path);
+    if (!file)
+        return {};
+
+    const auto trim = [](std::string text) {
+        const auto begin = text.find_first_not_of(" \t\r\n\"'");
+        if (begin == std::string::npos)
+            return std::string{};
+        const auto end = text.find_last_not_of(" \t\r\n\"'");
+        return text.substr(begin, end - begin + 1);
+    };
+
+    std::string line;
+    while (std::getline(file, line)) {
+        line = trim(std::move(line));
+        if (line.empty() || line[0] == '#' || line[0] == ';')
+            continue;
+
+        const auto separator = line.find_first_of("=:");
+        if (separator == std::string::npos)
+            return line; // bare key on its own line
+
+        std::string name = trim(line.substr(0, separator));
+        std::transform(name.begin(), name.end(), name.begin(),
+                       [](unsigned char c) {
+                           return static_cast<char>(std::tolower(c));
+                       });
+        if (name == "setup_key" || name == "setupkey" || name == "key")
+            return trim(line.substr(separator + 1));
+    }
+    return {};
+}
+
+// Polls remote-access status while the settings tab is on screen. Connecting
+// is asynchronous, so a value written once at construction would sit on
+// "Connecting" forever.
+class RemoteAccessStatusTask : public brls::RepeatingTask {
+  public:
+    explicit RemoteAccessStatusTask(std::function<void()> onTick)
+        : brls::RepeatingTask(1000), onTick_(std::move(onTick)) {}
+
+    void run() override {
+        if (onTick_)
+            onTick_();
+    }
+
+  private:
+    std::function<void()> onTick_;
+};
+
+} // namespace
 #endif
 
 #include <algorithm>
@@ -335,30 +403,57 @@ ArtemisSettingsTab::ArtemisSettingsTab() {
     panYSlider->setFocusable(false);
 #endif
 
-#if defined(__SWITCH__) && defined(ENABLE_WIREGUARD)
-    // Only persist "enabled" once the tunnel actually came up. Previously the
-    // setting was written first, so a failed enable left the switch on and the
-    // feature enabled across restarts while nothing was tunnelled.
-    auto applyWireguardEnabled = [this](bool value) {
-        bool effective = false;
-        if (value) {
-            effective = WireGuardManager::instance().enable_from_settings();
-        } else {
-            WireGuardManager::instance().disable();
-        }
-        Settings::instance().set_wireguard_enabled(effective);
-        Settings::instance().save();
-        wireguardStatus->setDetailText(
-            WireGuardManager::instance().status_text());
-        if (value && !effective) {
-            // Put the switch back where the truth is.
-            wireguardEnabled->setOn(false, true);
-        }
-    };
+#if defined(__SWITCH__) && (defined(ENABLE_NETBIRD) || defined(ENABLE_WIREGUARD))
+    // Provider choice is the single entry point. "Off" means no tunnel is
+    // connected; both providers are always compiled in, so this is never a
+    // statement about the build.
+    const auto currentProvider = Settings::instance().remote_access_provider();
+    remoteAccessProvider->init(
+        "settings/remote_access_provider"_i18n,
+        {"settings/remote_access_off"_i18n, "settings/wireguard"_i18n,
+         "settings/netbird"_i18n},
+        static_cast<int>(currentProvider),
+        // The value callback only updates the cell's own text. Applying the
+        // choice here would push the loading dialog while Dropdown is still
+        // mid-selection: it fires this callback and THEN calls popActivity,
+        // which would pop the dialog and strand the dropdown on screen.
+        [](int) {},
+        // Fires once the dropdown has finished popping, so it is safe to open
+        // a dialog from here.
+        [this](int selected) {
+            const auto provider = providerFromSelectorIndex(selected);
+            const auto previous = Settings::instance().remote_access_provider();
+            if (provider == previous &&
+                !RemoteAccessManager::instance().activeProviderId().empty()) {
+                return;
+            }
 
-    wireguardEnabled->init("settings/wireguard_enabled"_i18n,
-                           Settings::instance().wireguard_enabled(),
-                           applyWireguardEnabled);
+            if (provider == RemoteAccessProviderId::Off) {
+                // Off is a real preference change, so record it and tear the
+                // tunnel down.
+                Settings::instance().set_remote_access_provider(
+                    RemoteAccessProviderId::Off);
+                Settings::instance().save();
+                disconnectRemoteAccessAsync(
+                    alive_, [this]() { refreshRemoteAccessRows(); });
+                return;
+            }
+
+            applyRemoteAccessSelectionAsync(
+                provider, alive_,
+                [this](const RemoteAccessSelectionResult& result) {
+                    // applyRemoteAccessSelection already leaves the provider
+                    // selected on failure, so the rows for it stay visible and
+                    // the configuration can be corrected and retried.
+                    if (!result.started) {
+                        brls::Application::notify(
+                            result.status.empty()
+                                ? "settings/remote_access_failed"_i18n
+                                : brls::getStr(result.status));
+                    }
+                    refreshRemoteAccessRows();
+                });
+        });
 
     auto showConfigPath = [this](const std::string& path) {
         const std::string shown =
@@ -366,42 +461,156 @@ ArtemisSettingsTab::ArtemisSettingsTab() {
         wireguardConfigPath->setDetailText(
             shown.size() <= 40
                 ? shown
-                : shown.substr(0, 18) + "…" + shown.substr(shown.size() - 18));
+                : shown.substr(0, 18) + "…" +
+                      shown.substr(shown.size() - 18));
     };
 
     wireguardConfigPath->setText("settings/wireguard_config_path"_i18n);
     showConfigPath(Settings::instance().wireguard_config_path());
     wireguardConfigPath->registerClickAction([this, showConfigPath](View*) {
-        const std::string current =
-            Settings::instance().wireguard_config_path();
-        Application::getPlatform()->getImeManager()->openForText(
-            [this, showConfigPath](const std::string& text) {
-                Settings::instance().set_wireguard_config_path(text);
+        // Browse for the file instead of retyping a long sdmc: path by hand.
+        artemis::streaming::openFileBrowser(
+            artemis::streaming::JsonFileBrowserMode::Import, {".conf"},
+            "settings/wireguard_config_path_title"_i18n,
+            [this, showConfigPath](const std::string& path) {
+                if (path.empty())
+                    return;
+                Settings::instance().set_wireguard_config_path(path);
                 Settings::instance().save();
-                showConfigPath(text);
-                if (Settings::instance().wireguard_enabled()) {
-                    WireGuardManager::instance().enable_from_settings();
-                    wireguardStatus->setDetailText(
-                        WireGuardManager::instance().status_text());
+                showConfigPath(path);
+                // Re-apply immediately so a corrected file takes effect without
+                // toggling the provider off and on again.
+                if (Settings::instance().remote_access_provider() ==
+                    RemoteAccessProviderId::WireGuard) {
+                    applyRemoteAccessSelectionAsync(
+                        RemoteAccessProviderId::WireGuard, alive_,
+                        [this](const RemoteAccessSelectionResult&) {
+                            refreshRemoteAccessRows();
+                        });
                 }
-            },
-            "settings/wireguard_config_path_title"_i18n, "", 120,
-            current.empty() ? WireGuardManager::default_config_path() : current,
-            0);
+            });
         return true;
     });
+
+    netbirdServer->setText("settings/netbird_server"_i18n);
+    netbirdServer->setDetailText(Settings::instance().netbird_server());
+    netbirdServer->registerClickAction([this](View*) {
+        const std::string current = Settings::instance().netbird_server();
+        Application::getPlatform()->getImeManager()->openForText(
+            [this](const std::string& text) {
+                if (text.empty())
+                    return;
+                Settings::instance().set_netbird_server(text);
+                Settings::instance().save();
+                netbirdServer->setDetailText(text);
+            },
+            "settings/netbird_server"_i18n, "", 120,
+            current.empty() ? "https://api.netbird.io:443" : current, 0);
+        return true;
+    });
+
+    netbirdSetupKey->setText("settings/netbird_setup_key"_i18n);
+    netbirdSetupKey->registerClickAction([this](View*) {
+        editNetBirdSetupKey();
+        return true;
+    });
+
+    remoteAccessPreferLan->init(
+        "settings/remote_access_prefer_lan"_i18n,
+        Settings::instance().remote_access_prefer_lan(), [](bool enabled) {
+            Settings::instance().set_remote_access_prefer_lan(enabled);
+            Settings::instance().save();
+        });
+
+    // Explicit connect/disconnect. Without it the only way to retry a failed
+    // tunnel was to reselect the provider.
+    remoteAccessAction->registerClickAction([this](View*) {
+        const auto provider = Settings::instance().remote_access_provider();
+        if (provider == RemoteAccessProviderId::Off) {
+            return true;
+        }
+
+        // Disconnect leaves the chosen provider alone: it is a transport
+        // action, so reconnecting later must not need the setting again.
+        if (!RemoteAccessManager::instance().activeProviderId().empty()) {
+            disconnectRemoteAccessAsync(alive_,
+                                        [this]() { refreshRemoteAccessRows(); });
+            return true;
+        }
+
+        applyRemoteAccessSelectionAsync(
+            provider, alive_,
+            [this](const RemoteAccessSelectionResult& result) {
+                if (!result.started) {
+                    brls::Application::notify(
+                        result.status.empty()
+                            ? "settings/remote_access_failed"_i18n
+                            : brls::getStr(result.status));
+                }
+                refreshRemoteAccessRows();
+            });
+        return true;
+    });
+
+    remoteAccessAutoConnect->init(
+        "settings/remote_access_auto_connect"_i18n,
+        Settings::instance().remote_access_auto_connect(), [](bool enabled) {
+            Settings::instance().set_remote_access_auto_connect(enabled);
+            Settings::instance().save();
+        });
+
     wireguardStatus->setText("settings/wireguard_status"_i18n);
-    wireguardStatus->setDetailText(WireGuardManager::instance().status_text());
+    remoteAccessAddress->setText("settings/remote_access_vpn_address"_i18n);
+    remoteAccessPeers->setText("settings/remote_access_peers"_i18n);
+    remoteAccessError->setText("settings/remote_access_last_error"_i18n);
+    remoteAccessBackends->setText("settings/remote_access_diagnostics"_i18n);
+
+    // These rows are read-only readouts; keep them out of the focus order.
+    for (brls::DetailCell* row :
+         {static_cast<brls::DetailCell*>(remoteAccessAddress),
+          static_cast<brls::DetailCell*>(remoteAccessPeers),
+          static_cast<brls::DetailCell*>(remoteAccessError),
+          static_cast<brls::DetailCell*>(remoteAccessBackends),
+          static_cast<brls::DetailCell*>(wireguardStatus)}) {
+        row->setFocusable(false);
+    }
+
+    refreshRemoteAccessRows();
+
+    remoteAccessStatusTask_ =
+        new RemoteAccessStatusTask([this]() { refreshRemoteAccessStatus(); });
+    remoteAccessStatusTask_->start();
 #else
-    wireguardEnabled->removeFromSuperView(true);
+    remoteAccessProvider->removeFromSuperView(true);
     wireguardConfigPath->removeFromSuperView(true);
+    netbirdServer->removeFromSuperView(true);
+    netbirdSetupKey->removeFromSuperView(true);
+    remoteAccessPreferLan->removeFromSuperView(true);
+    remoteAccessAutoConnect->removeFromSuperView(true);
+    remoteAccessAction->removeFromSuperView(true);
+    remoteAccessStatusHeader->removeFromSuperView(true);
     wireguardStatus->removeFromSuperView(true);
+    remoteAccessAddress->removeFromSuperView(true);
+    remoteAccessPeers->removeFromSuperView(true);
+    remoteAccessError->removeFromSuperView(true);
+    remoteAccessBackends->removeFromSuperView(true);
 #endif
 
     refreshValues();
 }
 
 ArtemisSettingsTab::~ArtemisSettingsTab() {
+#if defined(__SWITCH__) && (defined(ENABLE_NETBIRD) || defined(ENABLE_WIREGUARD))
+    // Any async continuation still in flight checks this before touching the
+    // bound rows.
+    alive_->store(false);
+    // Stop before the bound rows go away; the task captures `this`.
+    if (remoteAccessStatusTask_) {
+        remoteAccessStatusTask_->stop();
+        delete remoteAccessStatusTask_;
+        remoteAccessStatusTask_ = nullptr;
+    }
+#endif
     Settings::instance().save();
     artemis::streaming::StreamProfileStore::instance().save();
 }
@@ -446,4 +655,163 @@ void ArtemisSettingsTab::editHeight() {
         "artemis/settings/custom_height_title"_i18n,
         "artemis/settings/custom_height_hint"_i18n, 4,
         std::to_string(current.height), "", "", 0);
+}
+
+void ArtemisSettingsTab::refreshRemoteAccessRows() {
+#if defined(__SWITCH__) && (defined(ENABLE_NETBIRD) || defined(ENABLE_WIREGUARD))
+    const auto provider = Settings::instance().remote_access_provider();
+    const auto visible = providerVisibility(provider);
+    const bool active = provider != RemoteAccessProviderId::Off;
+
+    const auto show = [](brls::View* view, bool shown) {
+        view->setVisibility(shown ? brls::Visibility::VISIBLE
+                                  : brls::Visibility::GONE);
+    };
+
+    // Keep the cell showing what is actually stored. Silent, so re-syncing
+    // never re-fires the selection handler.
+    remoteAccessProvider->setSelection(static_cast<int>(provider), true);
+
+    show(wireguardConfigPath, visible.wireGuard);
+    show(netbirdServer, visible.netBird);
+    show(netbirdSetupKey, visible.netBird);
+
+    // Prefer-LAN and connect-on-startup only mean something once a provider is
+    // chosen.
+    show(remoteAccessPreferLan, active);
+    show(remoteAccessAutoConnect, active);
+    show(remoteAccessAction, active);
+
+    show(remoteAccessStatusHeader, active);
+    show(wireguardStatus, active);
+    show(remoteAccessAddress, active);
+    show(remoteAccessPeers, active && visible.netBird);
+    show(remoteAccessBackends, active);
+
+    if (visible.netBird) {
+        netbirdSetupKey->setDetailText(
+            Settings::instance().netbird_setup_key().empty()
+                ? "settings/netbird_setup_key_unset"_i18n
+                : "settings/netbird_setup_key_set"_i18n);
+    }
+
+    remoteAccessAction->setText(
+        RemoteAccessManager::instance().activeProviderId().empty()
+            ? "settings/remote_access_connect"_i18n
+            : "settings/remote_access_disconnect"_i18n);
+
+    refreshRemoteAccessStatus();
+#endif
+}
+
+void ArtemisSettingsTab::refreshRemoteAccessStatus() {
+#if defined(__SWITCH__) && (defined(ENABLE_NETBIRD) || defined(ENABLE_WIREGUARD))
+    const auto provider = Settings::instance().remote_access_provider();
+    if (provider == RemoteAccessProviderId::Off)
+        return;
+
+    auto& manager = RemoteAccessManager::instance();
+    auto* active = manager.provider(remoteAccessProviderRuntimeId(provider));
+
+    wireguardStatus->setDetailText(
+        active ? brls::getStr(active->status())
+               : "settings/remote_access_off"_i18n);
+
+    const std::string address = active ? active->localAddress() : std::string{};
+    remoteAccessAddress->setDetailText(
+        address.empty() ? "settings/remote_access_unassigned"_i18n : address);
+
+    if (active && provider == RemoteAccessProviderId::NetBird) {
+        const auto peers = active->peers();
+        // Report reachable separately from total: a mesh peer that is not
+        // running Sunshine/Apollo is online but not streamable.
+        const auto reachable = static_cast<size_t>(
+            std::count_if(peers.begin(), peers.end(),
+                          [](const RemoteAccessPeer& p) { return p.online; }));
+        remoteAccessPeers->setDetailText(
+            fmt::format("{} / {}", reachable, peers.size()));
+    }
+
+    const std::string error = active ? active->lastError() : std::string{};
+    remoteAccessError->setVisibility(error.empty() ? brls::Visibility::GONE
+                                                   : brls::Visibility::VISIBLE);
+    if (!error.empty())
+        remoteAccessError->setDetailText(brls::getStr(error));
+
+    // Diagnostics row states which backend is actually linked, so a build that
+    // cannot move packets can never look like a working one.
+    remoteAccessBackends->setDetailText(
+        WireGuardManager::backend_is_real()
+            ? "settings/remote_access_backend_real"_i18n
+            : "settings/remote_access_backend_stub"_i18n);
+#endif
+}
+
+void ArtemisSettingsTab::editNetBirdSetupKey() {
+#if defined(__SWITCH__) && (defined(ENABLE_NETBIRD) || defined(ENABLE_WIREGUARD))
+    const bool hasKey = !Settings::instance().netbird_setup_key().empty();
+
+    std::vector<std::string> options{
+        "settings/netbird_setup_key_from_file"_i18n,
+        "settings/netbird_setup_key_type"_i18n,
+    };
+    if (hasKey)
+        options.push_back("settings/netbird_setup_key_clear"_i18n);
+
+    const auto applyKey = [this](const std::string& key) {
+        Settings::instance().set_netbird_setup_key(key);
+        Settings::instance().save();
+        refreshRemoteAccessRows();
+        // Re-apply so a corrected key takes effect without reselecting the
+        // provider.
+        if (Settings::instance().remote_access_provider() ==
+            RemoteAccessProviderId::NetBird) {
+            applyRemoteAccessSelectionAsync(
+                RemoteAccessProviderId::NetBird, alive_,
+                [this](const RemoteAccessSelectionResult&) {
+                    refreshRemoteAccessRows();
+                });
+        }
+    };
+
+    // Every branch below pushes another activity (file browser or IME), so the
+    // work belongs in the dismiss callback: Dropdown fires its value callback
+    // and only then calls popActivity, which would pop whatever we pushed.
+    auto* dropdown = new brls::Dropdown(
+        "settings/netbird_setup_key"_i18n, options, [](int) {}, 0,
+        [this, applyKey, hasKey](int index) {
+            if (index == 0) {
+                artemis::streaming::openFileBrowser(
+                    artemis::streaming::JsonFileBrowserMode::Import,
+                    {".key", ".txt", ".conf"},
+                    "settings/netbird_setup_key_from_file"_i18n,
+                    [applyKey](const std::string& path) {
+                        if (path.empty())
+                            return;
+                        const auto key = readSetupKeyFile(path);
+                        if (key.empty()) {
+                            brls::Application::notify(
+                                "settings/netbird_setup_key_file_empty"_i18n);
+                            return;
+                        }
+                        applyKey(key);
+                    });
+                return;
+            }
+            if (index == 1) {
+                Application::getPlatform()->getImeManager()->openForText(
+                    [applyKey](const std::string& text) {
+                        if (!text.empty())
+                            applyKey(text);
+                    },
+                    // Start empty rather than prefilled: never echo the stored
+                    // key back onto the screen.
+                    "settings/netbird_setup_key"_i18n, "", 120, "", 0);
+                return;
+            }
+            if (hasKey && index == 2)
+                applyKey("");
+        });
+    brls::Application::pushActivity(new brls::Activity(dropdown));
+#endif
 }
