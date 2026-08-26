@@ -27,6 +27,12 @@ unsigned int sceLibcHeapSize             = 24 * 1024 * 1024;
 #include <string>
 
 #include "add_host_tab.hpp"
+#if defined(__SWITCH__) && (defined(ENABLE_NETBIRD) || defined(ENABLE_WIREGUARD))
+#include "remote_access/RemoteAccessManager.hpp"
+#include "remote_access/providers/NetBirdProvider.hpp"
+#include "remote_access/providers/WireGuardProvider.hpp"
+#include <memory>
+#endif
 #include "artemis_settings_tab.hpp"
 #include "host_tab.hpp"
 #include "link_cell.hpp"
@@ -41,7 +47,7 @@ unsigned int sceLibcHeapSize             = 24 * 1024 * 1024;
 #include "MoonlightSession.hpp"
 #include "Settings.hpp"
 #include "SwitchMoonlightSessionDecoderAndRenderProvider.hpp"
-#if defined(__SWITCH__) && defined(ENABLE_WIREGUARD)
+#if defined(__SWITCH__) && (defined(ENABLE_NETBIRD) || defined(ENABLE_WIREGUARD))
 #include "vpn/WireGuardManager.hpp"
 #endif
 
@@ -190,15 +196,31 @@ int main(int argc, char* argv[]) {
     Settings::instance().set_launch_path(argc > 0 ? argv[0] : "");
     brls::Logger::info("Working dir, {}", home);
 
-#if defined(__SWITCH__) && defined(ENABLE_WIREGUARD)
-    if (Settings::instance().wireguard_enabled()) {
-        if (Settings::instance().wireguard_config_path().empty()) {
-            Settings::instance().set_wireguard_config_path(
-                WireGuardManager::default_config_path());
+#if defined(__SWITCH__) && (defined(ENABLE_NETBIRD) || defined(ENABLE_WIREGUARD))
+    if (Settings::instance().wireguard_config_path().empty()) {
+        Settings::instance().set_wireguard_config_path(
+            WireGuardManager::default_config_path());
+    }
+
+    // Both providers are compiled into every Switch build, so both are always
+    // registered. Whether either one connects is a runtime setting.
+    RemoteAccessManager::instance().registerProvider(
+        std::make_unique<WireGuardProvider>());
+    RemoteAccessManager::instance().registerProvider(
+        std::make_unique<NetBirdProvider>());
+
+    brls::Logger::info("Remote access: WireGuard backend {}, NetBird backend {}",
+                       WireGuardManager::instance().backend_is_real() ? "real" : "STUB",
+                       "real");
+
+    if (Settings::instance().remote_access_auto_connect()) {
+        const auto providerId = remoteAccessProviderRuntimeId(
+            Settings::instance().remote_access_provider());
+        if (!providerId.empty()) {
+            // A failure here surfaces in the Remote Access status row; it must
+            // not block startup.
+            RemoteAccessManager::instance().selectAndStartProvider(providerId);
         }
-        // A failure here is reported through the VPN status row in settings;
-        // it must not block startup.
-        WireGuardManager::instance().enable_from_settings();
     }
 #endif
 
@@ -251,7 +273,19 @@ int main(int argc, char* argv[]) {
             vitaHealthReported = true;
         }
 #endif
+#if defined(__SWITCH__) && (defined(ENABLE_NETBIRD) || defined(ENABLE_WIREGUARD))
+        // Single central pump for every remote-access provider. lwIP timers,
+        // WireGuard keepalives and TCP retransmission all depend on this
+        // running every frame, so it must not live in a settings page or in
+        // the discovery/streaming paths.
+        RemoteAccessManager::instance().poll();
+#endif
     }
+
+#if defined(__SWITCH__) && (defined(ENABLE_NETBIRD) || defined(ENABLE_WIREGUARD))
+    // Never leave a tunnel or its worker threads running past the main loop.
+    RemoteAccessManager::instance().stopActiveProvider();
+#endif
 
     // Exit
 #if defined(PLATFORM_TVOS)

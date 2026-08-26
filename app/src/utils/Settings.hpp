@@ -1,5 +1,7 @@
 #pragma once
 
+#include "remote_access_provider_id.hpp"
+
 #include "HostDeviceOs.hpp"
 #include "HostRecordIdentity.hpp"
 #include "Singleton.hpp"
@@ -339,6 +341,55 @@ class Settings : public Singleton<Settings> {
         return m_wireguard_config_path;
     }
 
+    // Remote access provider selection. "Off" means no tunnel is active; it
+    // does NOT mean the feature was left out of the build -- WireGuard and
+    // NetBird are compiled into every Switch NRO.
+    void set_remote_access_provider(RemoteAccessProviderId provider) {
+        m_remote_access_provider = provider;
+    }
+    [[nodiscard]] RemoteAccessProviderId remote_access_provider() const {
+        return m_remote_access_provider;
+    }
+
+    void set_netbird_server(std::string server) {
+        m_netbird_server = std::move(server);
+    }
+    [[nodiscard]] std::string netbird_server() const {
+        return m_netbird_server;
+    }
+
+    // The setup key is a credential: never log it, never include it in
+    // diagnostics output.
+    void set_netbird_setup_key(std::string key) {
+        m_netbird_setup_key = std::move(key);
+    }
+    [[nodiscard]] std::string netbird_setup_key() const {
+        return m_netbird_setup_key;
+    }
+
+    // Legacy/debug static-bundle path. The normal NetBird path is a setup-key
+    // login through netbird_init(); this is only a fallback.
+    void set_netbird_config_path(std::string path) {
+        m_netbird_config_path = std::move(path);
+    }
+    [[nodiscard]] std::string netbird_config_path() const {
+        return m_netbird_config_path;
+    }
+
+    void set_remote_access_prefer_lan(bool prefer) {
+        m_remote_access_prefer_lan = prefer;
+    }
+    [[nodiscard]] bool remote_access_prefer_lan() const {
+        return m_remote_access_prefer_lan;
+    }
+
+    void set_remote_access_auto_connect(bool enabled) {
+        m_remote_access_auto_connect = enabled;
+    }
+    [[nodiscard]] bool remote_access_auto_connect() const {
+        return m_remote_access_auto_connect;
+    }
+
     void set_show_host_web_config(bool enabled) {
         m_show_host_web_config = enabled;
     }
@@ -522,6 +573,12 @@ class Settings : public Singleton<Settings> {
     bool m_play_audio = false;
     bool m_wireguard_enabled = false;
     std::string m_wireguard_config_path;
+    RemoteAccessProviderId m_remote_access_provider = RemoteAccessProviderId::Off;
+    std::string m_netbird_server = "https://api.netbird.io:443";
+    std::string m_netbird_setup_key;
+    std::string m_netbird_config_path;
+    bool m_remote_access_prefer_lan = true;
+    bool m_remote_access_auto_connect = false;
     bool m_show_host_web_config = true;
     bool m_show_performance_tab = true;
     HostDeviceOs m_host_device_os = HostDeviceOs::Windows;

@@ -335,7 +335,7 @@ ArtemisSettingsTab::ArtemisSettingsTab() {
     panYSlider->setFocusable(false);
 #endif
 
-#if defined(__SWITCH__) && defined(ENABLE_WIREGUARD)
+#if defined(__SWITCH__) && (defined(ENABLE_NETBIRD) || defined(ENABLE_WIREGUARD))
     // Only persist "enabled" once the tunnel actually came up. Previously the
     // setting was written first, so a failed enable left the switch on and the
     // feature enabled across restarts while nothing was tunnelled.
@@ -391,7 +391,14 @@ ArtemisSettingsTab::ArtemisSettingsTab() {
         return true;
     });
     wireguardStatus->setText("settings/wireguard_status"_i18n);
-    wireguardStatus->setDetailText(WireGuardManager::instance().status_text());
+    {
+        // Diagnostics: never let a stub build look like a working tunnel.
+        std::string detail = WireGuardManager::instance().status_text();
+        if (!WireGuardManager::backend_is_real()) {
+            detail += " — " + "settings/remote_access_backend_stub"_i18n;
+        }
+        wireguardStatus->setDetailText(detail);
+    }
 #else
     wireguardEnabled->removeFromSuperView(true);
     wireguardConfigPath->removeFromSuperView(true);

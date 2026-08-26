@@ -165,3 +165,11 @@ std::string WireGuardManager::status_text() const {
     }
     return "artemis/settings/wireguard_status_error"_i18n;
 }
+
+bool WireGuardManager::backend_is_real() {
+#if defined(__SWITCH__) && defined(ENABLE_WIREGUARD)
+    return wg_nx_is_real_backend() != 0;
+#else
+    return false;
+#endif
+}

@@ -19,3 +19,10 @@ profile.json
 artemis_*.json
 *.pem
 *.key
+
+# Local VPN credentials. These hold a NetBird setup key / WireGuard private key
+# and must never be committed.
+/netbird_config.json
+/netbird_switch_config.json
+/netbird.conf
+/wg0.conf
