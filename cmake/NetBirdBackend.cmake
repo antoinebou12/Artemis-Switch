@@ -7,8 +7,11 @@
 #
 # Invoked in script mode: cmake -DNETBIRD_SRC=... -DNETBIRD_STAGE=... -P this
 
-if (NOT DEFINED NETBIRD_SRC OR NOT DEFINED NETBIRD_STAGE)
-    message(FATAL_ERROR "NETBIRD_SRC and NETBIRD_STAGE are required")
+if (NOT DEFINED NETBIRD_SRC OR NOT DEFINED NETBIRD_STAGE OR
+    NOT DEFINED NETBIRD_AR OR NOT DEFINED NETBIRD_NM OR
+    NOT DEFINED NETBIRD_OBJCOPY)
+    message(FATAL_ERROR
+        "NETBIRD_SRC, NETBIRD_STAGE and binutils paths are required")
 endif ()
 
 if (NOT EXISTS "${NETBIRD_SRC}/Makefile")
@@ -21,6 +24,13 @@ if (NETBIRD_STAGE MATCHES " ")
 endif ()
 
 message(STATUS "Staging NetBird sources into ${NETBIRD_STAGE}")
+
+get_filename_component(_netbird_stage_name "${NETBIRD_STAGE}" NAME)
+if (NOT _netbird_stage_name STREQUAL "netbird-switch")
+    message(FATAL_ERROR
+        "Refusing to replace unexpected NetBird stage directory: ${NETBIRD_STAGE}")
+endif ()
+file(REMOVE_RECURSE "${NETBIRD_STAGE}")
 
 # nghttp2 is a large submodule that the library build does not reference, so it
 # is deliberately left out of the copy.
@@ -36,7 +46,8 @@ file(COPY "${NETBIRD_SRC}/library/wg-nx" DESTINATION "${NETBIRD_STAGE}/library")
 # Artemis fixes for the pinned backend. The submodule stays clean; patches are
 # applied to the staged copy, exactly like the borealis and common-C patches.
 set(_netbird_patches
-    "${CMAKE_CURRENT_LIST_DIR}/../patches/netbird-switch-relay-use-after-free.patch")
+    "${CMAKE_CURRENT_LIST_DIR}/../patches/netbird-switch-relay-use-after-free.patch"
+    "${CMAKE_CURRENT_LIST_DIR}/../patches/netbird-switch-proxy-reliability.patch")
 
 find_program(_git_exe NAMES git REQUIRED)
 execute_process(
@@ -114,5 +125,8 @@ foreach (_artifact libnetbird.a handle_full.o)
             "NetBird build reported success but ${_artifact} is missing")
     endif ()
 endforeach ()
+
+set(NETBIRD_ARCHIVE "${NETBIRD_STAGE}/libnetbird.a")
+include("${CMAKE_CURRENT_LIST_DIR}/NetBirdNamespace.cmake")
 
 message(STATUS "NetBird backend ready: ${NETBIRD_STAGE}/libnetbird.a")

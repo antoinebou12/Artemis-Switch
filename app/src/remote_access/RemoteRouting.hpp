@@ -27,4 +27,12 @@ RemoteRouteLease acquireRouteFor(const std::string& address);
 std::string connectAddressFor(const RemoteRouteLease& lease,
                               const std::string& address);
 
+void logConnectionAttempt(const RemoteRouteLease& lease,
+                          const std::string& requestedAddress,
+                          const std::string& dialAddress);
+
+void logConnectionResult(const RemoteRouteLease& lease,
+                         const std::string& dialAddress, bool succeeded,
+                         const std::string& detail = {});
+
 } // namespace artemis::remote

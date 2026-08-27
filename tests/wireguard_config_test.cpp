@@ -176,7 +176,7 @@ PersistentKeepalive = 25
             std::string("[Interface]\nPrivateKey = ") + kKeyA +
             "\nAddress = 10.0.0.2/32\n[Peer]\nPublicKey = " + kKeyB +
             "\n[Peer]\nPublicKey = " + kKeyC + "\n");
-        assert(multi.validate() == Problem::None);
+        assert(multi.validate() == Problem::MultiplePeersUnsupported);
         assert(multi.peers.size() == 2);
         // A bad second peer must not be masked by a good first one.
         const auto multiBad = parse_wireguard_conf(
@@ -191,6 +191,7 @@ PersistentKeepalive = 25
         const Problem all[] = {
             Problem::None, Problem::MissingPrivateKey, Problem::MalformedPrivateKey,
             Problem::MissingAddress, Problem::MalformedAddress, Problem::NoPeers,
+            Problem::MultiplePeersUnsupported,
             Problem::MissingPeerPublicKey, Problem::MalformedPeerPublicKey,
             Problem::MalformedPeerPresharedKey, Problem::MalformedEndpoint,
             Problem::InvalidListenPort, Problem::InvalidKeepalive,
@@ -204,6 +205,17 @@ PersistentKeepalive = 25
             }
         }
     }
+
+    // --- Standalone IPv4 routing policy -----------------------------------
+    assert(wireguard_ipv4_matches_allowed_ips("100.115.188.144",
+                                               "100.115.0.0/16"));
+    assert(wireguard_ipv4_matches_allowed_ips(
+        "10.0.0.8", "fd00::/8, 10.0.0.0/24, 192.168.1.7/32"));
+    assert(wireguard_ipv4_matches_allowed_ips("203.0.113.9", "0.0.0.0/0"));
+    assert(!wireguard_ipv4_matches_allowed_ips("10.0.1.8", "10.0.0.0/24"));
+    assert(!wireguard_ipv4_matches_allowed_ips("host.example", "0.0.0.0/0"));
+    assert(!wireguard_ipv4_matches_allowed_ips("10.0.0.8", "invalid/24"));
+    assert(!wireguard_ipv4_matches_allowed_ips("fd00::8", "fd00::/64"));
 
     // --- Secret scrubbing --------------------------------------------------
     {

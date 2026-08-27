@@ -1,10 +1,25 @@
 #include "RemoteRouting.hpp"
 
 #include "../features/host/HostAddressParse.hpp"
+#include "../utils/Settings.hpp"
+#include "../vpn/VpnFileLogger.hpp"
 #include "RemoteAccessManager.hpp"
-#include "providers/NetBirdProvider.hpp"
 
 #include <borealis/core/logger.hpp>
+
+#include <algorithm>
+
+namespace {
+
+std::string route_provider_label(const RemoteRouteLease& lease) {
+    if (auto* provider =
+            RemoteAccessManager::instance().provider(lease.providerId())) {
+        return provider->name();
+    }
+    return lease.providerId().empty() ? "RemoteAccess" : lease.providerId();
+}
+
+} // namespace
 
 namespace artemis::remote {
 
@@ -30,11 +45,7 @@ RemoteRouteLease acquireRouteFor(const std::string& address) {
         return {};
     }
 
-    // Only NetBird exposes a peer directory to route against. Raw WireGuard is a
-    // routing VPN: its addresses are reachable directly once the tunnel is up,
-    // so there is nothing to proxy.
-    auto* netbird = dynamic_cast<NetBirdProvider*>(provider);
-    if (!netbird || !netbird->isKnownPeer(parsed.host)) {
+    if (!provider->canRouteAddress(parsed.host)) {
         return {};
     }
 
@@ -62,6 +73,44 @@ std::string connectAddressFor(const RemoteRouteLease& lease,
         return std::string(kProxyAddress) + ":" + std::to_string(*parsed.port);
     }
     return kProxyAddress;
+}
+
+void logConnectionAttempt(const RemoteRouteLease& lease,
+                           const std::string& requestedAddress,
+                           const std::string& dialAddress) {
+    if (!lease.isActive())
+        return;
+
+    const std::string message = "GameStream route: requested=" +
+                                requestedAddress + " effective=" +
+                                dialAddress + " remote=" + lease.peerId();
+    VpnFileLogger::append(Settings::instance().working_dir() + "/vpn.log",
+                          route_provider_label(lease),
+                          VpnFileLogger::Severity::Info, message);
+}
+
+void logConnectionResult(const RemoteRouteLease& lease,
+                         const std::string& dialAddress, bool succeeded,
+                         const std::string& detail) {
+    if (!lease.isActive())
+        return;
+
+    std::string oneLineDetail = detail;
+    std::replace(oneLineDetail.begin(), oneLineDetail.end(), '\n', ' ');
+    std::replace(oneLineDetail.begin(), oneLineDetail.end(), '\r', ' ');
+
+    std::string message = "GameStream handshake ";
+    message += succeeded ? "succeeded" : "failed";
+    message += " for peer " + lease.peerId() + " via " + dialAddress;
+    if (!oneLineDetail.empty())
+        message += ": " + oneLineDetail;
+
+    VpnFileLogger::append(
+        Settings::instance().working_dir() + "/vpn.log",
+        route_provider_label(lease),
+        succeeded ? VpnFileLogger::Severity::Info
+                  : VpnFileLogger::Severity::Error,
+        message);
 }
 
 } // namespace artemis::remote

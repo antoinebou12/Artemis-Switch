@@ -100,6 +100,13 @@ void RemoteAccessManager::stopActiveProvider() {
     {
         std::lock_guard<std::mutex> lock(mutex_);
         active.swap(activeProviderId_);
+        for (auto it = activeRoutes_.begin(); it != activeRoutes_.end();) {
+            if (it->first.providerId == active) {
+                it = activeRoutes_.erase(it);
+            } else {
+                ++it;
+            }
+        }
     }
     if (!active.empty())
         stopProvider(active);
@@ -137,6 +144,17 @@ bool RemoteAccessManager::activateRoute(const std::string& providerId, const std
         if (it == activeRoutes_.end()) {
             bool ok = p->activateRoute(peerId);
             if (!ok) return false;
+            if (p->routesAreExclusive()) {
+                for (auto route = activeRoutes_.begin();
+                     route != activeRoutes_.end();) {
+                    if (route->first.providerId == providerId &&
+                        route->first.peerId != peerId) {
+                        route = activeRoutes_.erase(route);
+                    } else {
+                        ++route;
+                    }
+                }
+            }
             activeRoutes_[key] = 1;
             return true;
         } else {
@@ -145,6 +163,22 @@ bool RemoteAccessManager::activateRoute(const std::string& providerId, const std
         }
     }
     return false;
+}
+
+bool RemoteAccessManager::prepareRouteForStreaming(
+    const std::string& providerId, const std::string& peerId) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    const RouteKey key{providerId, peerId};
+    if (activeRoutes_.find(key) == activeRoutes_.end())
+        return false;
+
+    const auto providerIt = std::find_if(
+        providers_.begin(), providers_.end(),
+        [&providerId](const auto& provider) {
+            return provider->id() == providerId;
+        });
+    return providerIt != providers_.end() &&
+           (*providerIt)->prepareRouteForStreaming(peerId);
 }
 
 void RemoteAccessManager::deactivateRoute(const std::string& providerId, const std::string& peerId) {

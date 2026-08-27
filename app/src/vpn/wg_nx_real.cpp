@@ -2,22 +2,24 @@
 
 #include "SocketFdLock.hpp"
 #include "WireGuardConfig.hpp"
+#include <wg_lwip_relay.hpp>
 
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
 
+#include <array>
+#include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <memory>
 #include <string>
 
 // Real wg-nx backend for the Artemis WireGuard ABI.
 //
-// This shares the exact wg-nx/lwIP implementation that libnetbird.a is built
-// on, so raw WireGuard and NetBird move packets through one tunnel stack
-// instead of two divergent ones. The stub (wg_nx_stub.cpp) stays available for
-// desktop/unit-test builds via -DARTEMIS_ALLOW_VPN_STUB=ON; a release Switch
-// NRO always links this file.
+// This links the independently pinned top-level wg-nx archive. NetBird's copy
+// is rewritten into a private symbol namespace during its staged build, so the
+// two providers never share WireGuard, lwIP, callback, or timer state.
 
 extern "C" {
 #include <wireguard.h>
@@ -51,6 +53,17 @@ bool split_endpoint(const std::string& endpoint, std::string& host, uint16_t& po
     return true;
 }
 
+constexpr std::array<std::uint16_t, 3> kTcpPorts{47989, 47984, 48010};
+constexpr std::array<std::uint16_t, 5> kUdpPorts{47998, 48000, 47999, 48002,
+                                                48010};
+
+void relay_log(wgnx::LogLevel level, const char* message) {
+    const char* label = level == wgnx::LogLevel::Error ? "ERROR" :
+                        level == wgnx::LogLevel::Debug ? "DEBUG" : "INFO";
+    std::fprintf(stderr, "[WIREGUARD-RELAY] %s %s\n", label,
+                 message ? message : "");
+}
+
 } // namespace
 
 struct WgNxTunnel {
@@ -60,7 +73,25 @@ struct WgNxTunnel {
     // Filled from wg_get_ip() once connected so the UI reports the address the
     // tunnel actually negotiated, not the one the config asked for.
     std::string resolvedAddress;
+    std::unique_ptr<wgnx::LwipRelay> relay;
+    std::string activeTarget;
+    bool udpPrepared = false;
 };
+
+namespace {
+
+void clear_relay(WgNxTunnel* handle) {
+    if (!handle)
+        return;
+    if (handle->relay) {
+        auto guard = SocketFdLock::instance().guard();
+        handle->relay.reset();
+    }
+    handle->activeTarget.clear();
+    handle->udpPrepared = false;
+}
+
+} // namespace
 
 extern "C" int wg_nx_is_real_backend(void) { return 1; }
 
@@ -69,11 +100,10 @@ extern "C" WgNxTunnel* wg_nx_tunnel_create(const char* conf_text) {
         return nullptr;
     }
 
-    auto* handle = new WgNxTunnel();
+    auto handle = std::make_unique<WgNxTunnel>();
     handle->config = parse_wireguard_conf(conf_text);
     if (!handle->config.valid()) {
         wireguard_scrub(handle->config.privateKey);
-        delete handle;
         return nullptr;
     }
 
@@ -82,18 +112,15 @@ extern "C" WgNxTunnel* wg_nx_tunnel_create(const char* conf_text) {
     WgConfig wg{};
     if (wg_key_from_base64(wg.private_key, handle->config.privateKey.c_str()) != 0) {
         wireguard_scrub(handle->config.privateKey);
-        delete handle;
         return nullptr;
     }
     if (wg_key_from_base64(wg.peer_public_key, peer.publicKey.c_str()) != 0) {
         wireguard_scrub(handle->config.privateKey);
-        delete handle;
         return nullptr;
     }
     if (!peer.presharedKey.empty()) {
         if (wg_key_from_base64(wg.preshared_key, peer.presharedKey.c_str()) != 0) {
             wireguard_scrub(handle->config.privateKey);
-            delete handle;
             return nullptr;
         }
         wg.has_preshared_key = 1;
@@ -102,7 +129,6 @@ extern "C" WgNxTunnel* wg_nx_tunnel_create(const char* conf_text) {
     const std::string addressHost = address_host_part(handle->config.address);
     if (inet_pton(AF_INET, addressHost.c_str(), &wg.tunnel_ip) != 1) {
         wireguard_scrub(handle->config.privateKey);
-        delete handle;
         return nullptr;
     }
 
@@ -110,7 +136,6 @@ extern "C" WgNxTunnel* wg_nx_tunnel_create(const char* conf_text) {
     uint16_t endpointPort = 0;
     if (!split_endpoint(peer.endpoint, endpointHost, endpointPort)) {
         wireguard_scrub(handle->config.privateKey);
-        delete handle;
         return nullptr;
     }
     std::snprintf(wg.endpoint_host, sizeof(wg.endpoint_host), "%s", endpointHost.c_str());
@@ -134,10 +159,9 @@ extern "C" WgNxTunnel* wg_nx_tunnel_create(const char* conf_text) {
     }
 
     if (!handle->tunnel) {
-        delete handle;
         return nullptr;
     }
-    return handle;
+    return handle.release();
 }
 
 extern "C" int wg_nx_tunnel_start(WgNxTunnel* handle) {
@@ -169,10 +193,88 @@ extern "C" int wg_nx_tunnel_start(WgNxTunnel* handle) {
     return 0;
 }
 
+extern "C" int wg_nx_tunnel_can_route(WgNxTunnel* handle,
+                                         const char* ipv4_address) {
+    if (!handle || !handle->running || !ipv4_address ||
+        handle->config.peers.size() != 1) {
+        return 0;
+    }
+    return wireguard_ipv4_matches_allowed_ips(
+               ipv4_address, handle->config.peers.front().allowedIps)
+               ? 1
+               : 0;
+}
+
+extern "C" int wg_nx_tunnel_activate_route(WgNxTunnel* handle,
+                                              const char* ipv4_address) {
+    if (!handle || !ipv4_address ||
+        wg_nx_tunnel_can_route(handle, ipv4_address) != 1) {
+        return -1;
+    }
+    if (handle->relay && handle->activeTarget == ipv4_address &&
+        handle->relay->isRunning()) {
+        return 0;
+    }
+
+    clear_relay(handle);
+
+    wgnx::LwipRelayConfig relayConfig;
+    relayConfig.log_callback = relay_log;
+    auto relay = std::make_unique<wgnx::LwipRelay>(handle->tunnel, relayConfig);
+    const std::string tunnelAddress =
+        handle->resolvedAddress.empty()
+            ? address_host_part(handle->config.address)
+            : handle->resolvedAddress;
+
+    {
+        auto guard = SocketFdLock::instance().guard();
+        if (!relay->start(tunnelAddress, ipv4_address)) {
+            return -2;
+        }
+        for (const auto port : kTcpPorts) {
+            if (relay->startTcpRelay(port, port) == 0) {
+                relay.reset();
+                return -3;
+            }
+        }
+    }
+
+    handle->relay = std::move(relay);
+    handle->activeTarget = ipv4_address;
+    handle->udpPrepared = false;
+    return 0;
+}
+
+extern "C" int wg_nx_tunnel_prepare_stream(WgNxTunnel* handle,
+                                              const char* ipv4_address) {
+    if (!handle || !handle->relay || !handle->relay->isRunning() ||
+        !ipv4_address || handle->activeTarget != ipv4_address) {
+        return -1;
+    }
+    if (handle->udpPrepared)
+        return 0;
+
+    auto guard = SocketFdLock::instance().guard();
+    for (const auto port : kUdpPorts) {
+        if (handle->relay->startUdpRelay(port, port) == 0)
+            return -2;
+    }
+    handle->udpPrepared = true;
+    return 0;
+}
+
+extern "C" void wg_nx_tunnel_deactivate_route(WgNxTunnel* handle,
+                                                 const char* ipv4_address) {
+    if (!handle || !ipv4_address || handle->activeTarget != ipv4_address)
+        return;
+    clear_relay(handle);
+}
+
 extern "C" void wg_nx_tunnel_stop(WgNxTunnel* handle) {
     if (!handle || !handle->tunnel || !handle->running) {
         return;
     }
+    clear_relay(handle);
     auto guard = SocketFdLock::instance().guard();
     wg_stop(handle->tunnel);
     handle->running = false;
@@ -182,13 +284,13 @@ extern "C" void wg_nx_tunnel_destroy(WgNxTunnel* handle) {
     if (!handle) {
         return;
     }
-    wg_nx_tunnel_stop(handle);
-    if (handle->tunnel) {
+    std::unique_ptr<WgNxTunnel> owner(handle);
+    wg_nx_tunnel_stop(owner.get());
+    if (owner->tunnel) {
         auto guard = SocketFdLock::instance().guard();
-        wg_close(handle->tunnel);
-        handle->tunnel = nullptr;
+        wg_close(owner->tunnel);
+        owner->tunnel = nullptr;
     }
-    delete handle;
 }
 
 extern "C" const char* wg_nx_tunnel_address(WgNxTunnel* handle) {

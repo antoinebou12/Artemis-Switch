@@ -16,6 +16,11 @@ int wg_nx_is_real_backend(void);
 
 WgNxTunnel* wg_nx_tunnel_create(const char* conf_text);
 int wg_nx_tunnel_start(WgNxTunnel* tunnel);
+int wg_nx_tunnel_can_route(WgNxTunnel* tunnel, const char* ipv4_address);
+int wg_nx_tunnel_activate_route(WgNxTunnel* tunnel, const char* ipv4_address);
+int wg_nx_tunnel_prepare_stream(WgNxTunnel* tunnel, const char* ipv4_address);
+void wg_nx_tunnel_deactivate_route(WgNxTunnel* tunnel,
+                                   const char* ipv4_address);
 void wg_nx_tunnel_stop(WgNxTunnel* tunnel);
 void wg_nx_tunnel_destroy(WgNxTunnel* tunnel);
 const char* wg_nx_tunnel_address(WgNxTunnel* tunnel);

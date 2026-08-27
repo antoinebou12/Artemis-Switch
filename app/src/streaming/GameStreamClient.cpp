@@ -3,6 +3,7 @@
 #include "remote_access/RemoteRouting.hpp"
 #include "Settings.hpp"
 #include "WakeOnLanManager.hpp"
+#include "features/host/HostAddressParse.hpp"
 #include "features/input/ControllerTopology.hpp"
 #include "host/HostIdentityProbe.hpp"
 #include <borealis.hpp>
@@ -161,8 +162,15 @@ bool connect_to_addresses_sync(const std::vector<std::string>& addresses,
         const std::string dialAddress =
             artemis::remote::connectAddressFor(candidateLease, address);
 
+        artemis::remote::logConnectionAttempt(candidateLease, address,
+                                               dialAddress);
+
         SERVER_DATA serverData{};
         const int status = gs_init(&serverData, dialAddress);
+        const std::string connectError =
+            status == GS_OK ? std::string{} : gs_error();
+        artemis::remote::logConnectionResult(candidateLease, dialAddress,
+                                             status == GS_OK, connectError);
         if (status == GS_OK) {
             // Keep the real address as the host's identity; only the transport
             // is loopback. The cached SERVER_DATA already carries the proxied
@@ -173,7 +181,7 @@ bool connect_to_addresses_sync(const std::vector<std::string>& addresses,
             return true;
         }
 
-        error = gs_error();
+        error = connectError;
         if (auto identity = artemis::host::probePunktfunkIdentity(address);
             identity && identity->kind == artemis::host::HostKind::Punktfunk) {
             error = artemis::host::punktfunkGameStreamRequiredError();
@@ -671,7 +679,23 @@ void GameStreamClient::connect_to_addresses(
 
 void GameStreamClient::connect(const std::string& address,
                                ServerCallback<SERVER_DATA>& callback) {
-    connect_to_addresses({address}, "", callback);
+    connect_to_addresses({address}, "address:" + address, callback);
+}
+
+bool GameStreamClient::prepare_remote_route_for_stream(
+    const std::string& address) {
+    const auto parsed = artemis::host::parse_host_address(address);
+    if (parsed.host.empty())
+        return true;
+
+    const auto route = std::find_if(
+        m_active_routes.begin(), m_active_routes.end(),
+        [&parsed](const auto& entry) {
+            return entry.second.isActive() &&
+                   entry.second.targetAddress() == parsed.host;
+        });
+    return route == m_active_routes.end() ||
+           route->second.prepareForStreaming();
 }
 
 std::string GameStreamClient::active_address(const Host& host) const {
@@ -811,6 +835,12 @@ void GameStreamClient::start(const std::string& address,
                                       Settings::instance().play_audio(),
                                       gamepadMask,
                                       &apolloOptions);
+
+            if (status == GS_OK &&
+                !prepare_remote_route_for_stream(cachedAddress)) {
+                gs_set_error("Remote access UDP relay could not start");
+                status = GS_IO_ERROR;
+            }
 
             brls::sync([this, callback, status] {
                 if (status == GS_OK) {

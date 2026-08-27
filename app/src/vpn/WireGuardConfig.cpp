@@ -2,7 +2,9 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstdint>
 #include <fstream>
+#include <optional>
 #include <sstream>
 
 namespace {
@@ -81,6 +83,28 @@ bool valid_ipv4(const std::string& value) {
         pos = dot + 1;
     }
     return octets == 4;
+}
+
+std::optional<std::uint32_t> parse_ipv4(const std::string& value) {
+    if (!valid_ipv4(value))
+        return std::nullopt;
+
+    std::uint32_t result = 0;
+    std::size_t pos = 0;
+    for (int octet = 0; octet < 4; ++octet) {
+        const auto dot = value.find('.', pos);
+        int number = 0;
+        if (!parse_int(value.substr(
+                           pos, dot == std::string::npos
+                                    ? std::string::npos
+                                    : dot - pos),
+                       number)) {
+            return std::nullopt;
+        }
+        result = (result << 8) | static_cast<std::uint32_t>(number);
+        pos = dot == std::string::npos ? value.size() : dot + 1;
+    }
+    return result;
 }
 
 // Accepts "10.0.0.2", "10.0.0.2/32", and IPv6 forms. IPv6 is only checked
@@ -162,6 +186,8 @@ const char* wireguard_problem_i18n_key(WireGuardConfig::Problem problem) {
             return "artemis/settings/wireguard_problem_malformed_address";
         case WireGuardConfig::Problem::NoPeers:
             return "artemis/settings/wireguard_problem_no_peers";
+        case WireGuardConfig::Problem::MultiplePeersUnsupported:
+            return "artemis/settings/wireguard_problem_multiple_peers";
         case WireGuardConfig::Problem::MissingPeerPublicKey:
             return "artemis/settings/wireguard_problem_missing_peer_key";
         case WireGuardConfig::Problem::MalformedPeerPublicKey:
@@ -209,7 +235,48 @@ WireGuardConfig::Problem WireGuardConfig::validate() const {
         if (peer.persistentKeepalive < 0 || peer.persistentKeepalive > 65535)
             return Problem::InvalidKeepalive;
     }
+    if (peers.size() > 1)
+        return Problem::MultiplePeersUnsupported;
     return Problem::None;
+}
+
+bool wireguard_ipv4_matches_allowed_ips(const std::string& address,
+                                        const std::string& allowedIps) {
+    const auto candidate = parse_ipv4(trim(address));
+    if (!candidate || allowedIps.empty())
+        return false;
+
+    std::size_t pos = 0;
+    while (pos <= allowedIps.size()) {
+        const auto comma = allowedIps.find(',', pos);
+        auto entry = trim(allowedIps.substr(
+            pos, comma == std::string::npos ? std::string::npos : comma - pos));
+
+        // Valid IPv6 routes remain in the config but this userland proxy only
+        // accepts literal IPv4 Artemis host addresses.
+        if (!entry.empty() && entry.find(':') == std::string::npos) {
+            int prefix = 32;
+            const auto slash = entry.find('/');
+            if (slash != std::string::npos) {
+                if (!parse_int(entry.substr(slash + 1), prefix) || prefix > 32)
+                    prefix = -1;
+                entry = entry.substr(0, slash);
+            }
+
+            const auto network = parse_ipv4(entry);
+            if (network && prefix >= 0) {
+                const std::uint32_t mask =
+                    prefix == 0 ? 0u : (0xffffffffu << (32 - prefix));
+                if ((*candidate & mask) == (*network & mask))
+                    return true;
+            }
+        }
+
+        if (comma == std::string::npos)
+            break;
+        pos = comma + 1;
+    }
+    return false;
 }
 
 std::string load_text_file(const std::string& path) {

@@ -563,14 +563,18 @@ ArtemisSettingsTab::ArtemisSettingsTab() {
     remoteAccessAddress->setText("settings/remote_access_vpn_address"_i18n);
     remoteAccessPeers->setText("settings/remote_access_peers"_i18n);
     remoteAccessError->setText("settings/remote_access_last_error"_i18n);
-    remoteAccessBackends->setText("settings/remote_access_diagnostics"_i18n);
+    wireguardBackendStatus->setText(
+        "settings/remote_access_backend_wireguard"_i18n);
+    netbirdBackendStatus->setText(
+        "settings/remote_access_backend_netbird"_i18n);
 
     // These rows are read-only readouts; keep them out of the focus order.
     for (brls::DetailCell* row :
          {static_cast<brls::DetailCell*>(remoteAccessAddress),
           static_cast<brls::DetailCell*>(remoteAccessPeers),
           static_cast<brls::DetailCell*>(remoteAccessError),
-          static_cast<brls::DetailCell*>(remoteAccessBackends),
+          static_cast<brls::DetailCell*>(wireguardBackendStatus),
+          static_cast<brls::DetailCell*>(netbirdBackendStatus),
           static_cast<brls::DetailCell*>(wireguardStatus)}) {
         row->setFocusable(false);
     }
@@ -593,7 +597,8 @@ ArtemisSettingsTab::ArtemisSettingsTab() {
     remoteAccessAddress->removeFromSuperView(true);
     remoteAccessPeers->removeFromSuperView(true);
     remoteAccessError->removeFromSuperView(true);
-    remoteAccessBackends->removeFromSuperView(true);
+    wireguardBackendStatus->removeFromSuperView(true);
+    netbirdBackendStatus->removeFromSuperView(true);
 #endif
 
     refreshValues();
@@ -686,7 +691,16 @@ void ArtemisSettingsTab::refreshRemoteAccessRows() {
     show(wireguardStatus, active);
     show(remoteAccessAddress, active);
     show(remoteAccessPeers, active && visible.netBird);
-    show(remoteAccessBackends, active);
+#if defined(ENABLE_WIREGUARD)
+    show(wireguardBackendStatus, active);
+#else
+    show(wireguardBackendStatus, false);
+#endif
+#if defined(ENABLE_NETBIRD)
+    show(netbirdBackendStatus, active);
+#else
+    show(netbirdBackendStatus, false);
+#endif
 
     if (visible.netBird) {
         netbirdSetupKey->setDetailText(
@@ -740,10 +754,14 @@ void ArtemisSettingsTab::refreshRemoteAccessStatus() {
 
     // Diagnostics row states which backend is actually linked, so a build that
     // cannot move packets can never look like a working one.
-    remoteAccessBackends->setDetailText(
+    wireguardBackendStatus->setDetailText(
         WireGuardManager::backend_is_real()
-            ? "settings/remote_access_backend_real"_i18n
+            ? "settings/remote_access_backend_isolated_real"_i18n
             : "settings/remote_access_backend_stub"_i18n);
+#if defined(ENABLE_NETBIRD)
+    netbirdBackendStatus->setDetailText(
+        "settings/remote_access_backend_isolated_real"_i18n);
+#endif
 #endif
 }
 
