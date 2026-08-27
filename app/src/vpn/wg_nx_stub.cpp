@@ -47,6 +47,33 @@ extern "C" int wg_nx_tunnel_start(WgNxTunnel* tunnel) {
     return -1;
 }
 
+extern "C" int wg_nx_tunnel_can_route(WgNxTunnel* tunnel,
+                                         const char* ipv4_address) {
+    (void)tunnel;
+    (void)ipv4_address;
+    return 0;
+}
+
+extern "C" int wg_nx_tunnel_activate_route(WgNxTunnel* tunnel,
+                                              const char* ipv4_address) {
+    (void)tunnel;
+    (void)ipv4_address;
+    return -1;
+}
+
+extern "C" int wg_nx_tunnel_prepare_stream(WgNxTunnel* tunnel,
+                                              const char* ipv4_address) {
+    (void)tunnel;
+    (void)ipv4_address;
+    return -1;
+}
+
+extern "C" void wg_nx_tunnel_deactivate_route(WgNxTunnel* tunnel,
+                                                 const char* ipv4_address) {
+    (void)tunnel;
+    (void)ipv4_address;
+}
+
 extern "C" void wg_nx_tunnel_stop(WgNxTunnel* tunnel) {
     (void)tunnel;
 }

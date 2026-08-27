@@ -24,10 +24,6 @@ namespace {
 // relay covers the video/audio/control ports on its own.
 constexpr uint16_t kGameStreamPort = 47989;
 
-// The first connection to a peer may also have to establish its WireGuard
-// handshake. A 300 ms LAN-style deadline produced false "offline" results on
-// relayed peers, so allow one realistic handshake window. Probing stays off the
-// UI thread and happens only during an explicit peer refresh.
 constexpr int kPeerProbeTimeoutMs = 1500;
 constexpr auto kPumpInterval = std::chrono::milliseconds(5);
 constexpr auto kPumpWatchdogInterval = std::chrono::seconds(5);
@@ -50,11 +46,10 @@ void vpn_log(VpnFileLogger::Severity severity, const std::string& message) {
 } // namespace
 
 NetBirdProvider::~NetBirdProvider() {
-    if (started_) {
+    if (started_)
         stop();
-    } else {
+    else
         stopPump();
-    }
 }
 
 std::string NetBirdProvider::id() const { return "netbird"; }
@@ -122,8 +117,6 @@ bool NetBirdProvider::start() {
     brls::Logger::info("NetBird: connected, tunnel address {}", localAddress());
     vpn_log(VpnFileLogger::Severity::Info, "connected, tunnel address " + localAddress());
 
-    // Start the timer/packet pump before the first reachability probe. This
-    // also keeps NetBird progressing while gs_init() blocks the UI thread.
     startPump();
     vpn_log(VpnFileLogger::Severity::Info,
             "authenticated peer sync returned " +
@@ -138,8 +131,8 @@ bool NetBirdProvider::start() {
 }
 
 void NetBirdProvider::poll() {
-    // NetBird owns a persistent pump thread. Frame-driven polling would leave
-    // the tunnel idle while the UI thread is blocked in a GameStream request.
+    // The persistent pump keeps timers and packets moving even while the UI
+    // thread is blocked in GameStream HTTP.
 }
 
 void NetBirdProvider::stop() {
@@ -169,9 +162,8 @@ void NetBirdProvider::stop() {
 
 void NetBirdProvider::startPump() {
 #if defined(__SWITCH__) && defined(ENABLE_NETBIRD)
-    if (pumpRunning_.exchange(true, std::memory_order_acq_rel)) {
+    if (pumpRunning_.exchange(true, std::memory_order_acq_rel))
         return;
-    }
 
     pumpPollCount_.store(0, std::memory_order_release);
     pumpMaxGapMs_.store(0, std::memory_order_release);
@@ -180,7 +172,6 @@ void NetBirdProvider::startPump() {
     pumpThread_ = std::thread([this] {
         auto previous = std::chrono::steady_clock::now();
         auto nextWatchdog = previous + kPumpWatchdogInterval;
-
         while (pumpRunning_.load(std::memory_order_acquire)) {
             const auto now = std::chrono::steady_clock::now();
             const auto gap = static_cast<std::uint64_t>(
@@ -228,12 +219,10 @@ void NetBirdProvider::startPump() {
 
 void NetBirdProvider::stopPump() {
 #if defined(__SWITCH__) && defined(ENABLE_NETBIRD)
-    if (!pumpRunning_.exchange(false, std::memory_order_acq_rel)) {
+    if (!pumpRunning_.exchange(false, std::memory_order_acq_rel))
         return;
-    }
-    if (pumpThread_.joinable()) {
+    if (pumpThread_.joinable())
         pumpThread_.join();
-    }
     vpn_log(VpnFileLogger::Severity::Info,
             "NetBird background pump stopped");
 #endif
@@ -304,9 +293,8 @@ void NetBirdProvider::refreshPeers() {
                 pumpPollCount_.load(std::memory_order_acquire);
             const auto lastPoll =
                 pumpLastPollMs_.load(std::memory_order_acquire);
-            const auto pumpAge = steady_milliseconds() >= lastPoll
-                                     ? steady_milliseconds() - lastPoll
-                                     : 0;
+            const auto nowMs = steady_milliseconds();
+            const auto pumpAge = nowMs >= lastPoll ? nowMs - lastPoll : 0;
             vpn_log(VpnFileLogger::Severity::Info,
                     "peer probe begin " + peer.address + ":" +
                         std::to_string(kGameStreamPort) +
@@ -330,14 +318,9 @@ void NetBirdProvider::refreshPeers() {
                         (peer.online ? "reachable" : "unreachable") +
                         " elapsed=" + std::to_string(elapsed.count()) +
                         "ms polls_during_probe=" +
-                        std::to_string(pollsAfter - pollsBefore) +
-                        " max_pump_gap=" +
-                        std::to_string(pumpMaxGapMs_.load(
-                            std::memory_order_acquire)) +
-                        "ms");
+                        std::to_string(pollsAfter - pollsBefore));
             refreshed.push_back(std::move(peer));
         }
-
         const auto reachable = std::count_if(
             refreshed.begin(), refreshed.end(),
             [](const RemoteAccessPeer& peer) { return peer.online; });
@@ -415,7 +398,6 @@ bool NetBirdProvider::activateRoute(const std::string& peerId) {
         return true;
     }
 
-    // One peer at a time: stop the previous route before starting the new one.
     if (!activePeer_.empty()) {
         vpn_log(VpnFileLogger::Severity::Info,
                 "switching TCP route from " + activePeer_ + " to " + peerId);
@@ -458,9 +440,6 @@ bool NetBirdProvider::prepareRouteForStreaming(const std::string& peerId) {
         return false;
     }
     if (udpRelaysStarted_) {
-        // Relay threads intentionally exit after an idle stream. Stop/join and
-        // recreate them for every launch so a second session cannot inherit
-        // sockets whose worker threads have already ended.
         vpn_log(VpnFileLogger::Severity::Info,
                 "restarting UDP media relays for a new stream launch");
         netbird_proxy_stop_udp();

@@ -106,10 +106,14 @@ bool WireGuardManager::enable_from_settings() {
 }
 
 void WireGuardManager::disable_locked() {
+#if defined(__SWITCH__) && defined(ENABLE_WIREGUARD)
     if (tunnel_) {
         wg_nx_tunnel_destroy(tunnel_);
         tunnel_ = nullptr;
     }
+#else
+    tunnel_ = nullptr;
+#endif
     tunnelAddress_.clear();
     lastError_.clear();
 }
@@ -139,6 +143,60 @@ std::string WireGuardManager::tunnel_address() const {
 std::string WireGuardManager::last_error() const {
     std::scoped_lock lock(mutex_);
     return lastError_;
+}
+
+bool WireGuardManager::can_route_address(const std::string& address) const {
+#if defined(__SWITCH__) && defined(ENABLE_WIREGUARD)
+    std::scoped_lock lock(mutex_);
+    return tunnel_ && status_ == Status::Running &&
+           wg_nx_tunnel_can_route(tunnel_, address.c_str()) == 1;
+#else
+    (void)address;
+    return false;
+#endif
+}
+
+bool WireGuardManager::activate_route(const std::string& address) {
+#if defined(__SWITCH__) && defined(ENABLE_WIREGUARD)
+    std::scoped_lock lock(mutex_);
+    if (!tunnel_ || status_ != Status::Running ||
+        wg_nx_tunnel_activate_route(tunnel_, address.c_str()) != 0) {
+        lastError_ = "artemis/settings/wireguard_proxy_failed";
+        return false;
+    }
+    lastError_.clear();
+    return true;
+#else
+    (void)address;
+    return false;
+#endif
+}
+
+bool WireGuardManager::prepare_route_for_streaming(
+    const std::string& address) {
+#if defined(__SWITCH__) && defined(ENABLE_WIREGUARD)
+    std::scoped_lock lock(mutex_);
+    if (!tunnel_ || status_ != Status::Running ||
+        wg_nx_tunnel_prepare_stream(tunnel_, address.c_str()) != 0) {
+        lastError_ = "artemis/settings/wireguard_proxy_failed";
+        return false;
+    }
+    lastError_.clear();
+    return true;
+#else
+    (void)address;
+    return false;
+#endif
+}
+
+void WireGuardManager::deactivate_route(const std::string& address) {
+#if defined(__SWITCH__) && defined(ENABLE_WIREGUARD)
+    std::scoped_lock lock(mutex_);
+    if (tunnel_)
+        wg_nx_tunnel_deactivate_route(tunnel_, address.c_str());
+#else
+    (void)address;
+#endif
 }
 
 std::string WireGuardManager::status_text() const {

@@ -194,6 +194,11 @@ add_artemis_test(wireguard_config_test
     app/src/vpn/WireGuardConfig.cpp
     app/src/vpn)
 
+add_artemis_test(remote_access_isolation_test
+    tests/remote_access_isolation_test.cpp
+    app/src/remote_access/RemoteAccessManager.cpp
+    app/src/remote_access)
+
 add_artemis_test(controller_diagnostics_test
     tests/controller_diagnostics_test.cpp
     app/src/features/input/ControllerDiagnostics.cpp

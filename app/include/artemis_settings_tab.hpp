@@ -54,7 +54,8 @@ private:
     BRLS_BIND(brls::DetailCell, remoteAccessAddress, "remote_access_address");
     BRLS_BIND(brls::DetailCell, remoteAccessPeers, "remote_access_peers");
     BRLS_BIND(brls::DetailCell, remoteAccessError, "remote_access_error");
-    BRLS_BIND(brls::DetailCell, remoteAccessBackends, "remote_access_backends");
+    BRLS_BIND(brls::DetailCell, wireguardBackendStatus, "wireguard_backend_status");
+    BRLS_BIND(brls::DetailCell, netbirdBackendStatus, "netbird_backend_status");
 
   private:
     // Rows that only apply to one provider are hidden for the other, so the

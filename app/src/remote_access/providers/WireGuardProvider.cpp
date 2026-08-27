@@ -63,3 +63,38 @@ std::vector<RemoteAccessPeer> WireGuardProvider::peers() const {
     return {};
 #endif
 }
+
+bool WireGuardProvider::canRouteAddress(const std::string& address) const {
+#if defined(__SWITCH__) && defined(ENABLE_WIREGUARD)
+    return WireGuardManager::instance().can_route_address(address);
+#else
+    (void)address;
+    return false;
+#endif
+}
+
+bool WireGuardProvider::activateRoute(const std::string& peerId) {
+#if defined(__SWITCH__) && defined(ENABLE_WIREGUARD)
+    return WireGuardManager::instance().activate_route(peerId);
+#else
+    (void)peerId;
+    return false;
+#endif
+}
+
+bool WireGuardProvider::prepareRouteForStreaming(const std::string& peerId) {
+#if defined(__SWITCH__) && defined(ENABLE_WIREGUARD)
+    return WireGuardManager::instance().prepare_route_for_streaming(peerId);
+#else
+    (void)peerId;
+    return false;
+#endif
+}
+
+void WireGuardProvider::deactivateRoute(const std::string& peerId) {
+#if defined(__SWITCH__) && defined(ENABLE_WIREGUARD)
+    WireGuardManager::instance().deactivate_route(peerId);
+#else
+    (void)peerId;
+#endif
+}

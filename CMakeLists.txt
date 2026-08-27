@@ -384,6 +384,38 @@ elseif (PLATFORM_SWITCH)
         )
     endif ()
 
+    if (ENABLE_WIREGUARD AND NOT ARTEMIS_ALLOW_VPN_STUB)
+        set(WIREGUARD_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/extern/wg-nx")
+        if (NOT EXISTS "${WIREGUARD_SOURCE_DIR}/include/wireguard.h")
+            message(FATAL_ERROR
+                "Standalone wg-nx submodule not initialized. Run:\n"
+                "  git submodule update --init --recursive extern/wg-nx")
+        endif ()
+        if (NOT EXISTS "${WIREGUARD_SOURCE_DIR}/library/lwip/src/include/lwip/netif.h")
+            message(FATAL_ERROR
+                "Standalone wg-nx lwIP submodule missing. Run:\n"
+                "  git -C extern/wg-nx submodule update --init library/lwip")
+        endif ()
+
+        set(WIREGUARD_STAGE_DIR "${ARTEMIS_VPN_STAGE_ROOT}/wg-nx-standalone")
+        set(LIBWIREGUARD_A "${WIREGUARD_STAGE_DIR}/libwireguard.a")
+        add_custom_command(
+            OUTPUT ${LIBWIREGUARD_A}
+            COMMAND ${CMAKE_COMMAND}
+                    -DWIREGUARD_SRC=${WIREGUARD_SOURCE_DIR}
+                    -DWIREGUARD_STAGE=${WIREGUARD_STAGE_DIR}
+                    -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/WireGuardBackend.cmake
+            DEPENDS
+                    ${CMAKE_CURRENT_SOURCE_DIR}/cmake/WireGuardBackend.cmake
+            COMMENT "Building isolated standalone WireGuard backend"
+            VERBATIM)
+        add_custom_target(artemis_wireguard_deps DEPENDS ${LIBWIREGUARD_A})
+
+        list(APPEND MAIN_SRC
+            app/src/vpn/wg_nx_real.cpp
+            ${WIREGUARD_SOURCE_DIR}/lwip-relay/src/wg_lwip_relay.cpp)
+    endif ()
+
     if (ENABLE_NETBIRD)
         set(NETBIRD_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/extern/netbird-switch")
         if (NOT EXISTS "${NETBIRD_SOURCE_DIR}/include/netbird.h")
@@ -412,35 +444,31 @@ elseif (PLATFORM_SWITCH)
             COMMAND ${CMAKE_COMMAND}
                     -DNETBIRD_SRC=${NETBIRD_SOURCE_DIR}
                     -DNETBIRD_STAGE=${NETBIRD_STAGE_DIR}
+                    -DNETBIRD_AR=${CMAKE_AR}
+                    -DNETBIRD_NM=${CMAKE_NM}
+                    -DNETBIRD_OBJCOPY=${CMAKE_OBJCOPY}
                     -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/NetBirdBackend.cmake
             DEPENDS
                     ${CMAKE_CURRENT_SOURCE_DIR}/cmake/NetBirdBackend.cmake
+                    ${CMAKE_CURRENT_SOURCE_DIR}/cmake/NetBirdNamespace.cmake
+                    ${CMAKE_CURRENT_SOURCE_DIR}/cmake/NetBirdCurrentRelayCompat.cmake
                     ${CMAKE_CURRENT_SOURCE_DIR}/patches/netbird-switch-relay-use-after-free.patch
                     ${CMAKE_CURRENT_SOURCE_DIR}/patches/netbird-switch-proxy-reliability.patch
-                    ${CMAKE_CURRENT_SOURCE_DIR}/patches/netbird-switch-signal-stream.patch
             COMMENT "Building NetBird Switch backend (libnetbird.a + handle_full.o)"
             VERBATIM)
         add_custom_target(artemis_vpn_deps DEPENDS ${LIBNETBIRD_A} ${HANDLE_FULL_O})
 
     endif ()
 
-    # Pick the WireGuard backend. wg_nx_real.cpp drives the same wg-nx/lwIP
-    # implementation that libnetbird.a is built on, so both providers share one
-    # tunnel stack. The stub validates a config but moves no packets, so it is
-    # never acceptable in a release NRO.
+    # The stub validates a config but moves no packets, so it is never
+    # acceptable in a release NRO. Real builds use the independent top-level
+    # wg-nx submodule; NetBird's embedded copy is namespaced separately.
     if (ENABLE_WIREGUARD)
         if (ARTEMIS_ALLOW_VPN_STUB)
             list(APPEND MAIN_SRC app/src/vpn/wg_nx_stub.cpp)
             message(WARNING
                 "ARTEMIS_ALLOW_VPN_STUB=ON: WireGuard will validate configs but tunnel NO traffic. "
                 "Never ship this build.")
-        elseif (ENABLE_NETBIRD)
-            list(APPEND MAIN_SRC app/src/vpn/wg_nx_real.cpp)
-        else ()
-            message(FATAL_ERROR
-                "ENABLE_WIREGUARD=ON needs the real wg-nx backend, which ships with the "
-                "NetBird submodule. Enable ENABLE_NETBIRD, or set ARTEMIS_ALLOW_VPN_STUB=ON "
-                "for a non-shippable development build.")
         endif ()
     endif ()
 elseif (PLATFORM_PSV)
@@ -475,10 +503,20 @@ endif ()
 program_target(${PROJECT_NAME} "${MAIN_SRC}")
 set_target_properties(${PROJECT_NAME} PROPERTIES CXX_STANDARD 20)
 
+if (ENABLE_WIREGUARD AND NOT ARTEMIS_ALLOW_VPN_STUB)
+    target_include_directories(${PROJECT_NAME} PRIVATE
+        "${WIREGUARD_SOURCE_DIR}/include"
+        "${WIREGUARD_SOURCE_DIR}/src"
+        "${WIREGUARD_SOURCE_DIR}/library/crypto"
+        "${WIREGUARD_SOURCE_DIR}/lwip-relay/include"
+        "${WIREGUARD_SOURCE_DIR}/library/lwip/src/include")
+    add_dependencies(${PROJECT_NAME} artemis_wireguard_deps)
+    target_link_libraries(${PROJECT_NAME} PRIVATE "${LIBWIREGUARD_A}")
+endif ()
+
 if (ENABLE_NETBIRD)
     target_include_directories(${PROJECT_NAME} PRIVATE
-        "${NETBIRD_SOURCE_DIR}/include"
-        "${NETBIRD_SOURCE_DIR}/library/wg-nx/include")
+        "${NETBIRD_SOURCE_DIR}/include")
     add_dependencies(${PROJECT_NAME} artemis_vpn_deps)
 
     # Order matters. handle_full.o overrides newlib's fd management and MUST

@@ -33,6 +33,7 @@ struct WireGuardConfig {
         MissingAddress,
         MalformedAddress,
         NoPeers,
+        MultiplePeersUnsupported,
         MissingPeerPublicKey,
         MalformedPeerPublicKey,
         MalformedPeerPresharedKey,
@@ -53,6 +54,11 @@ const char* wireguard_problem_i18n_key(WireGuardConfig::Problem problem);
 // Parse a standard WireGuard .conf (Interface + Peer sections).
 WireGuardConfig parse_wireguard_conf(const std::string& text);
 std::string load_text_file(const std::string& path);
+
+// Standalone WireGuard accepts manually configured literal IPv4 Artemis hosts.
+// IPv6 entries in AllowedIPs remain valid but are not routing candidates here.
+[[nodiscard]] bool wireguard_ipv4_matches_allowed_ips(
+    const std::string& address, const std::string& allowedIps);
 
 // Overwrite a secret in place before it is dropped. Not a hard guarantee under
 // an optimising compiler, but it keeps keys out of freed heap in practice.

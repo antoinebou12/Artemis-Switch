@@ -27,6 +27,9 @@ public:
     std::string lastError() const override;
     std::string localAddress() const override;
     std::vector<RemoteAccessPeer> peers() const override;
+    bool canRouteAddress(const std::string& address) const override {
+        return isKnownPeer(address);
+    }
     bool activateRoute(const std::string& peerId) override;
     bool routesAreExclusive() const override { return true; }
     bool prepareRouteForStreaming(const std::string& peerId) override;
@@ -48,9 +51,6 @@ private:
     bool started_ = false;
     bool udpRelaysStarted_ = false;
 
-    // NetBird's lwIP/WireGuard timers must continue while the UI thread is in
-    // a blocking GameStream request. The atomic in netbird_poll() coalesces
-    // legacy socket-level poll calls with this single persistent owner.
     std::atomic<bool> pumpRunning_{false};
     std::atomic<std::uint64_t> pumpPollCount_{0};
     std::atomic<std::uint64_t> pumpLastPollMs_{0};

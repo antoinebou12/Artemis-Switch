@@ -17,6 +17,9 @@ public:
     std::string lastError() const override { return {}; }
     std::string localAddress() const override { return {}; }
     std::vector<RemoteAccessPeer> peers() const override { return {}; }
+    bool canRouteAddress(const std::string& address) const override {
+        return !address.empty();
+    }
 
     bool activateRoute(const std::string&) override {
         ++activations;

@@ -7,8 +7,11 @@
 #
 # Invoked in script mode: cmake -DNETBIRD_SRC=... -DNETBIRD_STAGE=... -P this
 
-if (NOT DEFINED NETBIRD_SRC OR NOT DEFINED NETBIRD_STAGE)
-    message(FATAL_ERROR "NETBIRD_SRC and NETBIRD_STAGE are required")
+if (NOT DEFINED NETBIRD_SRC OR NOT DEFINED NETBIRD_STAGE OR
+    NOT DEFINED NETBIRD_AR OR NOT DEFINED NETBIRD_NM OR
+    NOT DEFINED NETBIRD_OBJCOPY)
+    message(FATAL_ERROR
+        "NETBIRD_SRC, NETBIRD_STAGE and binutils paths are required")
 endif ()
 
 if (NOT EXISTS "${NETBIRD_SRC}/Makefile")
@@ -22,8 +25,6 @@ endif ()
 
 message(STATUS "Staging NetBird sources into ${NETBIRD_STAGE}")
 
-# Always rebuild from a clean staged copy. Reusing a previously patched source
-# tree can silently keep an older patch revision when the patch file changes.
 get_filename_component(_netbird_stage_name "${NETBIRD_STAGE}" NAME)
 if (NOT _netbird_stage_name STREQUAL "netbird-switch")
     message(FATAL_ERROR
@@ -46,8 +47,7 @@ file(COPY "${NETBIRD_SRC}/library/wg-nx" DESTINATION "${NETBIRD_STAGE}/library")
 # applied to the staged copy, exactly like the borealis and common-C patches.
 set(_netbird_patches
     "${CMAKE_CURRENT_LIST_DIR}/../patches/netbird-switch-relay-use-after-free.patch"
-    "${CMAKE_CURRENT_LIST_DIR}/../patches/netbird-switch-proxy-reliability.patch"
-    "${CMAKE_CURRENT_LIST_DIR}/../patches/netbird-switch-signal-stream.patch")
+    "${CMAKE_CURRENT_LIST_DIR}/../patches/netbird-switch-proxy-reliability.patch")
 
 find_program(_git_exe NAMES git REQUIRED)
 execute_process(
@@ -87,6 +87,12 @@ foreach (_patch IN LISTS _netbird_patches)
     endif ()
 endforeach ()
 
+# Current NetBird clients negotiate a common exact relay instance through the
+# Signal stream. The pinned Switch PoC predates that behavior, so apply the
+# compatibility rewrites to the staged sources after normal patching.
+include("${CMAKE_CURRENT_LIST_DIR}/NetBirdCurrentRelayCompat.cmake")
+artemis_apply_netbird_current_relay_compat("${NETBIRD_STAGE}")
+
 find_program(_make_exe NAMES make gmake REQUIRED)
 
 include(ProcessorCount)
@@ -119,5 +125,8 @@ foreach (_artifact libnetbird.a handle_full.o)
             "NetBird build reported success but ${_artifact} is missing")
     endif ()
 endforeach ()
+
+set(NETBIRD_ARCHIVE "${NETBIRD_STAGE}/libnetbird.a")
+include("${CMAKE_CURRENT_LIST_DIR}/NetBirdNamespace.cmake")
 
 message(STATUS "NetBird backend ready: ${NETBIRD_STAGE}/libnetbird.a")

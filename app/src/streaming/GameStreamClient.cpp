@@ -167,7 +167,8 @@ bool connect_to_addresses_sync(const std::vector<std::string>& addresses,
 
         SERVER_DATA serverData{};
         const int status = gs_init(&serverData, dialAddress);
-        const std::string connectError = status == GS_OK ? std::string{} : gs_error();
+        const std::string connectError =
+            status == GS_OK ? std::string{} : gs_error();
         artemis::remote::logConnectionResult(candidateLease, dialAddress,
                                              status == GS_OK, connectError);
         if (status == GS_OK) {
@@ -678,17 +679,14 @@ void GameStreamClient::connect_to_addresses(
 
 void GameStreamClient::connect(const std::string& address,
                                ServerCallback<SERVER_DATA>& callback) {
-    // Address-only callers still proceed to pairing/app-list requests, so they
-    // need the same long-lived route ownership as Host-based callers.
     connect_to_addresses({address}, "address:" + address, callback);
 }
 
 bool GameStreamClient::prepare_remote_route_for_stream(
     const std::string& address) {
     const auto parsed = artemis::host::parse_host_address(address);
-    if (parsed.host.empty()) {
+    if (parsed.host.empty())
         return true;
-    }
 
     const auto route = std::find_if(
         m_active_routes.begin(), m_active_routes.end(),
@@ -838,12 +836,9 @@ void GameStreamClient::start(const std::string& address,
                                       gamepadMask,
                                       &apolloOptions);
 
-            // TCP is enough for discovery, pairing, app-list, and launch. Start
-            // the five UDP media relays only after the launch request succeeds,
-            // avoiding socket/session exhaustion during the HTTP handshake.
             if (status == GS_OK &&
                 !prepare_remote_route_for_stream(cachedAddress)) {
-                gs_set_error("NetBird UDP relay could not start");
+                gs_set_error("Remote access UDP relay could not start");
                 status = GS_IO_ERROR;
             }
 

@@ -39,6 +39,9 @@ jobs:
       - name: Validate release/CD contract
         run: python tests/release_contract_test.py
 
+      - name: Validate isolated VPN build contract
+        run: python tests/vpn_build_contract_test.py
+
       - name: Configure unit suite
         run: cmake -S tests -B build/tests -DCMAKE_BUILD_TYPE=Debug
 
@@ -83,6 +86,8 @@ jobs:
           test -s "$zipfile"
           tar -tzf "$tarball" | grep -q 'Artemis-Switch-0.0.0-ci/README.md$'
           tar -tzf "$tarball" | grep -q 'Artemis-Switch-0.0.0-ci/SOURCE_INFO.txt$'
+          tar -tzf "$tarball" | grep -q 'Artemis-Switch-0.0.0-ci/extern/wg-nx/include/wireguard.h$'
+          tar -tzf "$tarball" | grep -q 'Artemis-Switch-0.0.0-ci/extern/netbird-switch/include/netbird.h$'
           unzip -l "$zipfile" | grep -q 'Artemis-Switch-0.0.0-ci/README.md'
           unzip -l "$zipfile" | grep -q 'Artemis-Switch-0.0.0-ci/SOURCE_INFO.txt'
 

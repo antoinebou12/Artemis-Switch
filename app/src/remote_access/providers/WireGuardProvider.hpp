@@ -18,6 +18,9 @@ public:
     std::string localAddress() const override;
     std::vector<RemoteAccessPeer> peers() const override;
 
-    bool activateRoute(const std::string& peerId) override { return true; }
-    void deactivateRoute(const std::string& peerId) override {}
+    bool canRouteAddress(const std::string& address) const override;
+    bool activateRoute(const std::string& peerId) override;
+    bool routesAreExclusive() const override { return true; }
+    bool prepareRouteForStreaming(const std::string& peerId) override;
+    void deactivateRoute(const std::string& peerId) override;
 };

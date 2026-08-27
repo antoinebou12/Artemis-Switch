@@ -100,11 +100,6 @@ void RemoteAccessManager::stopActiveProvider() {
     {
         std::lock_guard<std::mutex> lock(mutex_);
         active.swap(activeProviderId_);
-
-        // A provider restart destroys its proxy/tunnel state. Forget every
-        // lease backed by that state so a later connection cannot increment a
-        // stale reference count and skip activateRoute(). Existing lease
-        // objects remain safe: their eventual release simply finds no entry.
         for (auto it = activeRoutes_.begin(); it != activeRoutes_.end();) {
             if (it->first.providerId == active) {
                 it = activeRoutes_.erase(it);
@@ -149,11 +144,6 @@ bool RemoteAccessManager::activateRoute(const std::string& providerId, const std
         if (it == activeRoutes_.end()) {
             bool ok = p->activateRoute(peerId);
             if (!ok) return false;
-
-            // Providers such as NetBird expose one proxy target at a time. A
-            // successful switch invalidates every lease for a different peer
-            // on that provider; retaining those counts would make a later
-            // switch back skip activateRoute() and dial a stale proxy.
             if (p->routesAreExclusive()) {
                 for (auto route = activeRoutes_.begin();
                      route != activeRoutes_.end();) {
@@ -179,9 +169,8 @@ bool RemoteAccessManager::prepareRouteForStreaming(
     const std::string& providerId, const std::string& peerId) {
     std::lock_guard<std::mutex> lock(mutex_);
     const RouteKey key{providerId, peerId};
-    if (activeRoutes_.find(key) == activeRoutes_.end()) {
+    if (activeRoutes_.find(key) == activeRoutes_.end())
         return false;
-    }
 
     const auto providerIt = std::find_if(
         providers_.begin(), providers_.end(),

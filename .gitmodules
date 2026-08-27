@@ -16,3 +16,6 @@
 [submodule "extern/netbird-switch"]
 	path = extern/netbird-switch
 	url = https://github.com/jmpangilinan/netbird-switch.git
+[submodule "extern/wg-nx"]
+	path = extern/wg-nx
+	url = https://github.com/jmpangilinan/wg-nx.git

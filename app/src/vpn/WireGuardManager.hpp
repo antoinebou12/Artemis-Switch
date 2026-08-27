@@ -37,6 +37,10 @@ class WireGuardManager : public Singleton<WireGuardManager> {
     [[nodiscard]] std::string status_text() const;
     [[nodiscard]] std::string tunnel_address() const;
     [[nodiscard]] std::string last_error() const;
+    [[nodiscard]] bool can_route_address(const std::string& address) const;
+    bool activate_route(const std::string& address);
+    bool prepare_route_for_streaming(const std::string& address);
+    void deactivate_route(const std::string& address);
 
     // True when a real wg-nx tunnel is linked in, false for the validate-only
     // stub. Surfaced in Remote Access diagnostics so a build that cannot move
