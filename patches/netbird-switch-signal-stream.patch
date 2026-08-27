@@ -1,0 +1,462 @@
+diff --git a/include/h2client.h b/include/h2client.h
+index 256440d..2fd9e56 100644
+--- a/include/h2client.h
++++ b/include/h2client.h
+@@ -56,6 +56,11 @@ uint32_t h2_stream_open(H2Conn *conn,
+                        const char *metadata_key, const char *metadata_val,
+                        char *error, size_t error_size);
+ 
++// Read one protobuf message from an open bidirectional gRPC stream.
++// Returns a malloc'd message body, or NULL on disconnect/protocol error.
++uint8_t* h2_stream_recv(H2Conn *conn, uint32_t stream_id,
++                        size_t *out_len, char *error, size_t error_size);
++
+ // Connect to Signal server (uses /ws-proxy/signal path)
+ H2Conn* h2_connect_path(const char *sni_host, uint16_t port,
+                         const char *connect_ip, const char *ws_path,
+diff --git a/include/signal_client.h b/include/signal_client.h
+index 9385567..dd6e409 100644
+--- a/include/signal_client.h
++++ b/include/signal_client.h
+@@ -9,11 +9,15 @@
+ #include <stddef.h>
+ 
+ typedef struct {
+-    H2Conn *h2;
++    H2Conn *h2;               // unary Send RPC connection
++    H2Conn *recv_h2;          // dedicated ConnectStream receive connection
+     uint32_t stream_id;
+     char wg_pubkey_b64[64];   // our public key (base64)
+     uint8_t wg_priv[32];       // our private key (raw)
++    char relay_addr[512];
++    Mutex send_mutex;
+     volatile bool running;
++    bool recv_thread_valid;
+     Thread recv_thread;        // background receive thread
+ } SignalClient;
+ 
+diff --git a/source/h2client.c b/source/h2client.c
+index dab0888..5495f4d 100644
+--- a/source/h2client.c
++++ b/source/h2client.c
+@@ -33,6 +33,10 @@ typedef struct{
+     uint32_t next_stream_id;
+     bool preface_done;
+     char sni[256];
++    uint8_t *stream_bytes;
++    size_t stream_bytes_len;
++    uint8_t *grpc_bytes;
++    size_t grpc_bytes_len;
+ } Conn;
+ 
+ // ─── bsd BIO callbacks — bypass newlib fd table ────────────────
+@@ -404,6 +408,123 @@ uint32_t h2_stream_open(H2Conn*conn,const char*service_method,
+     return 0;
+ }
+ 
++static int append_bytes(uint8_t **buffer, size_t *buffer_len,
++                        const uint8_t *data, size_t data_len) {
++    if (data_len == 0) return 0;
++    if (*buffer_len > SIZE_MAX - data_len) return -1;
++    uint8_t *next = realloc(*buffer, *buffer_len + data_len);
++    if (!next) return -1;
++    memcpy(next + *buffer_len, data, data_len);
++    *buffer = next;
++    *buffer_len += data_len;
++    return 0;
++}
++
++static uint8_t* take_grpc_message(Conn *c, size_t *out_len,
++                                  char *error, size_t error_size) {
++    if (c->grpc_bytes_len < 5) return NULL;
++    if (c->grpc_bytes[0] != 0) {
++        snprintf(error, error_size, "compressed gRPC message unsupported");
++        return NULL;
++    }
++    size_t message_len = ((size_t)c->grpc_bytes[1] << 24) |
++                         ((size_t)c->grpc_bytes[2] << 16) |
++                         ((size_t)c->grpc_bytes[3] << 8) |
++                         (size_t)c->grpc_bytes[4];
++    if (message_len > 1024 * 1024) {
++        snprintf(error, error_size, "gRPC message too large: %zu", message_len);
++        return NULL;
++    }
++    if (c->grpc_bytes_len < 5 + message_len) return NULL;
++
++    uint8_t *message = malloc(message_len ? message_len : 1);
++    if (!message) {
++        snprintf(error, error_size, "malloc");
++        return NULL;
++    }
++    if (message_len) memcpy(message, c->grpc_bytes + 5, message_len);
++
++    size_t consumed = 5 + message_len;
++    size_t remaining = c->grpc_bytes_len - consumed;
++    if (remaining) memmove(c->grpc_bytes, c->grpc_bytes + consumed, remaining);
++    c->grpc_bytes_len = remaining;
++    *out_len = message_len;
++    return message;
++}
++
++uint8_t* h2_stream_recv(H2Conn *conn, uint32_t stream_id,
++                        size_t *out_len, char *error, size_t error_size) {
++    *out_len = 0;
++    *error = 0;
++    Conn *c = (Conn*)conn;
++    if (!c || !c->preface_done || stream_id == 0) {
++        snprintf(error, error_size, "stream not connected");
++        return NULL;
++    }
++
++    for (;;) {
++        uint8_t *message = take_grpc_message(c, out_len, error, error_size);
++        if (message) return message;
++        if (*error) return NULL;
++
++        size_t ws_len = 0;
++        uint8_t *ws = ws_recv(c, &ws_len);
++        if (!ws) {
++            snprintf(error, error_size, "signal stream disconnected");
++            return NULL;
++        }
++        if (append_bytes(&c->stream_bytes, &c->stream_bytes_len, ws, ws_len) != 0) {
++            free(ws);
++            snprintf(error, error_size, "stream buffer allocation");
++            return NULL;
++        }
++        free(ws);
++
++        size_t consumed = 0;
++        while (c->stream_bytes_len - consumed >= 9) {
++            const uint8_t *frame = c->stream_bytes + consumed;
++            uint32_t frame_len = ((uint32_t)frame[0] << 16) |
++                                 ((uint32_t)frame[1] << 8) | frame[2];
++            if (c->stream_bytes_len - consumed < 9 + frame_len) break;
++
++            uint8_t type = frame[3];
++            uint8_t flags = frame[4];
++            uint32_t sid = ((uint32_t)(frame[5] & 0x7f) << 24) |
++                           ((uint32_t)frame[6] << 16) |
++                           ((uint32_t)frame[7] << 8) | frame[8];
++            const uint8_t *payload = frame + 9;
++
++            if (type == 0 && sid == stream_id) {
++                if (append_bytes(&c->grpc_bytes, &c->grpc_bytes_len,
++                                 payload, frame_len) != 0) {
++                    snprintf(error, error_size, "gRPC buffer allocation");
++                    return NULL;
++                }
++            } else if (type == 6 && sid == 0 && frame_len == 8 && !(flags & 1)) {
++                if (h2_send_frame(c, 8, 6, 1, 0, payload) != 0) {
++                    snprintf(error, error_size, "PING acknowledgement failed");
++                    return NULL;
++                }
++            } else if (type == 7) {
++                snprintf(error, error_size, "Signal server sent GOAWAY");
++                return NULL;
++            }
++
++            if (sid == stream_id && (flags & 1)) {
++                snprintf(error, error_size, "Signal stream ended");
++                return NULL;
++            }
++            consumed += 9 + frame_len;
++        }
++
++        if (consumed) {
++            size_t remaining = c->stream_bytes_len - consumed;
++            if (remaining) memmove(c->stream_bytes, c->stream_bytes + consumed, remaining);
++            c->stream_bytes_len = remaining;
++        }
++    }
++}
++
+ // ─── POLL (non-blocking frame read, for keep-alive) ────────────
+ 
+ void h2_poll(H2Conn*conn){
+@@ -423,6 +544,8 @@ void h2_close(H2Conn*conn){
+     mbedtls_ssl_free(&c->s);
+     mbedtls_ssl_config_free(&c->cf);
+     mbedtls_ctr_drbg_free(&c->d);
++    free(c->stream_bytes);
++    free(c->grpc_bytes);
+     free(c);
+ }
+ 
+diff --git a/source/signal_client.c b/source/signal_client.c
+index 0a7e2b1..bdddfeb 100644
+--- a/source/signal_client.c
++++ b/source/signal_client.c
+@@ -34,7 +34,8 @@ static const uint8_t* pb_find(const uint8_t *d, size_t dl, int f, int ew, size_t
+         if(w==PB_VARINT){uint64_t v=0;c=pb_read(d+p,dl-p,&v);if(c<=0)break;
+             if(fn==f&&ew==PB_VARINT){if(vl)*vl=(size_t)v;return d+p;}p+=c;}
+         else if(w==PB_LENDELIM){uint64_t l=0;c=pb_read(d+p,dl-p,&l);if(c<=0)break;p+=c;
+-            if(fn==f&&ew==PB_LENDELIM){if(vl)*vl=(size_t)l;return d+p;}p+=l;}else break;}
++            if(l>dl-p)break;
++            if(fn==f&&ew==PB_LENDELIM){if(vl)*vl=(size_t)l;return d+p;}p+=(size_t)l;}else break;}
+     return NULL;
+ }
+ 
+@@ -73,46 +74,64 @@ bool signal_connect(SignalClient *sc, const char *host, uint16_t port,
+              (uint8_t)he->h_addr[0], (uint8_t)he->h_addr[1],
+              (uint8_t)he->h_addr[2], (uint8_t)he->h_addr[3]);
+ 
+-    sc->h2 = h2_connect_path(host, port, ip, "/ws-proxy/signal", error, error_size);
+-    if (!sc->h2) { fprintf(stderr, "[SIGNAL] connect failed: %s\n", error); return false; }
+-    fprintf(stderr, "[SIGNAL] connected to %s:%d\n", host, port);
++    // A dedicated connection owns the long-lived receive stream. Unary Send
++    // RPCs must not share it: h2_call() consumes frames synchronously and an
++    // incoming offer could otherwise be read and discarded as an unrelated
++    // stream while a send is in flight.
++    sc->recv_h2 = h2_connect_path(host, port, ip, "/ws-proxy/signal",
++                                  error, error_size);
++    if (!sc->recv_h2) {
++        fprintf(stderr, "[SIGNAL] receive connect failed: %s\n", error);
++        return false;
++    }
+ 
+-    uint32_t sid = h2_stream_open(sc->h2,
++    uint32_t sid = h2_stream_open(sc->recv_h2,
+         "signalexchange.SignalExchange/ConnectStream",
+         "x-wiretrustee-peer-id", wg_pubkey_b64, error, error_size);
+-    if (sid == 0) { fprintf(stderr, "[SIGNAL] ConnectStream failed: %s\n", error); h2_close(sc->h2); sc->h2=NULL; return false; }
++    if (sid == 0) {
++        fprintf(stderr, "[SIGNAL] ConnectStream failed: %s\n", error);
++        h2_close(sc->recv_h2);
++        sc->recv_h2 = NULL;
++        return false;
++    }
+     sc->stream_id = sid;
++
++    sc->h2 = h2_connect_path(host, port, ip, "/ws-proxy/signal",
++                             error, error_size);
++    if (!sc->h2) {
++        fprintf(stderr, "[SIGNAL] send connect failed: %s\n", error);
++        h2_close(sc->recv_h2);
++        sc->recv_h2 = NULL;
++        sc->stream_id = 0;
++        return false;
++    }
++    fprintf(stderr, "[SIGNAL] connected send+receive to %s:%d\n", host, port);
+     fprintf(stderr, "[SIGNAL] ConnectStream registered on stream %u\n", sid);
+     return true;
+ }
+ 
+-// ─── Send OFFER ─────────────────────────────────────────────────
++// ─── Send OFFER / ANSWER ────────────────────────────────────────
+ 
+-bool signal_send_offer(SignalClient *sc, const char *remote_pubkey_b64,
+-                       const char *relay_addr, uint16_t wg_port,
+-                       char *error, size_t error_size) {
++static bool signal_send_offer_answer(SignalClient *sc,
++                                     const char *remote_pubkey_b64,
++                                     const char *relay_addr, uint16_t wg_port,
++                                     uint64_t message_type,
++                                     char *error, size_t error_size) {
+     *error = 0;
+     if (!sc || !sc->h2) { snprintf(error, error_size, "not connected"); return false; }
+     
+     // Build Body protobuf:
+-    // type=0(OFFER, field 1 varint), payload="a:b" (field 2, required)
++    // type=0(OFFER) or 1(ANSWER), payload="a:b" (field 2, required)
+     // wgListenPort=0 (field 3 varint)
+     // relayServerAddress (field 8, LENDELIM)
+     uint8_t body_buf[512], *bp = body_buf;
+-    bp = pb_varint(pb_tag(bp, 1, PB_VARINT), 0);  // type=OFFER
++    bp = pb_varint(pb_tag(bp, 1, PB_VARINT), message_type);
+     bp = pb_str(bp, 2, "a:b", 3);  // dummy ICE creds (required by UnMarshalCredential)
+     bp = pb_varint(pb_tag(bp, 3, PB_VARINT), wg_port);  // wgListenPort
++    bp = pb_str(bp, 4, "1.0.0-switch", 12);  // netBirdVersion
+     bp = pb_str(bp, 8, relay_addr, strlen(relay_addr));  // relayServerAddress
+     size_t body_len = (size_t)(bp - body_buf);
+     
+-    // Build Message protobuf:
+-    // key=2 (our pubkey), remoteKey=3 (peer pubkey), body=4 (Body)
+-    uint8_t msg_buf[1024], *mp = msg_buf;
+-    mp = pb_str(mp, 2, sc->wg_pubkey_b64, strlen(sc->wg_pubkey_b64));
+-    mp = pb_str(mp, 3, remote_pubkey_b64, strlen(remote_pubkey_b64));
+-    mp = pb_bytes(mp, 4, body_buf, body_len);
+-    size_t msg_len = (size_t)(mp - msg_buf);
+-    
+     // NaCl encrypt Body with peer's public key
+     uint8_t peer_pk[32];
+     if (b64_decode(remote_pubkey_b64, strlen(remote_pubkey_b64), peer_pk, 32) != 32) {
+@@ -136,58 +155,160 @@ bool signal_send_offer(SignalClient *sc, const char *remote_pubkey_b64,
+     
+     // Send via unary RPC: signalexchange.SignalExchange/Send
+     size_t rl;
++    mutexLock(&sc->send_mutex);
+     uint8_t *resp = h2_call(sc->h2, "signalexchange.SignalExchange/Send",
+                              em_buf, em_len, &rl, error, error_size);
++    mutexUnlock(&sc->send_mutex);
+     if (resp) {
+-        fprintf(stderr, "[SIGNAL] OFFER sent to %s, resp=%zu bytes\n", remote_pubkey_b64, rl);
++        fprintf(stderr, "[SIGNAL] %s sent to %s, resp=%zu bytes\n",
++                message_type == 0 ? "OFFER" : "ANSWER", remote_pubkey_b64, rl);
+         free(resp);
+         return true;
+     }
+-    fprintf(stderr, "[SIGNAL] OFFER send failed: %s\n", error);
++    fprintf(stderr, "[SIGNAL] %s send failed: %s\n",
++            message_type == 0 ? "OFFER" : "ANSWER", error);
+     return false;
+ }
+ 
++bool signal_send_offer(SignalClient *sc, const char *remote_pubkey_b64,
++                       const char *relay_addr, uint16_t wg_port,
++                       char *error, size_t error_size) {
++    return signal_send_offer_answer(sc, remote_pubkey_b64, relay_addr,
++                                    wg_port, 0, error, error_size);
++}
++
+ // ─── Receive loop ───────────────────────────────────────────────
+ 
+ static void signal_recv_thread(void *arg) {
+     SignalClient *sc = (SignalClient*)arg;
+     fprintf(stderr, "[SIGNAL] recv thread started\n");
+-    
++
+     while (sc->running) {
+-        // Read a frame from the stream
+-        // The stream is bidirectional — incoming messages are DATA frames
+-        // For now, just poll for WebSocket frames (simplified)
+-        size_t wl = 0;
+-        uint8_t *f = NULL;
+-        
+-        // Try to read from the WebSocket (would need ws_recv exposed from h2client)
+-        // For now, just log that we're running
+-        svcSleepThread(5e9);  // 5 second poll
+-        fprintf(stderr, "[SIGNAL] recv loop alive\n");
++        char stream_error[256];
++        size_t encrypted_message_len = 0;
++        uint8_t *encrypted_message = h2_stream_recv(
++            sc->recv_h2, sc->stream_id, &encrypted_message_len,
++            stream_error, sizeof(stream_error));
++        if (!encrypted_message) {
++            if (sc->running) {
++                fprintf(stderr, "[SIGNAL] receive failed: %s\n", stream_error);
++            }
++            break;
++        }
++
++        size_t sender_len = 0, target_len = 0, encrypted_body_len = 0;
++        const uint8_t *sender = pb_find(encrypted_message,
++                                        encrypted_message_len, 2,
++                                        PB_LENDELIM, &sender_len);
++        const uint8_t *target = pb_find(encrypted_message,
++                                        encrypted_message_len, 3,
++                                        PB_LENDELIM, &target_len);
++        const uint8_t *encrypted_body = pb_find(encrypted_message,
++                                                encrypted_message_len, 4,
++                                                PB_LENDELIM,
++                                                &encrypted_body_len);
++        if (!sender || !target || !encrypted_body || sender_len == 0 ||
++            target_len == 0 || sender_len >= 64 || target_len >= 64 ||
++            encrypted_body_len < 40) {
++            fprintf(stderr, "[SIGNAL] ignored malformed encrypted message\n");
++            free(encrypted_message);
++            continue;
++        }
++
++        char sender_key[64] = {0};
++        char target_key[64] = {0};
++        memcpy(sender_key, sender, sender_len);
++        memcpy(target_key, target, target_len);
++
++        uint8_t *encrypted_copy = malloc(encrypted_body_len);
++        if (!encrypted_copy) {
++            fprintf(stderr, "[SIGNAL] receive allocation failed\n");
++            free(encrypted_message);
++            continue;
++        }
++        memcpy(encrypted_copy, encrypted_body, encrypted_body_len);
++        free(encrypted_message);
++
++        if (strcmp(target_key, sc->wg_pubkey_b64) != 0) {
++            fprintf(stderr, "[SIGNAL] ignored message for another peer\n");
++            free(encrypted_copy);
++            continue;
++        }
++
++        uint8_t sender_public_key[32];
++        if (b64_decode(sender_key, sender_len, sender_public_key,
++                       sizeof(sender_public_key)) != 32) {
++            fprintf(stderr, "[SIGNAL] ignored message with invalid sender key\n");
++            free(encrypted_copy);
++            continue;
++        }
++
++        size_t plain_len = encrypted_body_len - 24 - 16;
++        uint8_t *plain = malloc(plain_len ? plain_len : 1);
++        if (!plain || nacl_box_open(plain, encrypted_copy + 24,
++                                    encrypted_body_len - 24,
++                                    encrypted_copy, sender_public_key,
++                                    sc->wg_priv) != 0) {
++            fprintf(stderr, "[SIGNAL] failed to decrypt peer message\n");
++            free(plain);
++            free(encrypted_copy);
++            continue;
++        }
++        free(encrypted_copy);
++
++        size_t message_type = 0;
++        const uint8_t *type_field = pb_find(plain, plain_len, 1,
++                                            PB_VARINT, &message_type);
++        size_t remote_relay_len = 0;
++        const uint8_t *remote_relay = pb_find(plain, plain_len, 8,
++                                              PB_LENDELIM,
++                                              &remote_relay_len);
++        fprintf(stderr, "[SIGNAL] received %s from %.12s... relay=%.*s\n",
++                type_field && message_type == 0 ? "OFFER" :
++                type_field && message_type == 1 ? "ANSWER" : "message",
++                sender_key, (int)remote_relay_len,
++                remote_relay ? (const char*)remote_relay : "");
++
++        if (type_field && message_type == 0) {
++            char answer_error[256];
++            signal_send_offer_answer(sc, sender_key, sc->relay_addr, 0, 1,
++                                     answer_error, sizeof(answer_error));
++        }
++        free(plain);
+     }
++    sc->running = false;
+     fprintf(stderr, "[SIGNAL] recv thread stopped\n");
+ }
+ 
+ void signal_start_recv(SignalClient *sc, const char *relay_addr) {
+-    (void)relay_addr;
+     if (!sc || sc->running) return;
++    if (relay_addr) {
++        strncpy(sc->relay_addr, relay_addr, sizeof(sc->relay_addr) - 1);
++        sc->relay_addr[sizeof(sc->relay_addr) - 1] = '\0';
++    }
+     sc->running = true;
+     if (R_FAILED(threadCreate(&sc->recv_thread, signal_recv_thread, sc, NULL, 0x8000, 0x30, -2))) {
+         sc->running = false; return;
+     }
++    sc->recv_thread_valid = true;
+     threadStart(&sc->recv_thread);
+     fprintf(stderr, "[SIGNAL] recv thread started\n");
+ }
+ 
+ void signal_stop(SignalClient *sc) {
+-    if (!sc || !sc->running) return;
+-    sc->running = false;
+-    threadWaitForExit(&sc->recv_thread);
+-    threadClose(&sc->recv_thread);
++    if (!sc) return;
++    if (sc->recv_thread_valid) {
++        sc->running = false;
++        if (sc->recv_h2) h2_shutdown(sc->recv_h2);
++        threadWaitForExit(&sc->recv_thread);
++        threadClose(&sc->recv_thread);
++        sc->recv_thread_valid = false;
++    }
+     signal_close(sc);
+ }
+ 
+ void signal_close(SignalClient *sc) {
+     if (sc->h2) { h2_close(sc->h2); sc->h2 = NULL; }
++    if (sc->recv_h2) { h2_close(sc->recv_h2); sc->recv_h2 = NULL; }
+     sc->stream_id = 0;
+ }

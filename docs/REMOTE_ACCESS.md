@@ -10,7 +10,7 @@ it never means the feature was left out of the build.
 ```
                   Artemis-Switch
                         |
-              RemoteAccessManager          <- polled once per frame
+              RemoteAccessManager          <- WireGuard frame polling
                         |
           +-------------+-------------+
           |                           |
@@ -18,6 +18,7 @@ it never means the feature was left out of the build.
           |                           |
    wg0.conf parsing            setup-key login
           |                     peer sync + relay
+          |                    5 ms pump thread
           |                           |
           +-------------+-------------+
                         |
@@ -104,6 +105,12 @@ Login goes through `netbird_init()`, which performs setup-key authentication,
 peer sync, relay connection, WireGuard key derivation and handshake. Artemis
 does not reimplement any part of that protocol.
 
+After initialization, `NetBirdProvider` starts a persistent 5 ms pump before
+probing peers. It services lwIP and WireGuard timers independently of the UI,
+including while a blocking GameStream HTTP request is waiting on the localhost
+proxy. `vpn.log` records a five-second watchdog and the number of pump cycles
+that occurred during every peer probe.
+
 ### WireGuard
 
 A standard `wg0.conf`:
@@ -145,12 +152,20 @@ remote 1, NetBird 2). For each candidate, `artemis::remote::acquireRouteFor()`
 checks whether the address is a peer from authenticated NetBird sync:
 
 - **Not a peer** (LAN, direct WAN) — no lease, dial the address unchanged.
-- **A peer** — start that peer's TCP/UDP proxies and dial `127.0.0.1` instead.
+- **A peer** — start that peer's TCP proxy and dial `127.0.0.1` instead. The
+  five UDP media relays are started only after the launch request succeeds, so
+  discovery and pairing do not consume the stream-time socket/thread budget.
 
 So LAN is always tried first and never detours through the tunnel. The lease
 lives in `m_active_routes` for the whole session, because pairing, the app list,
 launch and the stream all travel through the same proxy. Assigning over a key
 releases the previous peer's route, which is how host switching works.
+
+`vpn.log` records the authenticated peer count, each `47989` reachability probe,
+the required TCP listeners (`47989`, `47984`, `48010`), the exact GameStream
+handshake result, UDP-relay startup, and the peer whose route is released. A
+"route active" line therefore no longer hides a missing HTTPS/RTSP listener or
+a later HTTP timeout.
 
 The host keeps its **real mesh address as identity**; only the transport is
 loopback. (The reference integration stores `127.0.0.1` as the address, which

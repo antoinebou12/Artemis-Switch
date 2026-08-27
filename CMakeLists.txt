@@ -413,6 +413,11 @@ elseif (PLATFORM_SWITCH)
                     -DNETBIRD_SRC=${NETBIRD_SOURCE_DIR}
                     -DNETBIRD_STAGE=${NETBIRD_STAGE_DIR}
                     -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/NetBirdBackend.cmake
+            DEPENDS
+                    ${CMAKE_CURRENT_SOURCE_DIR}/cmake/NetBirdBackend.cmake
+                    ${CMAKE_CURRENT_SOURCE_DIR}/patches/netbird-switch-relay-use-after-free.patch
+                    ${CMAKE_CURRENT_SOURCE_DIR}/patches/netbird-switch-proxy-reliability.patch
+                    ${CMAKE_CURRENT_SOURCE_DIR}/patches/netbird-switch-signal-stream.patch
             COMMENT "Building NetBird Switch backend (libnetbird.a + handle_full.o)"
             VERBATIM)
         add_custom_target(artemis_vpn_deps DEPENDS ${LIBNETBIRD_A} ${HANDLE_FULL_O})

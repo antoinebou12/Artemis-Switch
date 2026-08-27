@@ -22,6 +22,15 @@ endif ()
 
 message(STATUS "Staging NetBird sources into ${NETBIRD_STAGE}")
 
+# Always rebuild from a clean staged copy. Reusing a previously patched source
+# tree can silently keep an older patch revision when the patch file changes.
+get_filename_component(_netbird_stage_name "${NETBIRD_STAGE}" NAME)
+if (NOT _netbird_stage_name STREQUAL "netbird-switch")
+    message(FATAL_ERROR
+        "Refusing to replace unexpected NetBird stage directory: ${NETBIRD_STAGE}")
+endif ()
+file(REMOVE_RECURSE "${NETBIRD_STAGE}")
+
 # nghttp2 is a large submodule that the library build does not reference, so it
 # is deliberately left out of the copy.
 file(MAKE_DIRECTORY "${NETBIRD_STAGE}/library")
@@ -36,7 +45,9 @@ file(COPY "${NETBIRD_SRC}/library/wg-nx" DESTINATION "${NETBIRD_STAGE}/library")
 # Artemis fixes for the pinned backend. The submodule stays clean; patches are
 # applied to the staged copy, exactly like the borealis and common-C patches.
 set(_netbird_patches
-    "${CMAKE_CURRENT_LIST_DIR}/../patches/netbird-switch-relay-use-after-free.patch")
+    "${CMAKE_CURRENT_LIST_DIR}/../patches/netbird-switch-relay-use-after-free.patch"
+    "${CMAKE_CURRENT_LIST_DIR}/../patches/netbird-switch-proxy-reliability.patch"
+    "${CMAKE_CURRENT_LIST_DIR}/../patches/netbird-switch-signal-stream.patch")
 
 find_program(_git_exe NAMES git REQUIRED)
 execute_process(

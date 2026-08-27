@@ -53,6 +53,12 @@ public:
     const std::string& targetAddress() const noexcept { return targetAddress_; }
     const std::string& connectAddress() const noexcept { return connectAddress_; }
 
+    bool prepareForStreaming() {
+        return active_ && mgr_ &&
+               (providerId_.empty() ||
+                mgr_->prepareRouteForStreaming(providerId_, peerId_));
+    }
+
     void release() noexcept {
         if (active_ && mgr_ && !providerId_.empty()) {
             mgr_->deactivateRoute(providerId_, peerId_);

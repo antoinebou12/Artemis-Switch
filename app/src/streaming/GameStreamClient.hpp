@@ -133,6 +133,7 @@ class GameStreamClient : public Singleton<GameStreamClient> {
     void connect_to_addresses(const std::vector<std::string>& addresses,
                               const std::string& activeKey,
                               ServerCallback<SERVER_DATA>& callback);
+    bool prepare_remote_route_for_stream(const std::string& address);
 
     std::map<std::string, SERVER_DATA> m_server_data;
     std::map<std::string, std::string> m_active_addresses;

@@ -27,4 +27,17 @@ RemoteRouteLease acquireRouteFor(const std::string& address);
 std::string connectAddressFor(const RemoteRouteLease& lease,
                               const std::string& address);
 
+// Records the exact address requested by GameStream and the address actually
+// dialed. This makes localhost proxy redirection visible in vpn.log.
+void logConnectionAttempt(const RemoteRouteLease& lease,
+                          const std::string& requestedAddress,
+                          const std::string& dialAddress);
+
+// Writes the outcome that caused a route to be retained or released. This is
+// deliberately separate from acquireRouteFor(): the useful failure text only
+// exists after gs_init() has attempted the proxied GameStream handshake.
+void logConnectionResult(const RemoteRouteLease& lease,
+                         const std::string& dialAddress, bool succeeded,
+                         const std::string& detail = {});
+
 } // namespace artemis::remote

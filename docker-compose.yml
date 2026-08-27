@@ -1,0 +1,17 @@
+version: '3.8'
+services:
+  artemis-switch-build:
+    image: devkitpro/devkitpro-toolchain:latest
+    container_name: artemis-switch-build
+    volumes:
+      - .:/workspace
+      - /opt/devkitpro:/opt/devkitpro
+    working_dir: /workspace
+    command: >
+      bash -c "
+        mkdir -p build/switch &&
+        cmake -G Ninja -B build/switch -DCMAKE_BUILD_TYPE=Release -DPLATFORM_SWITCH=ON -DUSE_DEKO3D=ON &&
+        cmake --build build/switch --target Moonlight.nro -j$(nproc) &&
+        mkdir -p dist/nro &&
+        cp build/switch/Moonlight.nro dist/nro/Artemis-Switch.nro
+      "

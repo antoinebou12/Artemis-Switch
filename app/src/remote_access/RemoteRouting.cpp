@@ -1,10 +1,14 @@
 #include "RemoteRouting.hpp"
 
 #include "../features/host/HostAddressParse.hpp"
+#include "../utils/Settings.hpp"
+#include "../vpn/VpnFileLogger.hpp"
 #include "RemoteAccessManager.hpp"
 #include "providers/NetBirdProvider.hpp"
 
 #include <borealis/core/logger.hpp>
+
+#include <algorithm>
 
 namespace artemis::remote {
 
@@ -62,6 +66,45 @@ std::string connectAddressFor(const RemoteRouteLease& lease,
         return std::string(kProxyAddress) + ":" + std::to_string(*parsed.port);
     }
     return kProxyAddress;
+}
+
+void logConnectionAttempt(const RemoteRouteLease& lease,
+                           const std::string& requestedAddress,
+                           const std::string& dialAddress) {
+    if (!lease.isActive()) {
+        return;
+    }
+
+    const std::string message = "GameStream route: requested=" +
+                                requestedAddress + " effective=" +
+                                dialAddress + " remote=" + lease.peerId();
+    VpnFileLogger::append(Settings::instance().working_dir() + "/vpn.log",
+                          "NetBird", VpnFileLogger::Severity::Info, message);
+}
+
+void logConnectionResult(const RemoteRouteLease& lease,
+                         const std::string& dialAddress, bool succeeded,
+                         const std::string& detail) {
+    if (!lease.isActive()) {
+        return;
+    }
+
+    std::string oneLineDetail = detail;
+    std::replace(oneLineDetail.begin(), oneLineDetail.end(), '\n', ' ');
+    std::replace(oneLineDetail.begin(), oneLineDetail.end(), '\r', ' ');
+
+    std::string message = "GameStream handshake ";
+    message += succeeded ? "succeeded" : "failed";
+    message += " for peer " + lease.peerId() + " via " + dialAddress;
+    if (!oneLineDetail.empty()) {
+        message += ": " + oneLineDetail;
+    }
+
+    VpnFileLogger::append(
+        Settings::instance().working_dir() + "/vpn.log", "NetBird",
+        succeeded ? VpnFileLogger::Severity::Info
+                  : VpnFileLogger::Severity::Error,
+        message);
 }
 
 } // namespace artemis::remote

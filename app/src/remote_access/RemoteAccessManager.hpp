@@ -44,6 +44,8 @@ public:
     std::string status() const;
 
     bool activateRoute(const std::string& providerId, const std::string& peerId);
+    bool prepareRouteForStreaming(const std::string& providerId,
+                                  const std::string& peerId);
     void deactivateRoute(const std::string& providerId, const std::string& peerId);
 
     // Reference counted route activation
