@@ -10,8 +10,8 @@
 // login, peer sync, relay transport, WireGuard handshake -- lives in that
 // library; this class only drives its lifecycle and exposes it to Artemis.
 //
-// Threading: start(), stop() and refreshPeers() all block (login, thread joins,
-// per-peer network probes) and MUST be called off the UI thread. peers() and
+// Threading: start() and stop() block (login and thread joins) and MUST be
+// called off the UI thread. peers() and
 // isKnownPeer() are cheap cache reads and are safe anywhere.
 class NetBirdProvider : public IRemoteAccessProvider {
 public:
@@ -27,15 +27,15 @@ public:
     std::string lastError() const override;
     std::string localAddress() const override;
     std::vector<RemoteAccessPeer> peers() const override;
-    bool canRouteAddress(const std::string& address) const override {
-        return isKnownPeer(address);
-    }
-    bool activateRoute(const std::string& peerId) override;
+    std::optional<RemoteRouteTarget>
+    resolveRoute(std::string_view address) const override;
+    bool activateRoute(const RemoteRouteTarget& target) override;
     bool routesAreExclusive() const override { return true; }
-    bool prepareRouteForStreaming(const std::string& peerId) override;
-    void deactivateRoute(const std::string& peerId) override;
+    bool prepareRouteForStreaming(const RemoteRouteTarget& target) override;
+    void deactivateRoute(const RemoteRouteTarget& target) override;
 
-    // BLOCKING: probes every peer's GameStream port. Call from brls::async.
+    // Refreshes the authenticated management peer cache. Kept on the worker
+    // path so future control-plane refreshes cannot stall the UI.
     void refreshPeers() override;
 
     // Cache read. True when the address was returned by an authenticated peer
@@ -43,13 +43,22 @@ public:
     [[nodiscard]] bool isKnownPeer(const std::string& address) const;
 
 private:
+    struct StateSnapshot {
+        std::string lastError;
+        std::string activePeer;
+        std::string localAddress;
+        bool started = false;
+        bool ready = false;
+        bool udpRelaysStarted = false;
+    };
+
     void startPump();
     void stopPump();
+    [[nodiscard]] StateSnapshot stateSnapshot() const;
+    void setLastError(std::string error);
 
-    std::string lastError_;
-    std::string activePeer_;
-    bool started_ = false;
-    bool udpRelaysStarted_ = false;
+    mutable std::mutex stateMutex_;
+    StateSnapshot state_;
 
     std::atomic<bool> pumpRunning_{false};
     std::atomic<std::uint64_t> pumpPollCount_{0};

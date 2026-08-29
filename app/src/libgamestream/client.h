@@ -20,6 +20,7 @@
 #pragma once
 
 #include "Data.hpp"
+#include "CancellationToken.hpp"
 #include "xml.h"
 #include "../host/HostCapabilities.hpp"
 #include <Limelight.h>
@@ -81,7 +82,8 @@ int gs_start_app(PSERVER_DATA server, PSTREAM_CONFIGURATION config, int appId,
                  const APOLLO_LAUNCH_OPTIONS* apolloOptions = nullptr);
 int gs_applist(PSERVER_DATA server, PAPP_LIST* app_list);
 int gs_unpair(PSERVER_DATA server);
-int gs_pair(PSERVER_DATA server, char* pin);
+int gs_pair(PSERVER_DATA server, const char* pin,
+            const CancellationToken& cancellation = {});
 int gs_quit_app(PSERVER_DATA server);
 int gs_clipboard_get(PSERVER_DATA server, std::string* text, long* httpStatus = nullptr);
 int gs_clipboard_set(PSERVER_DATA server, const std::string& text,

@@ -46,6 +46,7 @@ private:
     BRLS_BIND(brls::DetailCell, wireguardConfigPath, "wireguard_config_path");
     BRLS_BIND(brls::DetailCell, netbirdServer, "netbird_server");
     BRLS_BIND(brls::DetailCell, netbirdSetupKey, "netbird_setup_key");
+    BRLS_BIND(brls::DetailCell, tailscaleAuthKeyPath, "tailscale_auth_key_path");
     BRLS_BIND(brls::BooleanCell, remoteAccessPreferLan, "remote_access_prefer_lan");
     BRLS_BIND(brls::BooleanCell, remoteAccessAutoConnect, "remote_access_auto_connect");
     BRLS_BIND(brls::DetailCell, remoteAccessAction, "remote_access_action");
@@ -56,6 +57,7 @@ private:
     BRLS_BIND(brls::DetailCell, remoteAccessError, "remote_access_error");
     BRLS_BIND(brls::DetailCell, wireguardBackendStatus, "wireguard_backend_status");
     BRLS_BIND(brls::DetailCell, netbirdBackendStatus, "netbird_backend_status");
+    BRLS_BIND(brls::DetailCell, tailscaleBackendStatus, "tailscale_backend_status");
 
   private:
     // Rows that only apply to one provider are hidden for the other, so the

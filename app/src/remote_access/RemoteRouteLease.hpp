@@ -7,11 +7,14 @@ class RemoteRouteLease {
 public:
     RemoteRouteLease() noexcept = default;
 
-    RemoteRouteLease(RemoteAccessManager& mgr, const std::string& providerId, const std::string& peerId, std::string targetAddress, std::string connectAddress)
-        : mgr_(&mgr), providerId_(providerId), peerId_(peerId), targetAddress_(std::move(targetAddress)), connectAddress_(std::move(connectAddress)), active_(false)
+    RemoteRouteLease(RemoteAccessManager& mgr, const std::string& providerId,
+                     RemoteRouteTarget target)
+        : mgr_(&mgr), providerId_(providerId), peerId_(target.peerId),
+          targetAddress_(target.targetAddress),
+          connectAddress_(target.connectAddress), active_(false)
     {
         if (!providerId_.empty()) {
-            active_ = mgr_->activateRoute(providerId_, peerId_);
+            active_ = mgr_->activateRoute(providerId_, target);
         } else {
             active_ = true;
         }

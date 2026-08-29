@@ -40,6 +40,7 @@
     <brls:DetailCell id="wireguard_config_path"/>
     <brls:DetailCell id="netbird_server"/>
     <brls:DetailCell id="netbird_setup_key"/>
+    <brls:DetailCell id="tailscale_auth_key_path"/>
     <brls:BooleanCell id="remote_access_prefer_lan"/>
     <brls:BooleanCell id="remote_access_auto_connect"/>
     <brls:DetailCell id="remote_access_action"/>
@@ -51,6 +52,7 @@
     <brls:DetailCell id="remote_access_error"/>
     <brls:DetailCell id="wireguard_backend_status"/>
     <brls:DetailCell id="netbird_backend_status"/>
+    <brls:DetailCell id="tailscale_backend_status"/>
 
     <brls:Header title="@i18n/artemis/settings/notes" paddingTop="60" lineTop="1px"/>
     <brls:Label

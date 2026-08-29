@@ -61,6 +61,8 @@ uint8_t* h2_stream_recv(H2Conn *conn, uint32_t stream_id,
     char sni[256];
     uint8_t *stream_buf;       // buffered gRPC DATA from bidirectional stream
     size_t stream_buf_len;
+    uint8_t *h2_frame_buf;     // incomplete HTTP/2 frames across WS messages
+    size_t h2_frame_buf_len;
 } Conn;
 ]==])
     _artemis_nb_replace("${stage}/source/h2client.c" "buffer signal stream data" "${_old}" "${_new}")
@@ -137,53 +139,94 @@ uint8_t* h2_stream_recv(H2Conn *conn, uint32_t stream_id,
         return NULL;
     }
 
+    // A WebSocket message is only a transport chunk. HTTP/2 frame boundaries
+    // may cross it, so retain incomplete bytes for the next receive call.
+    const size_t h2_limit = 2 * 1024 * 1024;
+    if (wl > h2_limit || c->h2_frame_buf_len > h2_limit - wl) {
+        free(f);
+        snprintf(error, error_size, "HTTP/2 receive buffer limit exceeded");
+        return NULL;
+    }
+    uint8_t *h2 = realloc(c->h2_frame_buf, c->h2_frame_buf_len + wl);
+    if (!h2 && wl) {
+        free(f);
+        snprintf(error, error_size, "malloc");
+        return NULL;
+    }
+    c->h2_frame_buf = h2;
+    if (wl) memcpy(c->h2_frame_buf + c->h2_frame_buf_len, f, wl);
+    c->h2_frame_buf_len += wl;
+    free(f);
+
     size_t pos = 0;
-    while (pos + 9 <= wl) {
-        uint32_t fl = ((uint32_t)f[pos] << 16) |
-                      ((uint32_t)f[pos + 1] << 8) | f[pos + 2];
-        uint8_t ft = f[pos + 3], ff = f[pos + 4];
-        uint32_t fsid = ((uint32_t)(f[pos + 5] & 0x7F) << 24) |
-                        ((uint32_t)f[pos + 6] << 16) |
-                        ((uint32_t)f[pos + 7] << 8) | f[pos + 8];
-        if (pos + 9 + fl > wl) break;
+    while (pos + 9 <= c->h2_frame_buf_len) {
+        const uint8_t *frame = c->h2_frame_buf + pos;
+        uint32_t fl = ((uint32_t)frame[0] << 16) |
+                      ((uint32_t)frame[1] << 8) | frame[2];
+        uint8_t ft = frame[3], ff = frame[4];
+        uint32_t fsid = ((uint32_t)(frame[5] & 0x7F) << 24) |
+                        ((uint32_t)frame[6] << 16) |
+                        ((uint32_t)frame[7] << 8) | frame[8];
+        if (fl > 1024 * 1024) {
+            snprintf(error, error_size, "HTTP/2 frame too large: %u", fl);
+            c->h2_frame_buf_len = 0;
+            free(c->h2_frame_buf);
+            c->h2_frame_buf = NULL;
+            return NULL;
+        }
+        if (pos + 9 + fl > c->h2_frame_buf_len) break;
 
         if (ft == 6 && fsid == 0 && fl == 8 && !(ff & 1)) {
-            h2_send_frame(c, 8, 6, 1, 0, f + pos + 9);
+            h2_send_frame(c, 8, 6, 1, 0, frame + 9);
         } else if (fsid == stream_id && ft == 0) {
             size_t data_off = pos + 9;
             size_t data_len = fl;
             if ((ff & 8) && data_len > 0) {
-                uint8_t pad = f[data_off];
+                uint8_t pad = c->h2_frame_buf[data_off];
                 if ((size_t)pad + 1 <= data_len) {
                     data_off++;
                     data_len -= (size_t)pad + 1;
                 } else {
-                    data_len = 0;
+                    snprintf(error, error_size, "invalid HTTP/2 DATA padding");
+                    return NULL;
                 }
             }
             if (data_len) {
+                const size_t grpc_limit = 1024 * 1024 + 5;
+                if (data_len > grpc_limit ||
+                    c->stream_buf_len > grpc_limit - data_len) {
+                    snprintf(error, error_size, "gRPC receive buffer limit exceeded");
+                    return NULL;
+                }
                 uint8_t *nb = realloc(c->stream_buf, c->stream_buf_len + data_len);
                 if (!nb) {
-                    free(f);
                     snprintf(error, error_size, "malloc");
                     return NULL;
                 }
                 c->stream_buf = nb;
-                memcpy(c->stream_buf + c->stream_buf_len, f + data_off, data_len);
+                memcpy(c->stream_buf + c->stream_buf_len,
+                       c->h2_frame_buf + data_off, data_len);
                 c->stream_buf_len += data_len;
             }
         } else if (fsid == stream_id && ft == 3) {
-            free(f);
             snprintf(error, error_size, "signal stream reset");
             return NULL;
         } else if (fsid == 0 && ft == 7) {
-            free(f);
             snprintf(error, error_size, "signal connection goaway");
             return NULL;
         }
         pos += 9 + fl;
     }
-    free(f);
+    if (pos) {
+        const size_t remain = c->h2_frame_buf_len - pos;
+        if (remain)
+            memmove(c->h2_frame_buf, c->h2_frame_buf + pos, remain);
+        c->h2_frame_buf_len = remain;
+        if (!remain) {
+            free(c->h2_frame_buf);
+            c->h2_frame_buf = NULL;
+        }
+    }
 
     ready = h2_stream_take_message(c, out_len, error, error_size);
     if (ready || error[0]) return ready;
@@ -206,6 +249,9 @@ uint8_t* h2_stream_recv(H2Conn *conn, uint32_t stream_id,
     free(c->stream_buf);
     c->stream_buf = NULL;
     c->stream_buf_len = 0;
+    free(c->h2_frame_buf);
+    c->h2_frame_buf = NULL;
+    c->h2_frame_buf_len = 0;
     free(c);
 ]==])
     _artemis_nb_replace("${stage}/source/h2client.c" "free Signal stream buffer" "${_old}" "${_new}")
@@ -495,8 +541,14 @@ static void signal_recv_thread(void *arg) {
                                       &msg_len, err, sizeof(err));
         if (!msg) {
             if (!sc->running) break;
-            if (err[0] && strcmp(err, "timeout") != 0)
+            if (err[0] && strcmp(err, "timeout") != 0) {
                 fprintf(stderr, "[SIGNAL] receive error: %s\n", err);
+                // Protocol/frame errors are fatal for this HTTP/2 connection.
+                // Do not spin forever on the same retained bytes; ownership of
+                // reconnect remains with the NetBird lifecycle thread.
+                sc->running = false;
+                break;
+            }
             svcSleepThread(25e6);
             continue;
         }

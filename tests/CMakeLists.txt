@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(ArtemisSwitchUnitTests LANGUAGES CXX)
+project(ArtemisSwitchUnitTests LANGUAGES C CXX)
 
 enable_testing()
 
@@ -8,6 +8,10 @@ get_filename_component(REPO_ROOT "${CMAKE_CURRENT_LIST_DIR}/.." ABSOLUTE)
 add_executable(artemis_test_smoke smoke_test.cpp)
 target_compile_features(artemis_test_smoke PRIVATE cxx_std_20)
 add_test(NAME artemis_test_smoke COMMAND artemis_test_smoke)
+
+add_executable(cancellation_token_test cancellation_token_test.cpp)
+target_compile_features(cancellation_token_test PRIVATE cxx_std_20)
+add_test(NAME cancellation_token_test COMMAND cancellation_token_test)
 
 add_executable(app_library_paging_test app_library_paging_test.cpp)
 target_include_directories(app_library_paging_test PRIVATE
@@ -271,3 +275,169 @@ target_include_directories(remote_access_route_lifecycle_test PRIVATE
 target_compile_features(remote_access_route_lifecycle_test PRIVATE cxx_std_20)
 add_test(NAME remote_access_route_lifecycle_test
          COMMAND remote_access_route_lifecycle_test)
+
+add_executable(remote_access_manager_concurrency_test
+    "${REPO_ROOT}/tests/remote_access_manager_concurrency_test.cpp"
+    "${REPO_ROOT}/app/src/remote_access/RemoteAccessManager.cpp"
+)
+target_include_directories(remote_access_manager_concurrency_test PRIVATE
+    "${REPO_ROOT}/app/src/remote_access")
+target_compile_features(remote_access_manager_concurrency_test PRIVATE cxx_std_20)
+add_test(NAME remote_access_manager_concurrency_test
+         COMMAND remote_access_manager_concurrency_test)
+
+add_executable(tailscale_protocol_test
+    "${REPO_ROOT}/tests/tailscale_protocol_test.cpp"
+    "${REPO_ROOT}/app/src/remote_access/tailscale/TailscaleProtocol.cpp")
+target_include_directories(tailscale_protocol_test PRIVATE
+    "${REPO_ROOT}/app/src/remote_access/tailscale")
+target_compile_features(tailscale_protocol_test PRIVATE cxx_std_20)
+add_test(NAME tailscale_protocol_test COMMAND tailscale_protocol_test)
+
+add_executable(tailscale_auth_key_file_test
+    "${REPO_ROOT}/tests/tailscale_auth_key_file_test.cpp"
+    "${REPO_ROOT}/app/src/remote_access/tailscale/TailscaleAuthKeyFile.cpp")
+target_include_directories(tailscale_auth_key_file_test PRIVATE
+    "${REPO_ROOT}/app/src/remote_access/tailscale")
+target_compile_features(tailscale_auth_key_file_test PRIVATE cxx_std_20)
+add_test(NAME tailscale_auth_key_file_test COMMAND tailscale_auth_key_file_test)
+
+add_executable(tailscale_peer_path_test
+    "${REPO_ROOT}/tests/tailscale_peer_path_test.cpp"
+    "${REPO_ROOT}/app/src/remote_access/tailscale/TailscalePeerDirectory.cpp"
+    "${REPO_ROOT}/app/src/remote_access/tailscale/TailscalePathManager.cpp")
+target_include_directories(tailscale_peer_path_test PRIVATE
+    "${REPO_ROOT}/app/src/remote_access"
+    "${REPO_ROOT}/app/src/remote_access/tailscale")
+target_compile_features(tailscale_peer_path_test PRIVATE cxx_std_20)
+add_test(NAME tailscale_peer_path_test COMMAND tailscale_peer_path_test)
+
+add_executable(tailscale_state_store_test
+    "${REPO_ROOT}/tests/tailscale_state_store_test.cpp"
+    "${REPO_ROOT}/app/src/remote_access/tailscale/TailscaleStateStore.cpp"
+    "${REPO_ROOT}/extern/wg-nx/library/crypto/monocypher.c")
+target_include_directories(tailscale_state_store_test PRIVATE
+    "${REPO_ROOT}/app/src/remote_access/tailscale"
+    "${REPO_ROOT}/extern/wg-nx/library/crypto")
+target_compile_features(tailscale_state_store_test PRIVATE cxx_std_20)
+add_test(NAME tailscale_state_store_test COMMAND tailscale_state_store_test)
+
+include("${REPO_ROOT}/cmake/TailscaleCompatibility.cmake")
+artemis_generate_tailscale_compatibility(
+    "${CMAKE_CURRENT_BINARY_DIR}/generated/tailscale")
+
+add_executable(tailscale_control_codec_test
+    "${REPO_ROOT}/tests/tailscale_control_codec_test.cpp"
+    "${REPO_ROOT}/app/src/remote_access/tailscale/TailscaleControlCodec.cpp"
+    "${REPO_ROOT}/app/src/remote_access/tailscale/TailscalePeerDirectory.cpp")
+target_include_directories(tailscale_control_codec_test PRIVATE
+    "${CMAKE_CURRENT_BINARY_DIR}/generated/tailscale"
+    "${REPO_ROOT}/app/src/remote_access"
+    "${REPO_ROOT}/app/src/remote_access/tailscale"
+    "${REPO_ROOT}/extern/borealis/library/include")
+target_compile_features(tailscale_control_codec_test PRIVATE cxx_std_20)
+add_test(NAME tailscale_control_codec_test COMMAND tailscale_control_codec_test)
+
+add_executable(tailscale_control_key_test
+    "${REPO_ROOT}/tests/tailscale_control_key_test.cpp"
+    "${REPO_ROOT}/app/src/remote_access/tailscale/TailscaleControlKey.cpp"
+    "${REPO_ROOT}/app/src/remote_access/tailscale/TailscaleControlCodec.cpp"
+    "${REPO_ROOT}/app/src/remote_access/tailscale/TailscalePeerDirectory.cpp")
+target_include_directories(tailscale_control_key_test PRIVATE
+    "${CMAKE_CURRENT_BINARY_DIR}/generated/tailscale"
+    "${REPO_ROOT}/app/src/remote_access"
+    "${REPO_ROOT}/app/src/remote_access/tailscale"
+    "${REPO_ROOT}/extern/borealis/library/include")
+target_compile_features(tailscale_control_key_test PRIVATE cxx_std_20)
+add_test(NAME tailscale_control_key_test COMMAND tailscale_control_key_test)
+
+add_executable(tailscale_control_session_test
+    "${REPO_ROOT}/tests/tailscale_control_session_test.cpp"
+    "${REPO_ROOT}/app/src/remote_access/tailscale/TailscaleControlSession.cpp"
+    "${REPO_ROOT}/app/src/remote_access/tailscale/TailscaleControlCodec.cpp"
+    "${REPO_ROOT}/app/src/remote_access/tailscale/TailscaleHttpUpgrade.cpp"
+    "${REPO_ROOT}/app/src/remote_access/tailscale/TailscaleNoise.cpp"
+    "${REPO_ROOT}/app/src/remote_access/tailscale/TailscaleStateStore.cpp"
+    "${REPO_ROOT}/app/src/remote_access/tailscale/TailscalePeerDirectory.cpp"
+    "${REPO_ROOT}/app/src/remote_access/tailscale/TailscaleTransport.cpp"
+    "${REPO_ROOT}/extern/wg-nx/library/crypto/monocypher.c"
+    "${REPO_ROOT}/extern/wg-nx/library/crypto/blake2s.c"
+    "${REPO_ROOT}/extern/wg-nx/src/blake2s_neon.c")
+target_include_directories(tailscale_control_session_test PRIVATE
+    "${CMAKE_CURRENT_BINARY_DIR}/generated/tailscale"
+    "${REPO_ROOT}/app/src/remote_access"
+    "${REPO_ROOT}/app/src/remote_access/tailscale"
+    "${REPO_ROOT}/extern/wg-nx/library/crypto"
+    "${REPO_ROOT}/extern/wg-nx/src"
+    "${REPO_ROOT}/extern/borealis/library/include")
+target_compile_features(tailscale_control_session_test PRIVATE cxx_std_20)
+add_test(NAME tailscale_control_session_test COMMAND tailscale_control_session_test)
+
+add_executable(tailscale_noise_test
+    "${REPO_ROOT}/tests/tailscale_noise_test.cpp"
+    "${REPO_ROOT}/app/src/remote_access/tailscale/TailscaleNoise.cpp"
+    "${REPO_ROOT}/extern/wg-nx/library/crypto/monocypher.c"
+    "${REPO_ROOT}/extern/wg-nx/library/crypto/blake2s.c"
+    "${REPO_ROOT}/extern/wg-nx/src/blake2s_neon.c")
+target_include_directories(tailscale_noise_test PRIVATE
+    "${REPO_ROOT}/app/src/remote_access"
+    "${REPO_ROOT}/app/src/remote_access/tailscale"
+    "${REPO_ROOT}/extern/wg-nx/library/crypto"
+    "${REPO_ROOT}/extern/wg-nx/src")
+target_compile_features(tailscale_noise_test PRIVATE cxx_std_20)
+add_test(NAME tailscale_noise_test COMMAND tailscale_noise_test)
+
+add_executable(tailscale_http_upgrade_test
+    "${REPO_ROOT}/tests/tailscale_http_upgrade_test.cpp"
+    "${REPO_ROOT}/app/src/remote_access/tailscale/TailscaleHttpUpgrade.cpp")
+target_include_directories(tailscale_http_upgrade_test PRIVATE
+    "${REPO_ROOT}/app/src/remote_access/tailscale")
+target_compile_features(tailscale_http_upgrade_test PRIVATE cxx_std_20)
+add_test(NAME tailscale_http_upgrade_test COMMAND tailscale_http_upgrade_test)
+
+add_executable(tailscale_core_engine_test
+    "${REPO_ROOT}/tests/tailscale_core_engine_test.cpp"
+    "${REPO_ROOT}/app/src/remote_access/tailscale/TailscaleCore.cpp"
+    "${REPO_ROOT}/app/src/remote_access/tailscale/TailscaleStateStore.cpp"
+    "${REPO_ROOT}/app/src/remote_access/tailscale/TailscalePeerDirectory.cpp"
+    "${REPO_ROOT}/app/src/remote_access/tailscale/TailscalePathManager.cpp"
+    "${REPO_ROOT}/extern/wg-nx/library/crypto/monocypher.c")
+target_include_directories(tailscale_core_engine_test PRIVATE
+    "${REPO_ROOT}/app/src/remote_access"
+    "${REPO_ROOT}/app/src/remote_access/tailscale"
+    "${REPO_ROOT}/extern/wg-nx/library/crypto")
+target_compile_features(tailscale_core_engine_test PRIVATE cxx_std_20)
+add_test(NAME tailscale_core_engine_test COMMAND tailscale_core_engine_test)
+
+add_executable(tailscale_derp_test
+    "${REPO_ROOT}/tests/tailscale_derp_test.cpp"
+    "${REPO_ROOT}/app/src/remote_access/tailscale/TailscaleDerp.cpp")
+target_include_directories(tailscale_derp_test PRIVATE
+    "${REPO_ROOT}/app/src/remote_access/tailscale")
+target_compile_features(tailscale_derp_test PRIVATE cxx_std_20)
+add_test(NAME tailscale_derp_test COMMAND tailscale_derp_test)
+
+add_executable(tailscale_wgx_route_test
+    "${REPO_ROOT}/tests/tailscale_wgx_route_test.cpp"
+    "${REPO_ROOT}/app/src/remote_access/tailscale/TailscaleWgxRoute.cpp")
+target_include_directories(tailscale_wgx_route_test PRIVATE
+    "${REPO_ROOT}/app/src/remote_access"
+    "${REPO_ROOT}/app/src/remote_access/tailscale")
+target_compile_features(tailscale_wgx_route_test PRIVATE cxx_std_20)
+add_test(NAME tailscale_wgx_route_test COMMAND tailscale_wgx_route_test)
+
+add_executable(remote_access_provider_selection_test
+    "${REPO_ROOT}/tests/remote_access_provider_selection_test.cpp")
+target_include_directories(remote_access_provider_selection_test PRIVATE
+    "${REPO_ROOT}/app/include")
+target_compile_features(remote_access_provider_selection_test PRIVATE cxx_std_20)
+add_test(NAME remote_access_provider_selection_test
+         COMMAND remote_access_provider_selection_test)
+
+add_executable(vpn_file_logger_test
+    "${REPO_ROOT}/tests/vpn_file_logger_test.cpp"
+    "${REPO_ROOT}/app/src/vpn/VpnFileLogger.cpp")
+target_include_directories(vpn_file_logger_test PRIVATE
+    "${REPO_ROOT}/app/src/vpn")
+target_compile_features(vpn_file_logger_test PRIVATE cxx_std_20)
+add_test(NAME vpn_file_logger_test COMMAND vpn_file_logger_test)

@@ -27,9 +27,10 @@ unsigned int sceLibcHeapSize             = 24 * 1024 * 1024;
 #include <string>
 
 #include "add_host_tab.hpp"
-#if defined(__SWITCH__) && (defined(ENABLE_NETBIRD) || defined(ENABLE_WIREGUARD))
+#if defined(__SWITCH__) && (defined(ENABLE_NETBIRD) || defined(ENABLE_WIREGUARD) || defined(ENABLE_TAILSCALE))
 #include "remote_access/RemoteAccessManager.hpp"
 #include "remote_access/providers/NetBirdProvider.hpp"
+#include "remote_access/providers/TailscaleProvider.hpp"
 #include "remote_access/providers/WireGuardProvider.hpp"
 #include <memory>
 #endif
@@ -47,7 +48,7 @@ unsigned int sceLibcHeapSize             = 24 * 1024 * 1024;
 #include "MoonlightSession.hpp"
 #include "Settings.hpp"
 #include "SwitchMoonlightSessionDecoderAndRenderProvider.hpp"
-#if defined(__SWITCH__) && (defined(ENABLE_NETBIRD) || defined(ENABLE_WIREGUARD))
+#if defined(__SWITCH__) && (defined(ENABLE_NETBIRD) || defined(ENABLE_WIREGUARD) || defined(ENABLE_TAILSCALE))
 #include "vpn/WireGuardManager.hpp"
 #endif
 
@@ -196,7 +197,7 @@ int main(int argc, char* argv[]) {
     Settings::instance().set_launch_path(argc > 0 ? argv[0] : "");
     brls::Logger::info("Working dir, {}", home);
 
-#if defined(__SWITCH__) && (defined(ENABLE_NETBIRD) || defined(ENABLE_WIREGUARD))
+#if defined(__SWITCH__) && (defined(ENABLE_NETBIRD) || defined(ENABLE_WIREGUARD) || defined(ENABLE_TAILSCALE))
     if (Settings::instance().wireguard_config_path().empty()) {
         Settings::instance().set_wireguard_config_path(
             WireGuardManager::default_config_path());
@@ -208,8 +209,10 @@ int main(int argc, char* argv[]) {
         std::make_unique<WireGuardProvider>());
     RemoteAccessManager::instance().registerProvider(
         std::make_unique<NetBirdProvider>());
+    RemoteAccessManager::instance().registerProvider(
+        std::make_unique<TailscaleProvider>());
 
-    brls::Logger::info("Remote access: WireGuard backend {}, NetBird backend {}",
+    brls::Logger::info("Remote access: WireGuard backend {}, NetBird backend {}, Tailscale backend experimental",
                        WireGuardManager::instance().backend_is_real() ? "real" : "STUB",
                        "real");
 
@@ -273,7 +276,7 @@ int main(int argc, char* argv[]) {
             vitaHealthReported = true;
         }
 #endif
-#if defined(__SWITCH__) && (defined(ENABLE_NETBIRD) || defined(ENABLE_WIREGUARD))
+#if defined(__SWITCH__) && (defined(ENABLE_NETBIRD) || defined(ENABLE_WIREGUARD) || defined(ENABLE_TAILSCALE))
         // Single central pump for every remote-access provider. lwIP timers,
         // WireGuard keepalives and TCP retransmission all depend on this
         // running every frame, so it must not live in a settings page or in
@@ -282,7 +285,7 @@ int main(int argc, char* argv[]) {
 #endif
     }
 
-#if defined(__SWITCH__) && (defined(ENABLE_NETBIRD) || defined(ENABLE_WIREGUARD))
+#if defined(__SWITCH__) && (defined(ENABLE_NETBIRD) || defined(ENABLE_WIREGUARD) || defined(ENABLE_TAILSCALE))
     // Never leave a tunnel or its worker threads running past the main loop.
     RemoteAccessManager::instance().stopActiveProvider();
 #endif

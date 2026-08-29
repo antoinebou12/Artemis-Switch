@@ -713,26 +713,72 @@ void GameStreamClient::connect(const Host& host,
 }
 
 void GameStreamClient::pair(const std::string& address, const std::string& pin,
-                            ServerCallback<bool>& callback) {
+                            ServerCallback<bool>& callback,
+                            const CancellationToken& cancellation) {
     with_cached_server_data<bool>(
         address, "Firstly call connect()...", callback,
-        [this, pin](const std::string& cachedAddress,
-                    ServerCallback<bool>& callback) {
-            int status = gs_pair(&m_server_data[cachedAddress], (char*)pin.c_str());
+        [this, pin, cancellation](const std::string& cachedAddress,
+                                  ServerCallback<bool>& callback) {
+            int status = gs_pair(&m_server_data[cachedAddress], pin.c_str(),
+                                 cancellation);
+            if (!cancellation.tryComplete()) {
+                // Cancellation may win just after gs_pair's final check. Undo
+                // a completed server-side pairing before releasing its route.
+                if (status == GS_OK) {
+                    gs_unpair(&m_server_data[cachedAddress]);
+                    m_server_data[cachedAddress].paired = false;
+                }
+                status = GS_CANCELLED;
+                gs_set_error("Pairing cancelled");
+            }
+            const std::string error = status == GS_OK ? std::string{} : gs_error();
 
-            brls::sync([callback, status] {
+            brls::sync([this, callback, status, error, cachedAddress,
+                        cancellation] {
+                if (cancellation.isCancellationRequested()) {
+                    release_cancelled_pairing_connection(cachedAddress);
+                }
                 if (status == GS_OK) {
                     callback(GSResult<bool>::success(true));
                 } else {
-                    callback(GSResult<bool>::failure(gs_error()));
+                    callback(GSResult<bool>::failure(error));
                 }
             });
         });
 }
 
 void GameStreamClient::pair(const Host& host, const std::string& pin,
-                            ServerCallback<bool>& callback) {
-    pair(active_address(host), pin, callback);
+                            ServerCallback<bool>& callback,
+                            const CancellationToken& cancellation) {
+    pair(active_address(host), pin, callback, cancellation);
+}
+
+void GameStreamClient::release_cancelled_pairing_connection(
+    const std::string& address) {
+    std::vector<RemoteRouteLease> releasedRoutes;
+    for (auto route = m_active_routes.begin(); route != m_active_routes.end();) {
+        const auto active = m_active_addresses.find(route->first);
+        if (active != m_active_addresses.end() && active->second == address) {
+            releasedRoutes.push_back(std::move(route->second));
+            route = m_active_routes.erase(route);
+        } else {
+            ++route;
+        }
+    }
+    std::erase_if(m_active_addresses, [&address](const auto& entry) {
+        return entry.second == address;
+    });
+    m_server_data.erase(address);
+
+    // Provider teardown may join a relay thread. Keep that work off the UI
+    // thread while the moved leases retain deterministic ownership.
+    if (!releasedRoutes.empty()) {
+        auto routes = std::make_shared<std::vector<RemoteRouteLease>>(
+            std::move(releasedRoutes));
+        brls::async([routes] {
+            routes->clear();
+        });
+    }
 }
 
 void GameStreamClient::applist(const std::string& address,

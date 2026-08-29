@@ -337,14 +337,39 @@ static int gs_pair_validate(Data& data, std::string* result) {
     return ret;
 }
 
-static int gs_pair_cleanup(int ret, PSERVER_DATA server, std::string* result) {
-    if (ret != GS_OK) {
+static int gs_pair_cleanup(int ret, PSERVER_DATA server, std::string* result,
+                           const CancellationToken& cancellation) {
+    const bool cancelled = cancellation.isCancellationRequested();
+    if (ret != GS_OK || cancelled) {
         gs_unpair(server);
+    }
+    if (cancelled) {
+        server->paired = false;
+        gs_set_error("Pairing cancelled");
+        return GS_CANCELLED;
     }
     return ret;
 }
 
-int gs_pair(PSERVER_DATA server, char* pin) {
+static int gs_pair_request(const char* url, Data* data,
+                           const CancellationToken& cancellation) {
+    if (cancellation.isCancellationRequested()) {
+        gs_set_error("Pairing cancelled");
+        return GS_CANCELLED;
+    }
+    HTTPRequestOptions options;
+    options.cancellation = cancellation;
+    const int result =
+        http_request(url, data, HTTPRequestTimeoutLong, options, nullptr);
+    if (cancellation.isCancellationRequested()) {
+        gs_set_error("Pairing cancelled");
+        return GS_CANCELLED;
+    }
+    return result;
+}
+
+int gs_pair(PSERVER_DATA server, const char* pin,
+            const CancellationToken& cancellation) {
     int ret = GS_OK;
     Data data;
     std::string result;
@@ -379,16 +404,16 @@ int gs_pair(PSERVER_DATA server, char* pin) {
              unique_id.c_str(), salt.hex().bytes(),
              CryptoManager::cert_data().hex().bytes());
 
-    if ((ret = http_request(url, &data, HTTPRequestTimeoutLong)) != GS_OK) {
-        return gs_pair_cleanup(ret, server, &result);
+    if ((ret = gs_pair_request(url, &data, cancellation)) != GS_OK) {
+        return gs_pair_cleanup(ret, server, &result, cancellation);
     }
 
     if ((ret = gs_pair_validate(data, &result) != GS_OK)) {
-        return gs_pair_cleanup(ret, server, &result);
+        return gs_pair_cleanup(ret, server, &result, cancellation);
     }
 
     if ((ret = xml_search(data, "plaincert", &result)) != GS_OK) {
-        return gs_pair_cleanup(ret, server, &result);
+        return gs_pair_cleanup(ret, server, &result, cancellation);
     }
 
     brls::Logger::info("Client: Start pairing stage #2");
@@ -419,17 +444,17 @@ int gs_pair(PSERVER_DATA server, char* pin) {
         unique_id.c_str(),
         encryptedChallenge.hex().bytes());
 
-    if ((ret = http_request(url, &data, HTTPRequestTimeoutLong)) != GS_OK) {
-        return gs_pair_cleanup(ret, server, &result);
+    if ((ret = gs_pair_request(url, &data, cancellation)) != GS_OK) {
+        return gs_pair_cleanup(ret, server, &result, cancellation);
     }
 
     if ((ret = gs_pair_validate(data, &result) != GS_OK)) {
-        return gs_pair_cleanup(ret, server, &result);
+        return gs_pair_cleanup(ret, server, &result, cancellation);
     }
 
     if (xml_search(data, "challengeresponse", &result) != GS_OK) {
         ret = GS_INVALID;
-        return gs_pair_cleanup(ret, server, &result);
+        return gs_pair_cleanup(ret, server, &result, cancellation);
     }
 
     brls::Logger::info("Client: Start pairing stage #3");
@@ -468,17 +493,17 @@ int gs_pair(PSERVER_DATA server, char* pin) {
         unique_id.c_str(),
         challengeRespEncrypted.hex().bytes());
 
-    if ((ret = http_request(url, &data, HTTPRequestTimeoutLong)) != GS_OK) {
-        return gs_pair_cleanup(ret, server, &result);
+    if ((ret = gs_pair_request(url, &data, cancellation)) != GS_OK) {
+        return gs_pair_cleanup(ret, server, &result, cancellation);
     }
 
     if ((ret = gs_pair_validate(data, &result) != GS_OK)) {
-        return gs_pair_cleanup(ret, server, &result);
+        return gs_pair_cleanup(ret, server, &result, cancellation);
     }
 
     if (xml_search(data, "pairingsecret", &result) != GS_OK) {
         ret = GS_INVALID;
-        return gs_pair_cleanup(ret, server, &result);
+        return gs_pair_cleanup(ret, server, &result, cancellation);
     }
 
     brls::Logger::info("Client: Start pairing stage #4");
@@ -492,7 +517,7 @@ int gs_pair(PSERVER_DATA server, char* pin) {
                                          plainCert.hex_to_bytes())) {
         gs_set_error("MITM attack detected");
         ret = GS_FAILED;
-        return gs_pair_cleanup(ret, server, &result);
+        return gs_pair_cleanup(ret, server, &result, cancellation);
     }
 
     Data serverChallengeRespHashInput =
@@ -520,12 +545,12 @@ int gs_pair(PSERVER_DATA server, char* pin) {
         server->httpPort,
         unique_id.c_str(),
         clientPairingSecret.hex().bytes());
-    if ((ret = http_request(url, &data, HTTPRequestTimeoutLong)) != GS_OK) {
-        return gs_pair_cleanup(ret, server, &result);
+    if ((ret = gs_pair_request(url, &data, cancellation)) != GS_OK) {
+        return gs_pair_cleanup(ret, server, &result, cancellation);
     }
 
     if ((ret = gs_pair_validate(data, &result) != GS_OK)) {
-        return gs_pair_cleanup(ret, server, &result);
+        return gs_pair_cleanup(ret, server, &result, cancellation);
     }
 
     brls::Logger::info("Client: Start pairing stage #5");
@@ -535,17 +560,17 @@ int gs_pair(PSERVER_DATA server, char* pin) {
         "https://%s:%u/"
         "pair?uniqueid=%s&devicename=roth&updateState=1&phrase=pairchallenge",
         server->serverInfo.address, server->httpsPort, unique_id.c_str());
-    if ((ret = http_request(url, &data, HTTPRequestTimeoutLong)) != GS_OK) {
-        return gs_pair_cleanup(ret, server, &result);
+    if ((ret = gs_pair_request(url, &data, cancellation)) != GS_OK) {
+        return gs_pair_cleanup(ret, server, &result, cancellation);
     }
 
     if ((ret = gs_pair_validate(data, &result) != GS_OK)) {
-        return gs_pair_cleanup(ret, server, &result);
+        return gs_pair_cleanup(ret, server, &result, cancellation);
     }
 
     server->paired = true;
 
-    return gs_pair_cleanup(ret, server, &result);
+    return gs_pair_cleanup(ret, server, &result, cancellation);
 }
 
 int gs_applist(PSERVER_DATA server, PAPP_LIST* list) {

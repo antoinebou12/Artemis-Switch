@@ -1,0 +1,125 @@
+diff --git a/include/wireguard.h b/include/wireguard.h
+index 0558149..1f4d5bb 100644
+--- a/include/wireguard.h
++++ b/include/wireguard.h
+@@ -69,6 +69,10 @@ typedef struct WgPeer WgPeer;
+ WgPeer* wg_add_peer(WgTunnel* tun, const uint8_t public_key[WG_KEY_LEN],
+                     const uint8_t relay_hash[WG_RELAY_HASH_LEN], uint32_t ip_raw);
+ WgPeer* wg_find_peer_by_ip(WgTunnel* tun, uint32_t ip_raw);
++int wg_update_peer(WgTunnel* tun, WgPeer* peer,
++                   const uint8_t public_key[WG_KEY_LEN]);
++int wg_remove_peer(WgTunnel* tun, WgPeer* peer);
++int wg_connect_peer(WgTunnel* tun, WgPeer* peer);
+ int wg_send_to_peer(WgTunnel* tun, WgPeer* peer, const void* data, size_t len);
+ 
+ void wg_set_log_callback(void (*func)(const char* msg));
+diff --git a/src/wireguard.c b/src/wireguard.c
+index 8500d25..e5e5d72 100644
+--- a/src/wireguard.c
++++ b/src/wireguard.c
+@@ -166,9 +166,19 @@ WgTunnel* wg_init(const WgConfig* config) {
+ 
+ WgPeer* wg_add_peer(WgTunnel* tun, const uint8_t public_key[WG_KEY_LEN],
+                     const uint8_t relay_hash[WG_RELAY_HASH_LEN], uint32_t ip_raw) {
+-    if (!tun || tun->peer_count >= WG_MAX_PEERS) return NULL;
+-    
+-    WgPeer* peer = &tun->peers[tun->peer_count];
++    if (!tun) return NULL;
++
++    WgPeer* peer = NULL;
++    for (int i = 0; i < tun->peer_count; i++) {
++        if (!tun->peers[i].configured) {
++            peer = &tun->peers[i];
++            break;
++        }
++    }
++    if (!peer) {
++        if (tun->peer_count >= WG_MAX_PEERS) return NULL;
++        peer = &tun->peers[tun->peer_count++];
++    }
+     memset(peer, 0, sizeof(WgPeer));
+     memcpy(peer->public_key, public_key, WG_KEY_LEN);
+     memcpy(peer->relay_hash, relay_hash, WG_RELAY_HASH_LEN);
+@@ -176,10 +186,34 @@ WgPeer* wg_add_peer(WgTunnel* tun, const uint8_t public_key[WG_KEY_LEN],
+     peer->tunnel_ip.s_addr = ip_raw;
+     peer->configured = true;
+     peer->connected = false;
+-    tun->peer_count++;
+     return peer;
+ }
+ 
++int wg_update_peer(WgTunnel* tun, WgPeer* peer,
++                   const uint8_t public_key[WG_KEY_LEN]) {
++    if (!tun || !peer || !peer->configured || !public_key)
++        return WG_ERR_INVALID_CONFIG;
++    wg_mutex_lock(&tun->send_mutex);
++    crypto_wipe(&peer->session, sizeof(peer->session));
++    crypto_wipe(&peer->prev_session, sizeof(peer->prev_session));
++    crypto_wipe(&peer->pending_hs, sizeof(peer->pending_hs));
++    memcpy(peer->public_key, public_key, WG_KEY_LEN);
++    peer->connected = false;
++    peer->hs_pending = false;
++    wg_mutex_unlock(&tun->send_mutex);
++    return WG_OK;
++}
++
++int wg_remove_peer(WgTunnel* tun, WgPeer* peer) {
++    if (!tun || !peer || !peer->configured)
++        return WG_ERR_INVALID_CONFIG;
++    wg_mutex_lock(&tun->send_mutex);
++    peer->configured = false;
++    crypto_wipe(peer, sizeof(*peer));
++    wg_mutex_unlock(&tun->send_mutex);
++    return WG_OK;
++}
++
+ WgPeer* wg_find_peer_by_ip(WgTunnel* tun, uint32_t ip_raw) {
+     if (!tun) return NULL;
+     for (int i = 0; i < tun->peer_count; i++) {
+@@ -255,6 +289,46 @@ void wg_send_keepalive_to_peer(WgTunnel* tun, WgPeer* peer) {
+     peer->last_sent = wg_time_now();
+ }
+ 
++int wg_connect_peer(WgTunnel* tun, WgPeer* peer) {
++    if (!tun || !peer || !peer->configured || !tun->running)
++        return WG_ERR_INVALID_CONFIG;
++    if (tun->socket_fd < 0) {
++        const int socket_result = wg_socket_open(tun);
++        if (socket_result != WG_OK) return socket_result;
++    }
++
++    peer->connected = true;
++    for (int attempt = 0; attempt < WG_MAX_TIMER_HANDSHAKES; attempt++) {
++        WgHandshakeInit message;
++        crypto_wipe(&peer->pending_hs, sizeof(peer->pending_hs));
++        peer->hs_pending = true;
++        const int init_result = wg_handshake_init_peer(
++            tun, peer, &message, &peer->pending_hs);
++        if (init_result != WG_OK) return init_result;
++
++        wg_mutex_lock(&tun->send_mutex);
++        const int sent = wg_socket_send_to(
++            tun, peer->relay_hash, &message, sizeof(message));
++        wg_mutex_unlock(&tun->send_mutex);
++        crypto_wipe(&message, sizeof(message));
++        if (sent < 0) return WG_ERR_SOCKET;
++
++        for (int elapsed = 0; elapsed < WG_REKEY_TIMEOUT * 1000;
++             elapsed += 10) {
++            if (peer->session.valid) {
++                wg_mutex_lock(&tun->send_mutex);
++                wg_send_keepalive_to_peer(tun, peer);
++                wg_mutex_unlock(&tun->send_mutex);
++                return WG_OK;
++            }
++            wg_sleep_ms(10);
++        }
++    }
++    peer->connected = false;
++    peer->hs_pending = false;
++    return WG_ERR_TIMEOUT;
++}
++
+ void wg_set_recv_callback(WgTunnel* tun, WgRecvCallback cb, void* user) {
+     if (!tun)
+         return;

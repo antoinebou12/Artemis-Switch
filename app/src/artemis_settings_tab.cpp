@@ -32,15 +32,16 @@
 #define ARTEMIS_HAS_ZOOM_PAN 0
 #endif
 
-#if defined(__SWITCH__) && (defined(ENABLE_NETBIRD) || defined(ENABLE_WIREGUARD))
+#if defined(__SWITCH__) && (defined(ENABLE_NETBIRD) || defined(ENABLE_WIREGUARD) || defined(ENABLE_TAILSCALE))
 #include "remote_access/RemoteAccessManager.hpp"
 #include "remote_access/RemoteAccessSelection.hpp"
+#include "remote_access/tailscale/TailscaleAuthKeyFile.hpp"
 #include "remote_access_provider_id.hpp"
 #include "streaming/JsonFileBrowser.hpp"
 #include "vpn/WireGuardManager.hpp"
 #endif
 
-#if defined(__SWITCH__) && (defined(ENABLE_NETBIRD) || defined(ENABLE_WIREGUARD))
+#if defined(__SWITCH__) && (defined(ENABLE_NETBIRD) || defined(ENABLE_WIREGUARD) || defined(ENABLE_TAILSCALE))
 #include <borealis/core/task.hpp>
 #include <fstream>
 
@@ -403,7 +404,7 @@ ArtemisSettingsTab::ArtemisSettingsTab() {
     panYSlider->setFocusable(false);
 #endif
 
-#if defined(__SWITCH__) && (defined(ENABLE_NETBIRD) || defined(ENABLE_WIREGUARD))
+#if defined(__SWITCH__) && (defined(ENABLE_NETBIRD) || defined(ENABLE_WIREGUARD) || defined(ENABLE_TAILSCALE))
     // Provider choice is the single entry point. "Off" means no tunnel is
     // connected; both providers are always compiled in, so this is never a
     // statement about the build.
@@ -411,8 +412,8 @@ ArtemisSettingsTab::ArtemisSettingsTab() {
     remoteAccessProvider->init(
         "settings/remote_access_provider"_i18n,
         {"settings/remote_access_off"_i18n, "settings/wireguard"_i18n,
-         "settings/netbird"_i18n},
-        static_cast<int>(currentProvider),
+         "settings/netbird"_i18n, "settings/tailscale_experimental"_i18n},
+        selectorIndexFromProvider(currentProvider),
         // The value callback only updates the cell's own text. Applying the
         // choice here would push the loading dialog while Dropdown is still
         // mid-selection: it fires this callback and THEN calls popActivity,
@@ -515,6 +516,52 @@ ArtemisSettingsTab::ArtemisSettingsTab() {
         return true;
     });
 
+    const auto showTailscaleKeyPath = [this](const std::string& configured) {
+        const auto loaded = artemis::tailscale::loadAuthKeyFile(
+            Settings::instance().working_dir(), configured);
+        const std::string path = loaded.found()
+                                     ? loaded.path
+                                     : (configured.empty()
+                                            ? artemis::tailscale::defaultAuthKeyPath(
+                                                  Settings::instance().working_dir())
+                                            : configured);
+        const std::string shortened =
+            path.size() <= 44
+                ? path
+                : path.substr(0, 20) + "…" + path.substr(path.size() - 20);
+        tailscaleAuthKeyPath->setDetailText(
+            loaded.found()
+                ? fmt::format("{} · {}", shortened,
+                              "settings/tailscale_auth_key_found"_i18n)
+                : shortened);
+    };
+    tailscaleAuthKeyPath->setText("settings/tailscale_auth_key_file"_i18n);
+    showTailscaleKeyPath(Settings::instance().tailscale_auth_key_path());
+    tailscaleAuthKeyPath->registerClickAction(
+        [this, showTailscaleKeyPath](View*) {
+            artemis::streaming::openFileBrowser(
+                artemis::streaming::JsonFileBrowserMode::Import,
+                {".key", ".txt", ".conf"},
+                "settings/tailscale_auth_key_file_title"_i18n,
+                [this, showTailscaleKeyPath](const std::string& path) {
+                    if (path.empty())
+                        return;
+                    auto loaded = artemis::tailscale::loadAuthKeyFile(
+                        Settings::instance().working_dir(), path);
+                    if (!loaded.found()) {
+                        brls::Application::notify(
+                            "settings/tailscale_auth_key_file_invalid"_i18n);
+                        return;
+                    }
+                    // Persist only the location; provider start reads the key
+                    // into transient memory and wipes it after registration.
+                    Settings::instance().set_tailscale_auth_key_path(path);
+                    Settings::instance().save();
+                    showTailscaleKeyPath(path);
+                });
+            return true;
+        });
+
     remoteAccessPreferLan->init(
         "settings/remote_access_prefer_lan"_i18n,
         Settings::instance().remote_access_prefer_lan(), [](bool enabled) {
@@ -567,6 +614,8 @@ ArtemisSettingsTab::ArtemisSettingsTab() {
         "settings/remote_access_backend_wireguard"_i18n);
     netbirdBackendStatus->setText(
         "settings/remote_access_backend_netbird"_i18n);
+    tailscaleBackendStatus->setText(
+        "settings/remote_access_backend_tailscale"_i18n);
 
     // These rows are read-only readouts; keep them out of the focus order.
     for (brls::DetailCell* row :
@@ -575,6 +624,7 @@ ArtemisSettingsTab::ArtemisSettingsTab() {
           static_cast<brls::DetailCell*>(remoteAccessError),
           static_cast<brls::DetailCell*>(wireguardBackendStatus),
           static_cast<brls::DetailCell*>(netbirdBackendStatus),
+          static_cast<brls::DetailCell*>(tailscaleBackendStatus),
           static_cast<brls::DetailCell*>(wireguardStatus)}) {
         row->setFocusable(false);
     }
@@ -589,6 +639,7 @@ ArtemisSettingsTab::ArtemisSettingsTab() {
     wireguardConfigPath->removeFromSuperView(true);
     netbirdServer->removeFromSuperView(true);
     netbirdSetupKey->removeFromSuperView(true);
+    tailscaleAuthKeyPath->removeFromSuperView(true);
     remoteAccessPreferLan->removeFromSuperView(true);
     remoteAccessAutoConnect->removeFromSuperView(true);
     remoteAccessAction->removeFromSuperView(true);
@@ -599,13 +650,14 @@ ArtemisSettingsTab::ArtemisSettingsTab() {
     remoteAccessError->removeFromSuperView(true);
     wireguardBackendStatus->removeFromSuperView(true);
     netbirdBackendStatus->removeFromSuperView(true);
+    tailscaleBackendStatus->removeFromSuperView(true);
 #endif
 
     refreshValues();
 }
 
 ArtemisSettingsTab::~ArtemisSettingsTab() {
-#if defined(__SWITCH__) && (defined(ENABLE_NETBIRD) || defined(ENABLE_WIREGUARD))
+#if defined(__SWITCH__) && (defined(ENABLE_NETBIRD) || defined(ENABLE_WIREGUARD) || defined(ENABLE_TAILSCALE))
     // Any async continuation still in flight checks this before touching the
     // bound rows.
     alive_->store(false);
@@ -663,7 +715,7 @@ void ArtemisSettingsTab::editHeight() {
 }
 
 void ArtemisSettingsTab::refreshRemoteAccessRows() {
-#if defined(__SWITCH__) && (defined(ENABLE_NETBIRD) || defined(ENABLE_WIREGUARD))
+#if defined(__SWITCH__) && (defined(ENABLE_NETBIRD) || defined(ENABLE_WIREGUARD) || defined(ENABLE_TAILSCALE))
     const auto provider = Settings::instance().remote_access_provider();
     const auto visible = providerVisibility(provider);
     const bool active = provider != RemoteAccessProviderId::Off;
@@ -675,11 +727,12 @@ void ArtemisSettingsTab::refreshRemoteAccessRows() {
 
     // Keep the cell showing what is actually stored. Silent, so re-syncing
     // never re-fires the selection handler.
-    remoteAccessProvider->setSelection(static_cast<int>(provider), true);
+    remoteAccessProvider->setSelection(selectorIndexFromProvider(provider), true);
 
     show(wireguardConfigPath, visible.wireGuard);
     show(netbirdServer, visible.netBird);
     show(netbirdSetupKey, visible.netBird);
+    show(tailscaleAuthKeyPath, visible.tailscale);
 
     // Prefer-LAN and connect-on-startup only mean something once a provider is
     // chosen.
@@ -690,7 +743,7 @@ void ArtemisSettingsTab::refreshRemoteAccessRows() {
     show(remoteAccessStatusHeader, active);
     show(wireguardStatus, active);
     show(remoteAccessAddress, active);
-    show(remoteAccessPeers, active && visible.netBird);
+    show(remoteAccessPeers, active && (visible.netBird || visible.tailscale));
 #if defined(ENABLE_WIREGUARD)
     show(wireguardBackendStatus, active);
 #else
@@ -700,6 +753,11 @@ void ArtemisSettingsTab::refreshRemoteAccessRows() {
     show(netbirdBackendStatus, active);
 #else
     show(netbirdBackendStatus, false);
+#endif
+#if defined(ENABLE_TAILSCALE)
+    show(tailscaleBackendStatus, active);
+#else
+    show(tailscaleBackendStatus, false);
 #endif
 
     if (visible.netBird) {
@@ -719,7 +777,7 @@ void ArtemisSettingsTab::refreshRemoteAccessRows() {
 }
 
 void ArtemisSettingsTab::refreshRemoteAccessStatus() {
-#if defined(__SWITCH__) && (defined(ENABLE_NETBIRD) || defined(ENABLE_WIREGUARD))
+#if defined(__SWITCH__) && (defined(ENABLE_NETBIRD) || defined(ENABLE_WIREGUARD) || defined(ENABLE_TAILSCALE))
     const auto provider = Settings::instance().remote_access_provider();
     if (provider == RemoteAccessProviderId::Off)
         return;
@@ -735,15 +793,14 @@ void ArtemisSettingsTab::refreshRemoteAccessStatus() {
     remoteAccessAddress->setDetailText(
         address.empty() ? "settings/remote_access_unassigned"_i18n : address);
 
-    if (active && provider == RemoteAccessProviderId::NetBird) {
+    if (active && (provider == RemoteAccessProviderId::NetBird ||
+                   provider == RemoteAccessProviderId::Tailscale)) {
         const auto peers = active->peers();
-        // Report reachable separately from total: a mesh peer that is not
-        // running Sunshine/Apollo is online but not streamable.
-        const auto reachable = static_cast<size_t>(
+        const auto available = static_cast<size_t>(
             std::count_if(peers.begin(), peers.end(),
                           [](const RemoteAccessPeer& p) { return p.online; }));
         remoteAccessPeers->setDetailText(
-            fmt::format("{} / {}", reachable, peers.size()));
+            fmt::format("{} / {}", available, peers.size()));
     }
 
     const std::string error = active ? active->lastError() : std::string{};
@@ -762,11 +819,15 @@ void ArtemisSettingsTab::refreshRemoteAccessStatus() {
     netbirdBackendStatus->setDetailText(
         "settings/remote_access_backend_isolated_real"_i18n);
 #endif
+#if defined(ENABLE_TAILSCALE)
+    tailscaleBackendStatus->setDetailText(
+        "settings/remote_access_backend_experimental"_i18n);
+#endif
 #endif
 }
 
 void ArtemisSettingsTab::editNetBirdSetupKey() {
-#if defined(__SWITCH__) && (defined(ENABLE_NETBIRD) || defined(ENABLE_WIREGUARD))
+#if defined(__SWITCH__) && (defined(ENABLE_NETBIRD) || defined(ENABLE_WIREGUARD) || defined(ENABLE_TAILSCALE))
     const bool hasKey = !Settings::instance().netbird_setup_key().empty();
 
     std::vector<std::string> options{

@@ -7,7 +7,7 @@
 
 #include "add_host_tab.hpp"
 
-#if defined(__SWITCH__) && (defined(ENABLE_NETBIRD) || defined(ENABLE_WIREGUARD))
+#if defined(__SWITCH__) && (defined(ENABLE_NETBIRD) || defined(ENABLE_WIREGUARD) || defined(ENABLE_TAILSCALE))
 #include "remote_access/RemoteAccessManager.hpp"
 #include "remote_access_provider_id.hpp"
 #endif
@@ -129,7 +129,7 @@ void AddHostTab::appendSearchHosts(const std::vector<Host>& hosts) {
 }
 
 void AddHostTab::appendRemoteAccessPeers() {
-#if defined(__SWITCH__) && (defined(ENABLE_NETBIRD) || defined(ENABLE_WIREGUARD))
+#if defined(__SWITCH__) && (defined(ENABLE_NETBIRD) || defined(ENABLE_WIREGUARD) || defined(ENABLE_TAILSCALE))
     auto& manager = RemoteAccessManager::instance();
     const auto providerId = manager.activeProviderId();
     if (providerId.empty()) {
@@ -141,8 +141,8 @@ void AddHostTab::appendRemoteAccessPeers() {
         return;
     }
 
-    // peers() is a cache read. Refreshing it costs one probe per peer, so do
-    // that off the UI thread and only then build the rows.
+    // peers() is a cache read. Refresh the authenticated provider directory off
+    // the UI thread and only then build the rows.
     const std::string providerName = provider->name();
     brls::async([this, provider, providerName, guard = alive]() {
         if (!guard->load()) {
@@ -158,9 +158,10 @@ void AddHostTab::appendRemoteAccessPeers() {
 
             std::vector<Host> hosts;
             for (const auto& peer : peers) {
-                // Everything on the mesh answers ping; only things running
-                // Sunshine/Apollo answer on the GameStream port. Offering a NAS
-                // as a streaming host would just produce a confusing failure.
+                // NetBird cannot test the 100.x GameStream port until its
+                // exclusive loopback route is active. Authenticated provider
+                // peers are therefore offered here and the normal GameStream
+                // handshake performs the final service check.
                 if (!peer.online || peer.address.empty()) {
                     continue;
                 }
@@ -268,18 +269,29 @@ void AddHostTab::connectHost(const Host& host) {
                     auto pin = fmt::format("{}{}{}{}", (int)rand() % 10, (int)rand() % 10,
                             (int)rand() % 10, (int)rand() % 10);
 
+                    const CancellationToken cancellation;
+                    const auto dialogDismissed =
+                        std::make_shared<std::atomic_bool>(false);
                     brls::Dialog* dialog = createLoadingDialog(
                         "add_host/pair_prefix"_i18n + pin +
-                        "add_host/pair_postfix"_i18n);
-                    dialog->setCancelable(false);
+                            "add_host/pair_postfix"_i18n,
+                        [cancellation, dialogDismissed] {
+                            dialogDismissed->store(true);
+                            (void)cancellation.cancel();
+                        });
                     dialog->open();
 
                     ASYNC_RETAIN
                     GameStreamClient::instance().pair(
                         pairedHost, pin,
-                        [ASYNC_TOKEN, pairedHost, dialog](const GSResult<bool>& result) {
+                        [ASYNC_TOKEN, pairedHost, dialog, cancellation,
+                         dialogDismissed](const GSResult<bool>& result) {
                             ASYNC_RELEASE
-                            dialog->dismiss([result, pairedHost] {
+                            if (cancellation.isCancellationRequested()) {
+                                AddHostTab::startSearching();
+                                return;
+                            }
+                            const auto finish = [result, pairedHost] {
                                 if (result.isSuccess()) {
                                     Settings::instance().add_host(pairedHost);
                                     MainTabs::getInstanse()->refillTabs();
@@ -289,8 +301,16 @@ void AddHostTab::connectHost(const Host& host) {
                                         AddHostTab::startSearching();
                                     });
                                 }
-                            });
-                        });
+                            };
+                            // A late Cancel press can dismiss the dialog after
+                            // the worker has already committed completion. The
+                            // result is still valid, but the pointer is not.
+                            if (dialogDismissed->load()) {
+                                finish();
+                            } else {
+                                dialog->dismiss(finish);
+                            }
+                        }, cancellation);
                 } else {
                     showError(result.error(),
                               [] { AddHostTab::startSearching(); });

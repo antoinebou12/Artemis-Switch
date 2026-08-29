@@ -19,6 +19,7 @@
 
 #pragma once
 
+#include "CancellationToken.hpp"
 #include "Data.hpp"
 
 enum HTTPRequestTimeout : long {
@@ -38,6 +39,7 @@ struct HTTPRequestOptions {
     bool suppressErrors = false;
     long connectTimeoutMs = 0;
     long totalTimeoutMs = 0;
+    CancellationToken cancellation;
 };
 
 struct HTTPResponseInfo {

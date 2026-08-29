@@ -89,9 +89,11 @@ class GameStreamClient : public Singleton<GameStreamClient> {
                  ServerCallback<SERVER_DATA>& callback);
     void connect(const Host& host, ServerCallback<SERVER_DATA>& callback);
     void pair(const std::string& address, const std::string& pin,
-              ServerCallback<bool>& callback);
+              ServerCallback<bool>& callback,
+              const CancellationToken& cancellation = {});
     void pair(const Host& host, const std::string& pin,
-              ServerCallback<bool>& callback);
+              ServerCallback<bool>& callback,
+              const CancellationToken& cancellation = {});
     void applist(const std::string& address,
                  ServerCallback<AppInfoList>& callback);
     void applist(const Host& host, ServerCallback<AppInfoList>& callback);
@@ -134,6 +136,7 @@ class GameStreamClient : public Singleton<GameStreamClient> {
                               const std::string& activeKey,
                               ServerCallback<SERVER_DATA>& callback);
     bool prepare_remote_route_for_stream(const std::string& address);
+    void release_cancelled_pairing_connection(const std::string& address);
 
     std::map<std::string, SERVER_DATA> m_server_data;
     std::map<std::string, std::string> m_active_addresses;

@@ -44,6 +44,15 @@ bool contains_secret_field(std::string_view line) {
            lower.find("preshared key") != std::string::npos ||
            lower.find("setupkey") != std::string::npos ||
            lower.find("setup key") != std::string::npos ||
+           lower.find("authkey") != std::string::npos ||
+           lower.find("auth key") != std::string::npos ||
+           lower.find("passphrase") != std::string::npos ||
+           lower.find("machineprivate") != std::string::npos ||
+           lower.find("machine private") != std::string::npos ||
+           lower.find("nodeprivate") != std::string::npos ||
+           lower.find("node private") != std::string::npos ||
+           lower.find("discoprivate") != std::string::npos ||
+           lower.find("disco private") != std::string::npos ||
            lower.find("wireguard secret") != std::string::npos;
 }
 
@@ -128,4 +137,3 @@ bool VpnFileLogger::append(const std::string& path,
     output.write(line.data(), static_cast<std::streamsize>(line.size()));
     return output.good();
 }
-

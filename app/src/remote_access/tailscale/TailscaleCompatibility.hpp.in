@@ -1,0 +1,15 @@
+#pragma once
+
+namespace artemis::tailscale::compat {
+
+// Generated from compatibility/tailscale/manifest.json. The candidate is the
+// value a dedicated test-tailnet probe may try; it is not accepted until that
+// probe and the semantic audit both succeed.
+inline constexpr int kCandidateCapabilityVersion =
+    @TS_CANDIDATE_CAPABILITY@;
+inline constexpr int kAcceptedCapabilityVersion =
+    @TS_ACCEPTED_CAPABILITY@;
+inline constexpr const char* kProtocolReferenceCommit =
+    "@TS_PROTOCOL_REFERENCE_COMMIT@";
+
+} // namespace artemis::tailscale::compat

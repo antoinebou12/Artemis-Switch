@@ -39,6 +39,18 @@ int main() {
     assert(content.find("super-secret-key") == std::string::npos);
     assert(content.find("PrivateKey = <redacted>") != std::string::npos);
 
+    assert(VpnFileLogger::append(base.string(), "TS",
+                                 VpnFileLogger::Severity::Info,
+                                 "AuthKey = tskey-auth-secret"));
+    assert(VpnFileLogger::append(base.string(), "TS-CTRL",
+                                 VpnFileLogger::Severity::Error,
+                                 "passphrase: never-log-this"));
+    content = read_file(base);
+    assert(content.find("tskey-auth-secret") == std::string::npos);
+    assert(content.find("never-log-this") == std::string::npos);
+    assert(content.find("[INFO] [TS]") != std::string::npos);
+    assert(content.find("[ERROR] [TS-CTRL]") != std::string::npos);
+
     const std::string filler(VpnFileLogger::kMaxLogBytes, 'x');
     assert(VpnFileLogger::append(base.string(), "NetBird",
                                  VpnFileLogger::Severity::Info, filler));
@@ -52,4 +64,3 @@ int main() {
     std::filesystem::remove(backup, error);
     return 0;
 }
-

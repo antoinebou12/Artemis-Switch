@@ -10,6 +10,7 @@
 #include "../host/HostEndpoints.hpp"
 #include "../streaming/StreamAspectRatio.hpp"
 #include <map>
+#include <cstdint>
 #include <cstdio>
 #include <string>
 #include <utility>
@@ -383,6 +384,43 @@ class Settings : public Singleton<Settings> {
         return m_remote_access_prefer_lan;
     }
 
+    // Experimental Tailscale control endpoint. Normally the TS2021 Noise key
+    // is fetched over verified TLS; a manual override uses mkey: plus exactly
+    // 64 lowercase hexadecimal characters.
+    // An absent host or key keeps the provider fail-closed.
+    void set_tailscale_control_host(std::string host) {
+        m_tailscale_control_host = std::move(host);
+    }
+    [[nodiscard]] std::string tailscale_control_host() const {
+        return m_tailscale_control_host;
+    }
+    void set_tailscale_control_port(std::uint16_t port) {
+        m_tailscale_control_port = port;
+    }
+    [[nodiscard]] std::uint16_t tailscale_control_port() const {
+        return m_tailscale_control_port;
+    }
+    void set_tailscale_control_public_key(std::string key) {
+        m_tailscale_control_public_key = std::move(key);
+    }
+    [[nodiscard]] std::string tailscale_control_public_key() const {
+        return m_tailscale_control_public_key;
+    }
+    void set_tailscale_hostname(std::string hostname) {
+        m_tailscale_hostname = std::move(hostname);
+    }
+    [[nodiscard]] std::string tailscale_hostname() const {
+        return m_tailscale_hostname;
+    }
+    // Only the location is persisted. The auth key itself is loaded directly
+    // into transient provider memory and is never serialized by Settings.
+    void set_tailscale_auth_key_path(std::string path) {
+        m_tailscale_auth_key_path = std::move(path);
+    }
+    [[nodiscard]] std::string tailscale_auth_key_path() const {
+        return m_tailscale_auth_key_path;
+    }
+
     void set_remote_access_auto_connect(bool enabled) {
         m_remote_access_auto_connect = enabled;
     }
@@ -577,6 +615,11 @@ class Settings : public Singleton<Settings> {
     std::string m_netbird_server = "https://api.netbird.io:443";
     std::string m_netbird_setup_key;
     std::string m_netbird_config_path;
+    std::string m_tailscale_control_host;
+    std::uint16_t m_tailscale_control_port = 443;
+    std::string m_tailscale_control_public_key;
+    std::string m_tailscale_hostname = "artemis-switch";
+    std::string m_tailscale_auth_key_path;
     bool m_remote_access_prefer_lan = true;
     bool m_remote_access_auto_connect = false;
     bool m_show_host_web_config = true;

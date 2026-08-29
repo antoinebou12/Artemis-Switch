@@ -1,0 +1,33 @@
+{
+  "protocol_reference_commit": "37317073bae97cd17b6d1064e280b6d0cfce5c2b",
+  "candidate_capability_version": 68,
+  "accepted_capability_version": null,
+  "status": "foundation-only-live-control-blocked",
+  "implemented_primitives": [
+    "TS2021 Noise transport framing",
+    "canonical typed-hex machine, node, and disco key encoding",
+    "bounded HTTPS control-key response parsing",
+    "verified Switch TLS transport using the platform CA store",
+    "bounded full and delta peer-map decoding",
+    "stable-ID IPv4 route resolution",
+    "passphrase-protected identity envelopes",
+    "isolated multi-peer wgx ABI",
+    "DERP and direct IPv4 path metadata"
+  ],
+  "not_implemented": [
+    "HTTP/2-over-Noise control session",
+    "live registration and streaming map session",
+    "DERP transport",
+    "STUN and encrypted Disco socket flows",
+    "direct UDP path",
+    "Tailscale-owned lwIP Moonlight proxy",
+    "dedicated-tailnet capability probe"
+  ],
+  "platform_inapplicable": [
+    "system DNS configuration",
+    "system TUN routes",
+    "Tailscale SSH",
+    "exit nodes"
+  ],
+  "release_gate": "No capability is accepted and the provider must remain fail-closed until the dedicated-tailnet probe and all production acceptance gates pass"
+}

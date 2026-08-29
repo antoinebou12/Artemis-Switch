@@ -499,6 +499,44 @@ void Settings::load() {
                 }
             }
 
+            if (json_t* tailscale_control_host =
+                    json_object_get(settings, "tailscale_control_host")) {
+                if (json_typeof(tailscale_control_host) == JSON_STRING) {
+                    m_tailscale_control_host =
+                        json_string_value(tailscale_control_host);
+                }
+            }
+            if (json_t* tailscale_control_port =
+                    json_object_get(settings, "tailscale_control_port")) {
+                if (json_typeof(tailscale_control_port) == JSON_INTEGER) {
+                    m_tailscale_control_port = static_cast<std::uint16_t>(
+                        std::clamp(json_integer_value(tailscale_control_port),
+                                   static_cast<json_int_t>(1),
+                                   static_cast<json_int_t>(65535)));
+                }
+            }
+            if (json_t* tailscale_control_public_key =
+                    json_object_get(settings, "tailscale_control_public_key")) {
+                if (json_typeof(tailscale_control_public_key) == JSON_STRING) {
+                    m_tailscale_control_public_key =
+                        json_string_value(tailscale_control_public_key);
+                }
+            }
+            if (json_t* tailscale_hostname =
+                    json_object_get(settings, "tailscale_hostname")) {
+                if (json_typeof(tailscale_hostname) == JSON_STRING) {
+                    m_tailscale_hostname =
+                        json_string_value(tailscale_hostname);
+                }
+            }
+            if (json_t* tailscale_auth_key_path =
+                    json_object_get(settings, "tailscale_auth_key_path")) {
+                if (json_typeof(tailscale_auth_key_path) == JSON_STRING) {
+                    m_tailscale_auth_key_path =
+                        json_string_value(tailscale_auth_key_path);
+                }
+            }
+
             if (json_t* remote_access_prefer_lan =
                     json_object_get(settings, "remote_access_prefer_lan")) {
                 m_remote_access_prefer_lan =
@@ -861,6 +899,18 @@ void Settings::save() {
                                 json_string(m_netbird_setup_key.c_str()));
             json_object_set_new(settings, "netbird_config_path",
                                 json_string(m_netbird_config_path.c_str()));
+            json_object_set_new(settings, "tailscale_control_host",
+                                json_string(m_tailscale_control_host.c_str()));
+            json_object_set_new(settings, "tailscale_control_port",
+                                json_integer(m_tailscale_control_port));
+            json_object_set_new(
+                settings, "tailscale_control_public_key",
+                json_string(m_tailscale_control_public_key.c_str()));
+            json_object_set_new(settings, "tailscale_hostname",
+                                json_string(m_tailscale_hostname.c_str()));
+            json_object_set_new(
+                settings, "tailscale_auth_key_path",
+                json_string(m_tailscale_auth_key_path.c_str()));
             json_object_set_new(settings, "remote_access_prefer_lan",
                                 m_remote_access_prefer_lan ? json_true() : json_false());
             json_object_set_new(settings, "remote_access_auto_connect",

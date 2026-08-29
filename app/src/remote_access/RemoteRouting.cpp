@@ -45,12 +45,16 @@ RemoteRouteLease acquireRouteFor(const std::string& address) {
         return {};
     }
 
-    if (!provider->canRouteAddress(parsed.host)) {
+    auto target = provider->resolveRoute(parsed.host);
+    if (!target) {
         return {};
     }
 
-    RemoteRouteLease lease(manager, providerId, parsed.host, parsed.host,
-                           kProxyAddress);
+    if (target->targetAddress.empty())
+        target->targetAddress = parsed.host;
+    if (target->connectAddress.empty())
+        target->connectAddress = kProxyAddress;
+    RemoteRouteLease lease(manager, providerId, std::move(*target));
     if (!lease.isActive()) {
         brls::Logger::warning("Remote access: could not route to peer");
         return {};

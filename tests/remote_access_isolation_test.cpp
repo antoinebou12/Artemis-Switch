@@ -20,23 +20,28 @@ public:
     std::string lastError() const override { return {}; }
     std::string localAddress() const override { return "100.64.0.2"; }
     std::vector<RemoteAccessPeer> peers() const override { return {}; }
-    bool canRouteAddress(const std::string& address) const override {
-        return address.rfind("100.", 0) == 0;
+    std::optional<RemoteRouteTarget>
+    resolveRoute(std::string_view address) const override {
+        if (!address.starts_with("100."))
+            return std::nullopt;
+        const std::string value(address);
+        return RemoteRouteTarget{providerId_ + ":" + value, value, value,
+                                 "127.0.0.1", RemoteRouteMode::Proxy};
     }
-    bool activateRoute(const std::string& peerId) override {
-        activePeer = peerId;
+    bool activateRoute(const RemoteRouteTarget& target) override {
+        activePeer = target.peerId;
         ++activations;
         return true;
     }
-    void deactivateRoute(const std::string& peerId) override {
-        assert(peerId == activePeer);
+    void deactivateRoute(const RemoteRouteTarget& target) override {
+        assert(target.peerId == activePeer);
         activePeer.clear();
         ++deactivations;
     }
     bool routesAreExclusive() const override { return exclusive_; }
-    bool prepareRouteForStreaming(const std::string& peerId) override {
+    bool prepareRouteForStreaming(const RemoteRouteTarget& target) override {
         ++prepares;
-        return peerId == activePeer;
+        return target.peerId == activePeer;
     }
 
     int starts = 0;
@@ -62,25 +67,30 @@ int main() {
 
     assert(manager.selectAndStartProvider("wireguard").started);
     assert(wireGuardPtr->starts == 1);
-    assert(wireGuardPtr->canRouteAddress("100.115.188.144"));
-    assert(!wireGuardPtr->canRouteAddress("host.example"));
+    const auto firstTarget =
+        wireGuardPtr->resolveRoute("100.115.188.144");
+    assert(firstTarget);
+    assert(!wireGuardPtr->resolveRoute("host.example"));
 
-    RemoteRouteLease first(manager, "wireguard", "100.115.188.144",
-                           "100.115.188.144", "127.0.0.1");
+    RemoteRouteLease first(manager, "wireguard", *firstTarget);
     assert(first.isActive());
     assert(first.prepareForStreaming());
     assert(wireGuardPtr->prepares == 1);
 
     // An exclusive provider must activate the new target instead of retaining
     // the old lease count as valid state.
-    RemoteRouteLease second(manager, "wireguard", "100.115.188.145",
-                            "100.115.188.145", "127.0.0.1");
+    RemoteRouteLease second(
+        manager, "wireguard",
+        *wireGuardPtr->resolveRoute("100.115.188.145"));
     assert(second.isActive());
     assert(wireGuardPtr->activations == 2);
     first.release();
-    assert(wireGuardPtr->activePeer == "100.115.188.145");
+    assert(wireGuardPtr->activePeer ==
+           "wireguard:100.115.188.145");
     second.release();
-    assert(wireGuardPtr->deactivations == 1);
+    // The old target is torn down before the replacement is activated, and
+    // the final lease then tears down the replacement.
+    assert(wireGuardPtr->deactivations == 2);
 
     assert(manager.selectAndStartProvider("netbird").started);
     assert(wireGuardPtr->stops == 1);

@@ -1,0 +1,28 @@
+diff --git a/src/platform_switch.c b/src/platform_switch.c
+--- a/src/platform_switch.c
++++ b/src/platform_switch.c
+@@ -15,2 +15,3 @@
+ #include <fcntl.h>
++#include <stdlib.h>
+ 
+@@ -20,2 +21,4 @@
+ static void (*g_relay_send)(const uint8_t*, const void*, size_t) = NULL;
++static volatile uint32_t g_wseq_local = 0;
++static volatile uint32_t g_wseq = 0;
+ 
+@@ -83,7 +83,7 @@
+ int wg_socket_open(WgTunnel* tun) {
+-    if (g_relay_send) {
++    if (tun->relay_transport) {
+         tun->socket_fd = 0;  // dummy fd
+         return WG_OK;
+     }
+@@ -106,7 +106,12 @@
+ int wg_socket_send(WgTunnel* tun, const void* data, size_t len) {
+-    if (g_relay_send) { fprintf(stderr, "[WG] relay_send %zu bytes (legacy, no hash)\n", len); g_relay_send(NULL, data, len); return (int)len; }
++    if (tun->relay_transport) {
++        WgRelayTransport* relay = tun->relay_transport;
++        relay->send_fn(relay->send_user, NULL, data, len);
++        return (int)len;
++    }
+     for (int retry = 0; retry < 10; retry++) {

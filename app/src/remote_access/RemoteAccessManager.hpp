@@ -1,5 +1,7 @@
 #pragma once
 #include "IRemoteAccessProvider.hpp"
+#include <condition_variable>
+#include <cstdint>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -43,7 +45,8 @@ public:
     std::vector<RemoteAccessPeer> allPeers() const;
     std::string status() const;
 
-    bool activateRoute(const std::string& providerId, const std::string& peerId);
+    bool activateRoute(const std::string& providerId,
+                       const RemoteRouteTarget& target);
     bool prepareRouteForStreaming(const std::string& providerId,
                                   const std::string& peerId);
     void deactivateRoute(const std::string& providerId, const std::string& peerId);
@@ -63,9 +66,39 @@ public:
     };
 
 private:
+    struct ProviderSlot {
+        explicit ProviderSlot(std::shared_ptr<IRemoteAccessProvider> value)
+            : provider(std::move(value)) {}
+
+        std::shared_ptr<IRemoteAccessProvider> provider;
+        // Serializes every lifecycle and route mutation for this provider.
+        // The manager state mutex is never held while this mutex is used.
+        mutable std::mutex operations;
+    };
+
+    enum class RouteState { Activating, Active, Failed };
+    struct RouteEntry {
+        RemoteRouteTarget target;
+        std::uint64_t generation = 0;
+        std::size_t references = 1;
+        RouteState state = RouteState::Activating;
+        std::condition_variable changed;
+    };
+
     RemoteAccessManager() = default;
+    std::shared_ptr<ProviderSlot> providerSlot(const std::string& id) const;
+    std::vector<std::shared_ptr<ProviderSlot>> providerSlots() const;
+    std::shared_ptr<IRemoteAccessProvider>
+    providerShared(const std::string& id) const;
+    void stopActiveProviderLocked();
+
+    // Serializes provider selection/restart transactions. It is distinct from
+    // mutex_, which protects only short-lived manager bookkeeping.
+    mutable std::mutex lifecycleMutex_;
     mutable std::mutex mutex_;
-    std::vector<std::unique_ptr<IRemoteAccessProvider>> providers_;
+    std::vector<std::shared_ptr<ProviderSlot>> providers_;
     std::string activeProviderId_;
-    std::unordered_map<RouteKey, size_t, RouteKeyHash> activeRoutes_;
+    std::uint64_t providerGeneration_ = 0;
+    std::unordered_map<RouteKey, std::shared_ptr<RouteEntry>, RouteKeyHash>
+        activeRoutes_;
 };

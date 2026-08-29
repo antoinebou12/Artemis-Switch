@@ -1,0 +1,59 @@
+diff --git a/include/netbird.h b/include/netbird.h
+--- a/include/netbird.h
++++ b/include/netbird.h
+@@ -86,5 +86,12 @@ bool netbird_get_peer(int index, char *ip_out, size_t ip_size,
+                       char *name_out, size_t name_size);
+ 
++// Stable route identity derived from the authenticated WireGuard public key.
++// The returned form is "netbird:wg:" followed by the SHA-256 fingerprint in
++// lowercase hexadecimal. It remains stable when the peer's overlay IP changes.
++// Returns false if the peer or output buffer is invalid.
++bool netbird_get_peer_identity(int index, char *identity_out,
++                               size_t identity_size);
++
+ // Quick probe: returns 1 if peer_ip:port is reachable via WireGuard/lwIP.
+ // Uses a short-lived TCP PCB (no g_socks, no TIME_WAIT lingering).
+ int  netbird_peer_reachable(const char *peer_ip, uint16_t port, int timeout_ms);
+diff --git a/source/netbird_core.c b/source/netbird_core.c
+--- a/source/netbird_core.c
++++ b/source/netbird_core.c
+@@ -1130,6 +1130,39 @@ bool netbird_get_peer(int index, char *ip_out, size_t ip_size,
+     return true;
+ }
+ 
++bool netbird_get_peer_identity(int index, char *identity_out,
++                               size_t identity_size) {
++    static const char prefix[] = "netbird:wg:";
++    static const char hex[] = "0123456789abcdef";
++    const size_t required = sizeof(prefix) - 1 + 64 + 1;
++    if (!identity_out || identity_size < required || !g_login || index < 0 ||
++        index >= g_login->peer_count) {
++        return false;
++    }
++
++    NetbirdPeer *peer = &g_login->peers[index];
++    if (!peer->public_key[0]) return false;
++
++    uint8_t public_key[WG_KEY_LEN] = {0};
++    if (b64_decode(public_key, sizeof(public_key), peer->public_key,
++                   strlen(peer->public_key)) != WG_KEY_LEN) {
++        crypto_wipe(public_key, sizeof(public_key));
++        return false;
++    }
++
++    uint8_t digest[32];
++    mbedtls_sha256_ret(public_key, sizeof(public_key), digest, 0);
++    crypto_wipe(public_key, sizeof(public_key));
++    memcpy(identity_out, prefix, sizeof(prefix) - 1);
++    for (size_t i = 0; i < sizeof(digest); ++i) {
++        identity_out[sizeof(prefix) - 1 + i * 2] = hex[digest[i] >> 4];
++        identity_out[sizeof(prefix) + i * 2] = hex[digest[i] & 0x0f];
++    }
++    identity_out[required - 1] = '\0';
++    crypto_wipe(digest, sizeof(digest));
++    return true;
++}
++
+ // ============================================================
+ // UDP RELAY — bridges native UDP sockets ↔ lwIP UDP through WG
+ // ============================================================

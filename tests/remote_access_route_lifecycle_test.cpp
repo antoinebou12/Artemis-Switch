@@ -17,20 +17,27 @@ public:
     std::string lastError() const override { return {}; }
     std::string localAddress() const override { return {}; }
     std::vector<RemoteAccessPeer> peers() const override { return {}; }
-    bool canRouteAddress(const std::string& address) const override {
-        return !address.empty();
+    std::optional<RemoteRouteTarget>
+    resolveRoute(std::string_view address) const override {
+        if (address.empty())
+            return std::nullopt;
+        const std::string value(address);
+        return RemoteRouteTarget{value, value, value, "127.0.0.1",
+                                 RemoteRouteMode::Proxy};
     }
 
-    bool activateRoute(const std::string&) override {
+    bool activateRoute(const RemoteRouteTarget&) override {
         ++activations;
         return true;
     }
     bool routesAreExclusive() const override { return true; }
-    bool prepareRouteForStreaming(const std::string&) override {
+    bool prepareRouteForStreaming(const RemoteRouteTarget&) override {
         ++streamPreparations;
         return true;
     }
-    void deactivateRoute(const std::string&) override { ++deactivations; }
+    void deactivateRoute(const RemoteRouteTarget&) override {
+        ++deactivations;
+    }
 
     int activations = 0;
     int streamPreparations = 0;
@@ -48,7 +55,8 @@ int main() {
 
     auto selected = manager.selectAndStartProvider("route-test");
     assert(selected.started);
-    assert(manager.activateRoute("route-test", "peer"));
+    assert(manager.activateRoute("route-test",
+                                 *provider->resolveRoute("peer")));
     assert(provider->activations == 1);
     assert(manager.prepareRouteForStreaming("route-test", "peer"));
     assert(provider->streamPreparations == 1);
@@ -62,22 +70,25 @@ int main() {
 
     selected = manager.selectAndStartProvider("route-test");
     assert(selected.started);
-    assert(manager.activateRoute("route-test", "peer"));
+    assert(manager.activateRoute("route-test",
+                                 *provider->resolveRoute("peer")));
     assert(provider->activations == 2);
 
     manager.deactivateRoute("route-test", "peer");
     assert(provider->deactivations == 1);
 
-    assert(manager.activateRoute("route-test", "peer-a"));
-    assert(manager.activateRoute("route-test", "peer-b"));
+    assert(manager.activateRoute("route-test",
+                                 *provider->resolveRoute("peer-a")));
+    assert(manager.activateRoute("route-test",
+                                 *provider->resolveRoute("peer-b")));
     assert(provider->activations == 4);
     assert(!manager.prepareRouteForStreaming("route-test", "peer-a"));
     assert(manager.prepareRouteForStreaming("route-test", "peer-b"));
 
     // Releasing the stale peer-a lease must not tear down peer-b's route.
     manager.deactivateRoute("route-test", "peer-a");
-    assert(provider->deactivations == 1);
-    manager.deactivateRoute("route-test", "peer-b");
     assert(provider->deactivations == 2);
+    manager.deactivateRoute("route-test", "peer-b");
+    assert(provider->deactivations == 3);
     return 0;
 }

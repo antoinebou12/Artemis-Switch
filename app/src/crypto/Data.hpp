@@ -5,8 +5,9 @@
 class Data {
   public:
     Data() : Data(0){};
-    Data(unsigned char* bytes, size_t size);
-    Data(char* bytes, size_t size) : Data((unsigned char*)bytes, size){};
+    Data(const unsigned char* bytes, size_t size);
+    Data(const char* bytes, size_t size)
+        : Data(reinterpret_cast<const unsigned char*>(bytes), size) {};
     Data(size_t capacity);
 
     ~Data();

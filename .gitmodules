@@ -19,3 +19,9 @@
 [submodule "extern/wg-nx"]
 	path = extern/wg-nx
 	url = https://github.com/jmpangilinan/wg-nx.git
+[submodule "extern/tailscale-libsodium"]
+	path = extern/tailscale-libsodium
+	url = https://github.com/jedisct1/libsodium.git
+[submodule "extern/tailscale-nghttp2"]
+	path = extern/tailscale-nghttp2
+	url = https://github.com/nghttp2/nghttp2.git

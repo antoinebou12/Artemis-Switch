@@ -1,0 +1,169 @@
+diff --git a/src/wg_internal.h b/src/wg_internal.h
+--- a/src/wg_internal.h
++++ b/src/wg_internal.h
+@@ -143,6 +143,8 @@ typedef struct WgPeer {
+     uint8_t last_mac1[WG_MAC_LEN];
+ } WgPeer;
+ 
++typedef struct WgRelayTransport WgRelayTransport;
++
+ struct WgTunnel {
+@@ -189,6 +191,7 @@ struct WgTunnel {
+     struct sockaddr_in recv_src;
+     bool recv_src_valid;
+ 
++    WgRelayTransport* relay_transport;
+     WgRecvPool recv_pool;
+@@ -242,9 +245,12 @@ int wg_socket_recv(WgTunnel* tun, void* buf, size_t len, int timeout_ms);
+ 
+ // Relay integration: replace socket layer with relay transport
+-void wg_set_relay_send(void (*send_fn)(const uint8_t* peer_hash, const void* data, size_t len));
+-void wg_relay_input(const void *data, size_t len);
++int wg_set_relay_send(WgTunnel* tun,
++                      void (*send_fn)(void* user, const uint8_t* peer_hash,
++                                      const void* data, size_t len),
++                      void* user);
++int wg_relay_input(WgTunnel* tun, const void *data, size_t len);
+ void wg_relay_commit(void);
+ void wg_socket_close(WgTunnel* tun);
+ void wg_update_endpoint_from_recv(WgTunnel* tun);
+diff --git a/src/platform_switch.c b/src/platform_switch.c
+--- a/src/platform_switch.c
++++ b/src/platform_switch.c
+@@ -28,5 +27,5 @@
+ struct __attribute__((aligned(64))) ring_slot {
+-    volatile uint16_t len;
++    uint16_t len;
+     uint8_t data[RING_DATA_MAX];
+ };
+@@ -33,7 +32,16 @@
+-static struct ring_slot g_ring[RING_SLOTS];
+-static volatile uint32_t g_wseq_local = 0;
+-static volatile uint32_t g_wseq __attribute__((aligned(64))) = 0;
++struct WgRelayTransport {
++    void (*send_fn)(void*, const uint8_t*, const void*, size_t);
++    void* send_user;
++    WgMutex ring_mutex;
++    uint32_t write_seq;
++    uint32_t read_seq;
++    struct ring_slot ring[RING_SLOTS];
++};
+ 
+-void wg_set_relay_send(void (*send_fn)(const uint8_t*, const void*, size_t)) {
+-    g_relay_send = send_fn;
++int wg_set_relay_send(WgTunnel* tun,
++                      void (*send_fn)(void*, const uint8_t*, const void*, size_t),
++                      void* user) {
++    if (!tun || !send_fn || tun->relay_transport) return WG_ERR_INVALID_CONFIG;
++    WgRelayTransport* relay = calloc(1, sizeof(*relay));
++    if (!relay) return WG_ERR_THREAD;
++    if (wg_mutex_init(&relay->ring_mutex, false) != 0) {
++        free(relay);
++        return WG_ERR_THREAD;
++    }
++    relay->send_fn = send_fn;
++    relay->send_user = user;
++    tun->relay_transport = relay;
++    return WG_OK;
+ }
+@@ -41,25 +49,27 @@
+-void wg_relay_input(const void *data, size_t len) {
+-    if (len > RING_DATA_MAX) return;
+-    // Block if consumer is too far behind (ring full)
+-    static int ring_full_logged = 0;
+-    while (g_wseq_local - g_wseq >= RING_SLOTS - 4) {
+-        if (!ring_full_logged) {
+-            fprintf(stderr, "[WG] RING FULL! wseq_local=%u wseq=%u slots=%d\n", g_wseq_local, g_wseq, RING_SLOTS);
+-            ring_full_logged = 1;
+-        }
+-        svcSleepThread(100000);  // 100µs
+-    }
+-    uint32_t seq = g_wseq_local;
++int wg_relay_input(WgTunnel* tun, const void *data, size_t len) {
++    if (!tun || !tun->relay_transport || !data || len == 0 ||
++        len > RING_DATA_MAX) return WG_ERR_INVALID_CONFIG;
++    WgRelayTransport* relay = tun->relay_transport;
++    wg_mutex_lock(&relay->ring_mutex);
++    if (relay->write_seq - relay->read_seq >= RING_SLOTS) {
++        wg_mutex_unlock(&relay->ring_mutex);
++        return WG_ERR_TIMEOUT;
++    }
++    uint32_t seq = relay->write_seq;
+     uint32_t idx = seq & (RING_SLOTS - 1);
+-    
+-    g_ring[idx].len = (uint16_t)len;
+-    memcpy((void*)g_ring[idx].data, data, len);
+-    g_wseq_local = seq + 1;
++    relay->ring[idx].len = (uint16_t)len;
++    memcpy(relay->ring[idx].data, data, len);
++    relay->write_seq = seq + 1;
++    wg_mutex_unlock(&relay->ring_mutex);
++    return WG_OK;
+ }
+@@ -105,11 +116,11 @@ int wg_socket_send_to(WgTunnel* tun, const uint8_t* relay_hash, const void* data, size_t len) {
+-    (void)tun;
+-    if (g_relay_send) {
++    if (tun->relay_transport) {
+ #if WG_DEBUG_LOG
+         fprintf(stderr, "[WG] relay_send_to %zu bytes hash=%.4s...\n", len, relay_hash ? (const char*)relay_hash : "null");
+ #endif
+-        g_relay_send(relay_hash, data, len);
++        WgRelayTransport* relay = tun->relay_transport;
++        relay->send_fn(relay->send_user, relay_hash, data, len);
+         return (int)len;
+@@ -117,38 +128,34 @@ int wg_socket_recv(WgTunnel* tun, void* buf, size_t len, int timeout_ms) {
+-    if (g_relay_send) {
+-        // Full FIFO drain: consume ALL packets in order from g_wseq.
+-        // Batch commit (wg_relay_commit) ensures we never see partial writes.
+-        // Core 2 is dedicated — FIFO delay can't starve Core 1 producer.
+-        static uint32_t rseq = 0;
++    if (tun->relay_transport) {
++        WgRelayTransport* relay = tun->relay_transport;
+         uint64_t deadline = wg_time_now() + (uint64_t)timeout_ms * 1000000ULL;
+-        
+         while (wg_time_now() < deadline) {
+-            uint32_t w = g_wseq;
+-            __asm__ __volatile__("dmb ish" ::: "memory");
+-            
+-            if (rseq >= w) {
++            wg_mutex_lock(&relay->ring_mutex);
++            if (relay->read_seq >= relay->write_seq) {
++                wg_mutex_unlock(&relay->ring_mutex);
+                 svcSleepThread(50000);  // 50µs — more responsive for fragment bursts
+                 continue;
+             }
+-            
+-            // Catch up if fell far behind (scheduling jitter)
+-            if (w - rseq > RING_SLOTS) rseq = w - RING_SLOTS + 1;
+-            
+-            // Drain next packet in strict FIFO order
+-            uint32_t idx = rseq & (RING_SLOTS - 1);
+-            uint16_t slot_len = g_ring[idx].len;
++            uint32_t idx = relay->read_seq & (RING_SLOTS - 1);
++            uint16_t slot_len = relay->ring[idx].len;
+             if (slot_len == 0) {
+-                rseq++;
++                relay->read_seq++;
++                wg_mutex_unlock(&relay->ring_mutex);
+                 continue;
+             }
+-            
+             size_t n = slot_len < len ? slot_len : len;
+-            memcpy(buf, (const void*)g_ring[idx].data, n);
+-            rseq++;
++            memcpy(buf, relay->ring[idx].data, n);
++            relay->ring[idx].len = 0;
++            relay->read_seq++;
++            wg_mutex_unlock(&relay->ring_mutex);
+             return (int)n;
+@@ -186,6 +193,14 @@ void wg_socket_close(WgTunnel* tun) {
++    if (tun->relay_transport) {
++        WgRelayTransport* relay = tun->relay_transport;
++        tun->relay_transport = NULL;
++        wg_mutex_fini(&relay->ring_mutex);
++        crypto_wipe(relay, sizeof(*relay));
++        free(relay);
++        tun->socket_fd = -1;
++        return;
++    }
+     if (tun->socket_fd >= 0) {

@@ -47,7 +47,8 @@ file(COPY "${NETBIRD_SRC}/library/wg-nx" DESTINATION "${NETBIRD_STAGE}/library")
 # applied to the staged copy, exactly like the borealis and common-C patches.
 set(_netbird_patches
     "${CMAKE_CURRENT_LIST_DIR}/../patches/netbird-switch-relay-use-after-free.patch"
-    "${CMAKE_CURRENT_LIST_DIR}/../patches/netbird-switch-proxy-reliability.patch")
+    "${CMAKE_CURRENT_LIST_DIR}/../patches/netbird-switch-proxy-reliability.patch"
+    "${CMAKE_CURRENT_LIST_DIR}/../patches/netbird-switch-peer-identity.patch")
 
 find_program(_git_exe NAMES git REQUIRED)
 execute_process(

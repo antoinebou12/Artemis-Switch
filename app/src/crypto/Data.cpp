@@ -3,7 +3,7 @@
 #include <cstdlib>
 #include <string.h>
 
-Data::Data(unsigned char* bytes, size_t size) {
+Data::Data(const unsigned char* bytes, size_t size) {
     if (bytes && size > 0) {
         m_bytes = (unsigned char*)malloc(size + 1);
         m_bytes[size] = '\0';

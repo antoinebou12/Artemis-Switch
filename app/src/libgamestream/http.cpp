@@ -40,6 +40,13 @@ struct HTTP_DATA {
     bool tooLarge;
 };
 
+static int _cancel_curl(void* clientp, curl_off_t, curl_off_t, curl_off_t,
+                        curl_off_t) {
+    const auto* cancellation =
+        static_cast<const CancellationToken*>(clientp);
+    return cancellation && cancellation->isCancellationRequested() ? 1 : 0;
+}
+
 static size_t _write_curl(void* contents, size_t size, size_t nmemb,
                           void* userp) {
     size_t realsize = size * nmemb;
@@ -139,6 +146,9 @@ int http_request(const std::string& url, Data* data,
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, http_data);
     curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
     curl_easy_setopt(curl, CURLOPT_TIMEOUT, timeout);
+    curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0L);
+    curl_easy_setopt(curl, CURLOPT_XFERINFOFUNCTION, _cancel_curl);
+    curl_easy_setopt(curl, CURLOPT_XFERINFODATA, &options.cancellation);
     if (options.connectTimeoutMs > 0)
         curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT_MS,
                          options.connectTimeoutMs);
@@ -169,9 +179,13 @@ int http_request(const std::string& url, Data* data,
 
     if (res != CURLE_OK) {
         const bool tooLarge = http_data->tooLarge;
+        const bool cancelled =
+            res == CURLE_ABORTED_BY_CALLBACK &&
+            options.cancellation.isCancellationRequested();
         const char* message = tooLarge
-            ? "HTTP response exceeded configured limit"
-            : curl_easy_strerror(res);
+                                  ? "HTTP response exceeded configured limit"
+                              : cancelled ? "Request cancelled"
+                                          : curl_easy_strerror(res);
         if (!options.suppressErrors)
             gs_set_error(message);
         brls::Logger::error("Curl: error: {}", message);

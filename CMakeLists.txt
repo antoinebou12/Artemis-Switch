@@ -111,9 +111,11 @@ endif ()
 if (PLATFORM_SWITCH)
     option(ENABLE_WIREGUARD "Enable WireGuard support" ON)
     option(ENABLE_NETBIRD "Enable NetBird VPN support" ON)
+    option(ENABLE_TAILSCALE "Enable experimental Tailscale support" OFF)
 else ()
     set(ENABLE_WIREGUARD OFF)
     set(ENABLE_NETBIRD OFF)
+    set(ENABLE_TAILSCALE OFF)
 endif ()
 
 if (ENABLE_WIREGUARD AND NOT PLATFORM_SWITCH)
@@ -121,6 +123,9 @@ if (ENABLE_WIREGUARD AND NOT PLATFORM_SWITCH)
 endif ()
 if (ENABLE_NETBIRD AND NOT PLATFORM_SWITCH)
     message(FATAL_ERROR "ENABLE_NETBIRD is only supported on Switch")
+endif ()
+if (ENABLE_TAILSCALE AND NOT PLATFORM_SWITCH)
+    message(FATAL_ERROR "ENABLE_TAILSCALE is only supported on Switch")
 endif ()
 
 if (ENABLE_WIREGUARD)
@@ -131,6 +136,11 @@ endif ()
 if (ENABLE_NETBIRD)
     message(STATUS "Use ENABLE_NETBIRD")
     add_definitions(-DENABLE_NETBIRD)
+endif ()
+
+if (ENABLE_TAILSCALE)
+    message(STATUS "Use experimental ENABLE_TAILSCALE")
+    add_definitions(-DENABLE_TAILSCALE)
 endif ()
 
 # Escape hatch for desktop/unit-test work only. A release NRO must contain a
@@ -368,7 +378,7 @@ elseif (PLATFORM_SWITCH)
 
     # VPN support. Both providers are standard Switch features: they are always
     # compiled in, and "Off" in the UI means "not connected", never "not built".
-    if (ENABLE_WIREGUARD OR ENABLE_NETBIRD)
+    if (ENABLE_WIREGUARD OR ENABLE_NETBIRD OR ENABLE_TAILSCALE)
         list(APPEND MAIN_SRC
             app/src/vpn/WireGuardConfig.cpp
             app/src/vpn/WireGuardManager.cpp
@@ -380,8 +390,62 @@ elseif (PLATFORM_SWITCH)
             app/src/remote_access/NetBirdStaticConfig.cpp
             app/src/remote_access/providers/WireGuardProvider.cpp
             app/src/remote_access/providers/NetBirdProvider.cpp
+            app/src/remote_access/providers/TailscaleProvider.cpp
+            app/src/remote_access/tailscale/TailscaleAuthKeyFile.cpp
             app/src/vpn/VpnFileLogger.cpp
         )
+    endif ()
+
+    if (ENABLE_TAILSCALE)
+        include(cmake/TailscaleCompatibility.cmake)
+        set(TAILSCALE_GENERATED_INCLUDE_DIR
+            "${CMAKE_CURRENT_BINARY_DIR}/generated/tailscale")
+        artemis_generate_tailscale_compatibility(
+            "${TAILSCALE_GENERATED_INCLUDE_DIR}")
+        foreach (_tailscale_dependency tailscale-libsodium tailscale-nghttp2)
+            if (NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/extern/${_tailscale_dependency}/.git")
+                message(FATAL_ERROR
+                    "Tailscale dependency ${_tailscale_dependency} is not initialized. Run:\n"
+                    "  git submodule update --init extern/${_tailscale_dependency}")
+            endif ()
+        endforeach ()
+        list(APPEND MAIN_SRC
+            app/src/remote_access/tailscale/TailscaleControlCodec.cpp
+            app/src/remote_access/tailscale/TailscaleControlKey.cpp
+            app/src/remote_access/tailscale/TailscaleControlSession.cpp
+            app/src/remote_access/tailscale/TailscaleDerp.cpp
+            app/src/remote_access/tailscale/TailscaleHttpUpgrade.cpp
+            app/src/remote_access/tailscale/TailscaleNoise.cpp
+            app/src/remote_access/tailscale/TailscalePathManager.cpp
+            app/src/remote_access/tailscale/TailscalePeerDirectory.cpp
+            app/src/remote_access/tailscale/TailscaleProtocol.cpp
+            app/src/remote_access/tailscale/TailscaleStateStore.cpp
+            app/src/remote_access/tailscale/TailscaleTransport.cpp
+            app/src/remote_access/tailscale/TailscaleWgxRoute.cpp
+            app/src/remote_access/tailscale/TailscaleCore.cpp
+            app/src/remote_access/tailscale/wgx_adapter.cpp)
+
+        set(TAILSCALE_WGX_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/extern/wg-nx")
+        set(TAILSCALE_WGX_STAGE_DIR "${ARTEMIS_VPN_STAGE_ROOT}/wg-nx-tailscale")
+        set(LIBTAILSCALE_WGX_A "${TAILSCALE_WGX_STAGE_DIR}/libtailscale-wgx.a")
+        add_custom_command(
+            OUTPUT ${LIBTAILSCALE_WGX_A}
+            COMMAND ${CMAKE_COMMAND}
+                    -DTAILSCALE_WGX_SRC=${TAILSCALE_WGX_SOURCE_DIR}
+                    -DTAILSCALE_WGX_STAGE=${TAILSCALE_WGX_STAGE_DIR}
+                    -DTAILSCALE_WGX_AR=${CMAKE_AR}
+                    -DTAILSCALE_WGX_NM=${CMAKE_NM}
+                    -DTAILSCALE_WGX_OBJCOPY=${CMAKE_OBJCOPY}
+                    -DTAILSCALE_WGX_PATCH=${CMAKE_CURRENT_SOURCE_DIR}/patches/wg-nx-tailscale-multipeer.patch
+                    -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/TailscaleWgxBackend.cmake
+            DEPENDS
+                    ${CMAKE_CURRENT_SOURCE_DIR}/cmake/TailscaleWgxBackend.cmake
+                    ${CMAKE_CURRENT_SOURCE_DIR}/patches/wg-nx-tailscale-multipeer.patch
+                    ${CMAKE_CURRENT_SOURCE_DIR}/patches/wg-nx-tailscale-instance-transport.patch
+                    ${CMAKE_CURRENT_SOURCE_DIR}/patches/wg-nx-tailscale-instance-socket.patch
+            COMMENT "Building isolated Tailscale wgx backend"
+            VERBATIM)
+        add_custom_target(artemis_tailscale_wgx_deps DEPENDS ${LIBTAILSCALE_WGX_A})
     endif ()
 
     if (ENABLE_WIREGUARD AND NOT ARTEMIS_ALLOW_VPN_STUB)
@@ -454,6 +518,7 @@ elseif (PLATFORM_SWITCH)
                     ${CMAKE_CURRENT_SOURCE_DIR}/cmake/NetBirdCurrentRelayCompat.cmake
                     ${CMAKE_CURRENT_SOURCE_DIR}/patches/netbird-switch-relay-use-after-free.patch
                     ${CMAKE_CURRENT_SOURCE_DIR}/patches/netbird-switch-proxy-reliability.patch
+                    ${CMAKE_CURRENT_SOURCE_DIR}/patches/netbird-switch-peer-identity.patch
             COMMENT "Building NetBird Switch backend (libnetbird.a + handle_full.o)"
             VERBATIM)
         add_custom_target(artemis_vpn_deps DEPENDS ${LIBNETBIRD_A} ${HANDLE_FULL_O})
@@ -527,6 +592,23 @@ if (ENABLE_NETBIRD)
     target_link_libraries(${PROJECT_NAME} PRIVATE
         "${HANDLE_FULL_O}"
         "${LIBNETBIRD_A}")
+endif ()
+if (ENABLE_TAILSCALE)
+    target_include_directories(${PROJECT_NAME} PRIVATE
+        "${TAILSCALE_GENERATED_INCLUDE_DIR}"
+        "${TAILSCALE_WGX_SOURCE_DIR}/include")
+    add_dependencies(${PROJECT_NAME} artemis_tailscale_wgx_deps)
+    target_link_libraries(${PROJECT_NAME} PRIVATE "${LIBTAILSCALE_WGX_A}")
+    # Keep the private ABI in the release ELF even before the live control
+    # transport is enabled. This makes symbol-collision verification a real
+    # link-time contract instead of inspecting an unused archive in isolation.
+    foreach (_wgx_symbol
+            wgx_create wgx_add_or_update_peer wgx_remove_peer wgx_start
+            wgx_connect_peer wgx_send_plaintext wgx_inject_encrypted wgx_poll
+            wgx_destroy)
+        target_link_options(${PROJECT_NAME} PRIVATE
+            "LINKER:--undefined=${_wgx_symbol}")
+    endforeach ()
 endif ()
 if (USE_SDL3)
     target_compile_definitions(${PROJECT_NAME} PRIVATE SDL_ENABLE_OLD_NAMES)
