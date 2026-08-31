@@ -22,26 +22,16 @@ def gitlink(path: str) -> str:
 def main():
     modules = (ROOT / ".gitmodules").read_text(encoding="utf-8")
     cmake = (ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
-    namespace = (ROOT / "cmake/NetBirdNamespace.cmake").read_text(
-        encoding="utf-8"
-    )
-    netbird_backend = (ROOT / "cmake/NetBirdBackend.cmake").read_text(
-        encoding="utf-8"
-    )
-    wireguard = (ROOT / "cmake/WireGuardBackend.cmake").read_text(
-        encoding="utf-8"
-    )
-    tailscale = (ROOT / "cmake/TailscaleWgxBackend.cmake").read_text(
-        encoding="utf-8"
-    )
+    namespace = (ROOT / "cmake/NetBirdNamespace.cmake").read_text(encoding="utf-8")
+    netbird_backend = (ROOT / "cmake/NetBirdBackend.cmake").read_text(encoding="utf-8")
+    wireguard = (ROOT / "cmake/WireGuardBackend.cmake").read_text(encoding="utf-8")
+    tailscale = (ROOT / "cmake/TailscaleWgxBackend.cmake").read_text(encoding="utf-8")
     compatibility = json.loads(
-        (ROOT / "compatibility/tailscale/manifest.json").read_text(
-            encoding="utf-8"
-        )
+        (ROOT / "compatibility/tailscale/manifest.json").read_text(encoding="utf-8")
     )
 
-    assert 'path = extern/wg-nx' in modules
-    assert 'url = https://github.com/jmpangilinan/wg-nx.git' in modules
+    assert "path = extern/wg-nx" in modules
+    assert "url = https://github.com/jmpangilinan/wg-nx.git" in modules
     assert gitlink("extern/wg-nx") == WG_NX_PIN
     assert gitlink("extern/netbird-switch") == NETBIRD_PIN
     assert gitlink("extern/tailscale-libsodium") == TAILSCALE_LIBSODIUM_PIN

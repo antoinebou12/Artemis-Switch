@@ -1,0 +1,19 @@
+---
+BasedOnStyle: LLVM
+Language: Cpp
+IndentWidth: 4
+ContinuationIndentWidth: 4
+AccessModifierOffset: -4
+ColumnLimit: 0
+SortIncludes: Never
+DerivePointerAlignment: false
+PointerAlignment: Left
+BreakBeforeBraces: Attach
+AllowShortBlocksOnASingleLine: Empty
+AllowShortFunctionsOnASingleLine: Empty
+AllowShortIfStatementsOnASingleLine: WithoutElse
+AllowShortLoopsOnASingleLine: true
+AllowShortCaseLabelsOnASingleLine: true
+IndentCaseLabels: true
+KeepEmptyLinesAtTheStartOfBlocks: false
+...

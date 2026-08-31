@@ -17,10 +17,6 @@ using artemis::tailscale::kDerpFrameHeaderLen;
 
 namespace {
 
-std::vector<std::uint8_t> bytes(std::initializer_list<std::uint8_t> init) {
-    return std::vector<std::uint8_t>(init);
-}
-
 // A loop-back transport with an outbound read queue and a captured write log.
 class MockTransport final : public ITransport {
 public:
@@ -61,7 +57,7 @@ int main() {
     const std::vector<std::uint8_t> empty{};
     const std::vector<std::uint8_t> ping = pingPayload(0x1122334455667788ULL);
     std::vector<std::uint8_t> peer(33);
-    peer[0] = 7;  // reason byte
+    peer[0] = 7; // reason byte
     std::string error;
 
     for (const auto& entry : {std::pair{DerpFrameType::KeepAlive, empty},

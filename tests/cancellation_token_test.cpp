@@ -5,7 +5,8 @@
 
 int main() {
     CancellationToken uiToken;
-    const CancellationToken workerToken = uiToken;
+    // This copy is the behavior under test: UI and worker handles must share state.
+    const CancellationToken workerToken = uiToken; // NOLINT(performance-unnecessary-copy-initialization)
     assert(!uiToken.isCancellationRequested());
     assert(!workerToken.isCancellationRequested());
 

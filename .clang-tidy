@@ -1,0 +1,16 @@
+---
+Checks: >
+  -*,
+  bugprone-branch-clone,
+  bugprone-infinite-loop,
+  bugprone-suspicious-semicolon,
+  bugprone-swapped-arguments,
+  bugprone-use-after-move,
+  modernize-use-nullptr,
+  performance-for-range-copy,
+  performance-move-const-arg,
+  performance-unnecessary-copy-initialization
+WarningsAsErrors: '*'
+HeaderFilterRegex: '(^|.*[/\\])(app[/\\]src|tests|ci[/\\]integration)[/\\].*'
+FormatStyle: file
+...

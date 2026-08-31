@@ -1,0 +1,78 @@
+name: Lint
+
+on:
+  push:
+    branches: ["main", "feature/**"]
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: artemis-lint-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  changed-files:
+    name: Changed-file lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install pinned linters
+        run: |
+          python -m pip install --disable-pip-version-check ruff==0.12.10
+          sudo apt-get update
+          sudo apt-get install --yes clang-format
+
+      - name: Select comparison revision
+        id: comparison
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PUSH_BASE: ${{ github.event.before }}
+        run: |
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            echo "base=$PR_BASE" >> "$GITHUB_OUTPUT"
+          else
+            echo "base=$PUSH_BASE" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Lint changed first-party files
+        run: >-
+          python scripts/lint.py
+          --base "${{ steps.comparison.outputs.base }}"
+          --head "${{ github.sha }}"
+
+      - name: Lint complete first-party Python surface
+        run: |
+          ruff check docs/source/conf.py tests scripts
+          ruff format --check docs/source/conf.py tests scripts
+
+  portable-static-analysis:
+    name: Portable warnings and clang-tidy
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install clang-tidy
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes clang-tidy
+
+      - name: Configure strict portable build
+        run: >-
+          cmake -S tests -B build/lint
+          -DCMAKE_BUILD_TYPE=Debug
+          -DARTEMIS_STRICT_WARNINGS=ON
+          -DARTEMIS_ENABLE_CLANG_TIDY=ON
+
+      - name: Build lint surface
+        run: cmake --build build/lint --parallel 2

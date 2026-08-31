@@ -30,7 +30,7 @@ def referenced_artemis_keys():
     # brls::getStr (e.g. wireguard_problem_i18n_key), so they never appear with
     # the _i18n literal. Catch those too or they can rot unnoticed.
     cpp_runtime_pattern = re.compile(r'return "(artemis/[A-Za-z0-9_./-]+)";')
-    xml_pattern = re.compile(r'@i18n/(artemis/[A-Za-z0-9_./-]+)')
+    xml_pattern = re.compile(r"@i18n/(artemis/[A-Za-z0-9_./-]+)")
 
     for root in SCAN_ROOTS:
         for path in root.rglob("*"):
@@ -57,8 +57,7 @@ def main():
     locale_keys = {}
     for locale, path in LOCALES.items():
         try:
-            data = json.loads(path.read_text(encoding="utf-8"),
-                              object_pairs_hook=no_duplicate_keys)
+            data = json.loads(path.read_text(encoding="utf-8"), object_pairs_hook=no_duplicate_keys)
         except AssertionError as exc:
             raise AssertionError(f"{locale}: {exc}") from None
         flattened = flatten(data)

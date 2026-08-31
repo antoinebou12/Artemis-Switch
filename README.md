@@ -392,6 +392,18 @@ cmake --build build/tests --parallel
 ctest --test-dir build/tests --output-on-failure
 ```
 
+Lint changed first-party files and run the strict portable C++ analysis surface:
+
+```bash
+python -m pip install ruff==0.12.10
+python scripts/lint.py
+cmake -S tests -B build/lint -DCMAKE_BUILD_TYPE=Debug -DARTEMIS_STRICT_WARNINGS=ON -DARTEMIS_ENABLE_CLANG_TIDY=ON
+cmake --build build/lint --parallel
+```
+
+The changed-file linter checks UTF-8/text hygiene, JSON and Python syntax, Ruff,
+and clang-format. Vendored dependencies under `extern/` are excluded.
+
 Cross-feature integration:
 
 ```bash

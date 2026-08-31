@@ -1,9 +1,45 @@
 cmake_minimum_required(VERSION 3.20)
 project(ArtemisSwitchUnitTests LANGUAGES C CXX)
 
-enable_testing()
-
 get_filename_component(REPO_ROOT "${CMAKE_CURRENT_LIST_DIR}/.." ABSOLUTE)
+
+option(ARTEMIS_STRICT_WARNINGS
+    "Treat warnings in the portable Artemis test surface as errors" OFF)
+option(ARTEMIS_ENABLE_CLANG_TIDY
+    "Run clang-tidy while compiling the portable Artemis test surface" OFF)
+
+if(ARTEMIS_STRICT_WARNINGS)
+    if(MSVC)
+        add_compile_options($<$<COMPILE_LANGUAGE:CXX>:/W4>
+                            $<$<COMPILE_LANGUAGE:CXX>:/WX>)
+        # Portable code intentionally uses standard C APIs such as getenv;
+        # MSVC's non-standard secure-CRT deprecations are not actionable here.
+        add_compile_definitions(_CRT_SECURE_NO_WARNINGS)
+    else()
+        add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-Wall>
+                            $<$<COMPILE_LANGUAGE:CXX>:-Wextra>
+                            $<$<COMPILE_LANGUAGE:CXX>:-Wpedantic>
+                            $<$<COMPILE_LANGUAGE:CXX>:-Werror>)
+    endif()
+    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+        # Borealis currently vendors an older nlohmann/json header whose
+        # literal-operator spelling is deprecated by recent Clang versions.
+        add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-Wno-deprecated-literal-operator>)
+    endif()
+endif()
+
+if(ARTEMIS_ENABLE_CLANG_TIDY)
+    find_program(ARTEMIS_CLANG_TIDY_EXECUTABLE NAMES clang-tidy REQUIRED)
+    set(CMAKE_CXX_CLANG_TIDY
+        "${ARTEMIS_CLANG_TIDY_EXECUTABLE};--config-file=${REPO_ROOT}/.clang-tidy")
+    if(MSVC)
+        # clang-tidy does not consistently preserve clang-cl's /EHsc through
+        # CMake's compiler launcher, so make the parse mode explicit.
+        list(APPEND CMAKE_CXX_CLANG_TIDY "--extra-arg=/EHsc")
+    endif()
+endif()
+
+enable_testing()
 
 add_executable(artemis_test_smoke smoke_test.cpp)
 target_compile_features(artemis_test_smoke PRIVATE cxx_std_20)
@@ -371,6 +407,9 @@ target_include_directories(tailscale_control_session_test PRIVATE
     "${REPO_ROOT}/extern/wg-nx/src"
     "${REPO_ROOT}/extern/borealis/library/include")
 target_compile_features(tailscale_control_session_test PRIVATE cxx_std_20)
+if(WIN32)
+    target_link_libraries(tailscale_control_session_test PRIVATE ws2_32)
+endif()
 add_test(NAME tailscale_control_session_test COMMAND tailscale_control_session_test)
 
 add_executable(tailscale_noise_test
