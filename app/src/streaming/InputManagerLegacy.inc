@@ -358,18 +358,18 @@ GamepadState MoonlightInputManager::getControllerState(int controllerNum,
 
     if (leftStickDeadzone > 0) {
         float magnitude = fsqrt_(leftXAxis * leftXAxis + leftYAxis * leftYAxis);
-        if (magnitude < leftStickDeadzone) {
-            leftXAxis = 0;
-            leftYAxis = 0;
-        }
+        const auto scaled = artemis::input::applyRadialDeadzone(
+            leftXAxis, leftYAxis, magnitude, leftStickDeadzone);
+        leftXAxis = scaled.x;
+        leftYAxis = scaled.y;
     }
 
     if (rightStickDeadzone > 0) {
         float magnitude = fsqrt_(rightXAxis * rightXAxis + rightYAxis * rightYAxis);
-        if (magnitude < rightStickDeadzone) {
-            rightXAxis = 0;
-            rightYAxis = 0;
-        }
+        const auto scaled = artemis::input::applyRadialDeadzone(
+            rightXAxis, rightYAxis, magnitude, rightStickDeadzone);
+        rightXAxis = scaled.x;
+        rightYAxis = scaled.y;
     }
 
     GamepadState gamepadState{

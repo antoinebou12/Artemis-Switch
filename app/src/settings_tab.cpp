@@ -17,6 +17,7 @@
 #include "UpscalingSupport.hpp"
 #include "features/i18n/AppLocalePreference.hpp"
 #include "features/input/InputSettingsStore.hpp"
+#include "features/stream/BitrateSteps.hpp"
 #include "features/video/UpscalingModeSelect.hpp"
 #include "keyboard_view.hpp"
 #include "StreamConfigProfileNormalize.hpp"
@@ -441,20 +442,13 @@ SettingsTab::SettingsTab() {
     hwDecoding->setEnabled(false);
 #endif
 
-#if defined(__PSV__)
-    const float mbpsMaxLimit = 20000;
-#elif defined(PLATFORM_SWITCH)
-    const float mbpsMaxLimit = 100000;
-#else
-    const float mbpsMaxLimit = 150000;
-#endif
+    const auto bitrateRange = artemis::stream::bitrateSliderRange();
 
-    const float limitOffset = 500;
-    const float limit = mbpsMaxLimit - limitOffset;
-
-    float progress = (Settings::instance().bitrate() - limitOffset) / limit;
-    slider->getProgressEvent()->subscribe([this, limitOffset, limit](float progress) {
-        int bitrate = progress * limit + limitOffset;
+    float progress = artemis::stream::sliderProgressFromBitrate(
+        Settings::instance().bitrate(), bitrateRange);
+    slider->getProgressEvent()->subscribe([this, bitrateRange](float progress) {
+        int bitrate =
+            artemis::stream::bitrateFromSliderProgress(progress, bitrateRange);
         float fbitrate = bitrate / 1000.0f;
         std::stringstream stream;
         stream << std::fixed << std::setprecision(1) << fbitrate;
