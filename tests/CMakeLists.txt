@@ -194,6 +194,11 @@ add_artemis_test(controller_topology_test
     app/src/features/input/ControllerTopology.cpp
     app/src/features/input)
 
+add_artemis_test(controller_session_reset_test
+    tests/controller_session_reset_test.cpp
+    app/src/features/input/ControllerSessionReset.cpp
+    app/src/features/input)
+
 add_artemis_test(controller_battery_test
     tests/controller_battery_test.cpp
     app/src/features/input/ControllerBattery.cpp

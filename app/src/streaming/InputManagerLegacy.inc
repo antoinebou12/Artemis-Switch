@@ -280,9 +280,58 @@ void MoonlightInputManager::sampleDiagnostics() {
         controllersCount);
 }
 
+void MoonlightInputManager::stopAllRumble() {
+    const int reportedControllers = brls::Application::getPlatform()
+                                        ->getInputManager()
+                                        ->getControllersConnectedCount();
+    const int controllersCount =
+        artemis::input::clampControllerCount(reportedControllers);
+    for (int i = 0; i < controllersCount; i++) {
+        brls::Application::getPlatform()->getInputManager()->sendRumble(i, 0, 0);
+    }
+    for (auto& cached : rumbleCache) {
+        cached = {};
+    }
+}
+
+void MoonlightInputManager::resetForNewSession() {
+    // The manager outlives every stream, so anything remembered here is state
+    // the new host has never been told about.
+    lastControllerCount = artemis::input::announcedCountForNewSession();
+    for (auto& state : lastGamepadStates) {
+        state = {};
+    }
+    for (auto& reading : lastBatteryReadings) {
+        reading = {};
+    }
+    for (auto& sentAt : lastBatterySendMs) {
+        sentAt = 0;
+    }
+    lastMouseState = {};
+    lastScrollSentAt = std::chrono::high_resolution_clock::now();
+    desktopMouseRemainder = {0, 0};
+    desktopScrollRemainder = {0, 0};
+    pendingHorizontalScroll = 0;
+    pendingHorizontalScrollEvents = 0;
+    desktopScrollAxis = DesktopScrollAxis::None;
+    lastDesktopScrollEvent = {};
+    motionFallbackGate.reset();
+    // Only forget the cached amplitudes here. Whether the motors are actually
+    // pulsed at stream start stays governed by
+    // ARTEMIS_CLEAR_RUMBLE_ON_STREAM_START in StreamingView.
+    for (auto& cached : rumbleCache) {
+        cached = {};
+    }
+}
+
 void MoonlightInputManager::dropInput() {
     if (inputDropped)
         return;
+
+    // A rumble packet can land in the same frame as a suspend or a disconnect.
+    // Stopping the motors here covers the teardown paths that never reach
+    // StreamingView::terminate().
+    stopAllRumble();
 
     desktopMouseRemainder = {0, 0};
     desktopScrollRemainder = {0, 0};
@@ -496,11 +545,13 @@ void MoonlightInputManager::handleControllers(bool specialKey) {
 
     const short mappedControllersCount = static_cast<short>(
         artemis::input::connectedControllerMask(controllersCount));
-    const bool topologyChanged = controllersCount != lastControllerCount;
+    const auto topology = artemis::input::controllerTopologyDelta(
+        lastControllerCount, controllersCount);
+    const bool topologyChanged = topology.changed;
 
     if (topologyChanged) {
         GamepadState releasedState;
-        for (int i = controllersCount; i < lastControllerCount; ++i) {
+        for (int i = topology.releaseFirst; i < topology.releaseEnd; ++i) {
             LiSendMultiControllerEvent(
                 i, mappedControllersCount, releasedState.buttonFlags,
                 releasedState.leftTrigger, releasedState.rightTrigger,
@@ -511,7 +562,7 @@ void MoonlightInputManager::handleControllers(bool specialKey) {
             lastBatterySendMs[i] = 0;
         }
 
-        for (int i = lastControllerCount; i < controllersCount; ++i) {
+        for (int i = topology.arriveFirst; i < topology.arriveEnd; ++i) {
             Logger::debug(
                 "StreamingView: controller #{} connected (mask 0x{:X})", i,
                 mappedControllersCount);
@@ -601,8 +652,6 @@ void MoonlightInputManager::handleInput(bool ignoreTouch) {
         }
     }
 
-    static MouseStateS lastMouseState;
-
     MouseStateS mouseState;
     if (trackpadMode) {
         mouseState = {
@@ -652,14 +701,13 @@ void MoonlightInputManager::handleInput(bool ignoreTouch) {
 
     std::chrono::high_resolution_clock::time_point timeNow =
             std::chrono::high_resolution_clock::now();
-    static std::chrono::high_resolution_clock::time_point timeStamp = timeNow;
 
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
-            timeNow - timeStamp)
+            timeNow - lastScrollSentAt)
             .count();
     if (mouseState.scroll_y != 0 &&
         (float) duration > 550 - std::fabs(mouseState.scroll_y) * 500) {
-        timeStamp = timeNow;
+        lastScrollSentAt = timeNow;
         brls::Logger::info("Scroll sended: {}", mouseState.scroll_y);
         lastMouseState.scroll_y = mouseState.scroll_y;
         LiSendScrollEvent(mouseState.scroll_y > 0 ? 1 : -1);
