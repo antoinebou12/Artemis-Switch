@@ -1,6 +1,9 @@
 #include "WakeOnLanManager.hpp"
 #include "Data.hpp"
 #include "Settings.hpp"
+#include "../features/host/WakeOnLanTargets.hpp"
+#include "../features/host/WakeOnLanOverridesStore.hpp"
+#include "../streaming/HostProfileKey.hpp"
 #include <borealis.hpp>
 #include <algorithm>
 #include <array>
@@ -139,8 +142,12 @@ bool split_address_and_port(const std::string& addressPort,
     return true;
 }
 
-std::vector<std::string> wake_address_candidates(const Host& host) {
+std::vector<std::string> wake_address_candidates(
+    const Host& host, const artemis::host::WakeOnLanOverride& over) {
+    // An explicit override target is authoritative and goes first.
     std::vector<std::string> candidates;
+    if (!over.address.empty())
+        candidates.push_back(over.address);
 
     auto push_unique = [&candidates](const std::string& value) {
         if (!value.empty() &&
@@ -176,8 +183,14 @@ std::vector<std::string> wake_address_candidates(const Host& host) {
     return candidates;
 }
 
-std::vector<unsigned short> wake_port_candidates(unsigned short basePort) {
+std::vector<unsigned short> wake_port_candidates(
+    unsigned short basePort, const artemis::host::WakeOnLanOverride& over) {
+    // An explicit override port wins outright.
     std::vector<unsigned short> ports;
+    if (over.port != 0) {
+        ports.push_back(over.port);
+        return ports;
+    }
 
     auto push_unique = [&ports](unsigned short port) {
         if (std::find(ports.begin(), ports.end(), port) == ports.end()) {
@@ -245,7 +258,9 @@ std::string last_socket_error_string() {
 }
 #endif
 
-GSResult<bool> send_magic_packets(const Host& host, const Data& payload) {
+GSResult<bool> send_magic_packets(
+    const Host& host, const Data& payload,
+    const artemis::host::WakeOnLanOverride& over) {
     if (payload.is_empty()) {
         return GSResult<bool>::failure("Magic packet payload is empty");
     }
@@ -253,7 +268,7 @@ GSResult<bool> send_magic_packets(const Host& host, const Data& payload) {
     std::string lastError = "Failed to resolve any wake address";
     size_t packetsSent = 0;
 
-    for (const auto& candidate : wake_address_candidates(host)) {
+    for (const auto& candidate : wake_address_candidates(host, over)) {
         std::string rawAddress;
         unsigned short basePort = DEFAULT_SUNSHINE_PORT;
         if (!split_address_and_port(candidate, rawAddress, basePort) ||
@@ -312,7 +327,7 @@ GSResult<bool> send_magic_packets(const Host& host, const Data& payload) {
             sockaddr_storage target{};
             memcpy(&target, current->ai_addr, current->ai_addrlen);
 
-            for (const auto port : wake_port_candidates(basePort)) {
+            for (const auto port : wake_port_candidates(basePort, over)) {
                 populate_port(target, port);
 
                 const int sendResult = sendto(
@@ -359,14 +374,28 @@ GSResult<bool> send_magic_packets(const Host& host, const Data& payload) {
 
 bool WakeOnLanManager::can_wake_up_host(const Host& host) {
 #if defined(UNIX_SOCKS) || defined(WIN32_SOCKS)
-    return !normalize_mac_address(host.mac).empty();
+    if (!normalize_mac_address(host.mac).empty())
+        return true;
+    // A manual override MAC lets a host that reported an all-zero MAC at pair
+    // time still be woken up.
+    const auto over = artemis::host::WakeOnLanOverridesStore::instance().get(
+        artemis::streaming::host_profile_key(host));
+    return artemis::host::hasUsableOverrideMac(over);
 #else
     return false;
 #endif
 }
 
 GSResult<bool> WakeOnLanManager::wake_up_host(const Host& host) {
-    const std::string normalizedMac = normalize_mac_address(host.mac);
+    const auto over = artemis::host::WakeOnLanOverridesStore::instance().get(
+        artemis::streaming::host_profile_key(host));
+
+    // An override MAC wins over the stored one so a host that reports an
+    // all-zero MAC can be woken; otherwise fall back to the paired MAC.
+    const std::string storedMac = normalize_mac_address(host.mac);
+    const std::string overrideMac = normalize_mac_address(over.mac);
+    const std::string normalizedMac = !overrideMac.empty() ? overrideMac
+                                                           : storedMac;
     if (normalizedMac.empty()) {
         return GSResult<bool>::failure("Missing or invalid host MAC address");
     }
@@ -377,7 +406,7 @@ GSResult<bool> WakeOnLanManager::wake_up_host(const Host& host) {
     }
 
 #if defined(UNIX_SOCKS)
-    return send_magic_packets(host, payload);
+    return send_magic_packets(host, payload, over);
 #elif defined(_WIN32)
     WSADATA data{};
     const int startupResult = WSAStartup(MAKEWORD(2, 2), &data);
@@ -385,7 +414,7 @@ GSResult<bool> WakeOnLanManager::wake_up_host(const Host& host) {
         return GSResult<bool>::failure("Failed to initialize Winsock");
     }
 
-    const auto result = send_magic_packets(host, payload);
+    const auto result = send_magic_packets(host, payload, over);
     WSACleanup();
     return result;
 #endif
