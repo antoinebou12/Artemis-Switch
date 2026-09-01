@@ -592,11 +592,18 @@ void GameStreamClient::wake_up_host(const Host& host,
             return;
         }
 
+        // Re-send the magic packet once every poll so a sleeping host still on
+        // its way up is not missed if the first packet was dropped on the wire.
+        constexpr int kWakeResendEveryPoll = 5;
+
         std::string connectedAddress;
         std::string error;
         SERVER_DATA connectedServer{};
 
         for (int attempt = 0; attempt < WAKE_POLL_ATTEMPTS; attempt++) {
+            if (attempt > 0 && attempt % kWakeResendEveryPoll == 0) {
+                WakeOnLanManager::wake_up_host(host);
+            }
             RemoteRouteLease lease;
             if (connect_to_addresses_sync(host.connection_addresses(),
                                           connectedAddress, connectedServer,

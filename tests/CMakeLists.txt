@@ -119,6 +119,11 @@ add_artemis_test(codec_capabilities_test
     app/src/features/host/CodecCapabilities.cpp
     app/src/features/host)
 
+add_artemis_test(wake_on_lan_targets_test
+    tests/wake_on_lan_targets_test.cpp
+    app/src/features/host/WakeOnLanTargets.cpp
+    app/src/features/host)
+
 add_executable(host_identity_probe_test
     "${REPO_ROOT}/tests/host_identity_probe_test.cpp"
     "${REPO_ROOT}/app/src/host/HostIdentityProbe.cpp"
