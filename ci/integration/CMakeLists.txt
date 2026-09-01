@@ -3,6 +3,8 @@ project(ArtemisSwitchIntegrationTests LANGUAGES CXX)
 
 enable_testing()
 
+find_package(Threads REQUIRED)
+
 get_filename_component(REPO_ROOT "${CMAKE_CURRENT_LIST_DIR}/../.." ABSOLUTE)
 
 function(add_artemis_test target test_source feature_source include_dir)
@@ -103,6 +105,15 @@ target_include_directories(host_identity_probe_test PRIVATE
     "${REPO_ROOT}/app/src/libgamestream")
 target_compile_features(host_identity_probe_test PRIVATE cxx_std_20)
 add_test(NAME host_identity_probe_test COMMAND host_identity_probe_test)
+
+add_executable(active_session_guard_test
+    "${REPO_ROOT}/tests/active_session_guard_test.cpp"
+)
+target_include_directories(active_session_guard_test PRIVATE
+    "${REPO_ROOT}/app/src/features/stream")
+target_compile_features(active_session_guard_test PRIVATE cxx_std_20)
+target_link_libraries(active_session_guard_test PRIVATE Threads::Threads)
+add_test(NAME active_session_guard_test COMMAND active_session_guard_test)
 
 add_artemis_test(quick_stream_menu_test
     tests/quick_stream_menu_test.cpp

@@ -41,6 +41,8 @@ endif()
 
 enable_testing()
 
+find_package(Threads REQUIRED)
+
 add_executable(artemis_test_smoke smoke_test.cpp)
 target_compile_features(artemis_test_smoke PRIVATE cxx_std_20)
 add_test(NAME artemis_test_smoke COMMAND artemis_test_smoke)
@@ -235,6 +237,15 @@ target_include_directories(usable_mac_test PRIVATE
     "${REPO_ROOT}/app/src/utils")
 target_compile_features(usable_mac_test PRIVATE cxx_std_20)
 add_test(NAME usable_mac_test COMMAND usable_mac_test)
+
+add_executable(active_session_guard_test
+    "${REPO_ROOT}/tests/active_session_guard_test.cpp"
+)
+target_include_directories(active_session_guard_test PRIVATE
+    "${REPO_ROOT}/app/src/features/stream")
+target_compile_features(active_session_guard_test PRIVATE cxx_std_20)
+target_link_libraries(active_session_guard_test PRIVATE Threads::Threads)
+add_test(NAME active_session_guard_test COMMAND active_session_guard_test)
 
 add_artemis_test(display_transform_test
     tests/display_transform_test.cpp

@@ -17,7 +17,11 @@ extern void getWindowSize(int* w, int* h);
 using namespace brls;
 
 int m_video_format;
-static MoonlightSession* m_active_session = nullptr;
+// Atomic so decoder/audio/connection worker threads never observe a torn or
+// half-written pointer while the UI thread tears the session down. The object
+// may still be destroyed after clear(), so callbacks must not dereference only
+// on this null-check alone; see ActiveSessionGuard for the full pinning model.
+static std::atomic<MoonlightSession*> m_active_session = nullptr;
 static MoonlightSessionDecoderAndRenderProvider* m_provider = nullptr;
 
 MoonlightSession* MoonlightSession::activeSession() {
@@ -420,6 +424,11 @@ void MoonlightSession::stop(int terminate_app, bool sync_host_quit) {
 
     m_stop_requested = true;
     m_restart_in_progress = false;
+
+    // Stop dispatching to callbacks as early as possible: worker threads check
+    // the active pointer, so clearing it here (not only in the destructor)
+    // narrows the window in which they could keep dereferencing this session.
+    m_active_session = nullptr;
 
     // Sunshine can leave the host session paused after LiStopConnection alone
     // (community report: Moonlight-Switch #215). Always cancel for Sunshine so
