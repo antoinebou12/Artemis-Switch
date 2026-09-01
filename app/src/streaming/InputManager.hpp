@@ -11,6 +11,7 @@
 #include "keyboard_view.hpp"
 #include "../features/input/ControllerBattery.hpp"
 #include "../features/input/StickDeadzone.hpp"
+#include "../features/input/ControllerSessionReset.hpp"
 #include <borealis.hpp>
 #include <chrono>
 #include <optional>
@@ -55,6 +56,11 @@ class MoonlightInputManager : public Singleton<MoonlightInputManager> {
   public:
     MoonlightInputManager();
     void dropInput();
+    // Forgets everything the previous stream told the host, so a new session
+    // re-announces its pads instead of assuming the host still knows them.
+    void resetForNewSession();
+    // Stops every motor. Safe to call when no stream is running.
+    void stopAllRumble();
     void handleInput(bool ignoreTouch = false);
     // Sample pads into ControllerDiagnostics without requiring stream focus.
     void sampleDiagnostics();
@@ -91,6 +97,12 @@ class MoonlightInputManager : public Singleton<MoonlightInputManager> {
     bool inputDropped = false;
     bool inputEnabled = true;
     int lastControllerCount = 0;
+    // Mouse and scroll pacing state. These were function-level statics, which
+    // meant they outlived the stream that produced them and leaked into the
+    // next session.
+    MouseStateS lastMouseState = {};
+    std::chrono::high_resolution_clock::time_point lastScrollSentAt =
+        std::chrono::high_resolution_clock::now();
 
     brls::ControllerState mapController(brls::ControllerState controller);
     static short glfwKeyToVKKey(brls::BrlsKeyboardScancode key);

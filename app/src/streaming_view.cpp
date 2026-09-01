@@ -161,6 +161,11 @@ StreamingView::StreamingView(const Host& host, const AppInfo& app) : host(host),
             session->stopForApplicationExit();
         });
 
+    // The input manager outlives every stream. Forget what the previous host
+    // was told so this session re-announces its pads, which is what makes
+    // rumble, motion and battery work on the second stream of a run.
+    MoonlightInputManager::instance().resetForNewSession();
+
 #if ARTEMIS_CLEAR_RUMBLE_ON_STREAM_START
     // Clear any rumble left from wireless pads connected before launch.
     clearControllerRumble();
@@ -596,11 +601,7 @@ void StreamingView::removeKeyboard() {
 }
 
 void StreamingView::clearControllerRumble() {
-    int controllersCount = Application::getPlatform()
-                               ->getInputManager()
-                               ->getControllersConnectedCount();
-    for (int i = 0; i < controllersCount; i++)
-        Application::getPlatform()->getInputManager()->sendRumble(i, 0, 0);
+    MoonlightInputManager::instance().stopAllRumble();
 }
 
 void StreamingView::onWindowFocusChanged(bool focused) {
@@ -959,6 +960,9 @@ StreamingView::~StreamingView() {
     Application::getWindowShouldCloseEvent()->unsubscribe(
         windowShouldCloseSubscription);
     releaseInputBlock();
+    // Covers the destroy paths that never run terminate(), so motors do not
+    // keep buzzing after the stream is gone.
+    clearControllerRumble();
     restoreGlobalSettingsIfNeeded();
     if (session) {
         // Prefer pending teardown choice; otherwise force host cancel on
