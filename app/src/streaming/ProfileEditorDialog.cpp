@@ -9,6 +9,7 @@
 #include "features/input/PointerSettings.hpp"
 #include "features/input/SwitchMotionPolicy.hpp"
 #include "features/stream/AdvancedStreamOptions.hpp"
+#include "features/stream/BitrateSteps.hpp"
 #include "features/stream/FrameRateOptions.hpp"
 #include "keyboard_view.hpp"
 #include "views/boolean_slider_cell.hpp"
@@ -118,24 +119,15 @@ brls::Label* addLabeledSlider(
 }
 
 void addBitrateSlider(brls::Box* content, StreamConfigProfile* draft) {
-#if defined(__PSV__)
-    const float mbpsMaxLimit = 20000.0f;
-#elif defined(PLATFORM_SWITCH)
-    const float mbpsMaxLimit = 100000.0f;
-#else
-    const float mbpsMaxLimit = 150000.0f;
-#endif
-    const float limitOffset = 500.0f;
-    const float limit = mbpsMaxLimit - limitOffset;
-    const float progress = std::clamp(
-        (static_cast<float>(draft->bitrateKbps) - limitOffset) / limit, 0.0f,
-        1.0f);
+    const auto range = artemis::stream::bitrateSliderRange();
+    const float progress =
+        artemis::stream::sliderProgressFromBitrate(draft->bitrateKbps, range);
     addLabeledSlider(
         content, "settings/video_bitrate"_i18n,
         fmt::format("{:.1f} Mbps", draft->bitrateKbps / 1000.0), progress, 12.0f,
-        [draft, limitOffset, limit](float p, brls::Label* valueLabel) {
-            const int kbps = static_cast<int>(
-                std::clamp(p, 0.0f, 1.0f) * limit + limitOffset);
+        [draft, range](float p, brls::Label* valueLabel) {
+            const int kbps =
+                artemis::stream::bitrateFromSliderProgress(p, range);
             draft->bitrateKbps = kbps;
             valueLabel->setText(fmt::format("{:.1f} Mbps", kbps / 1000.0));
         });

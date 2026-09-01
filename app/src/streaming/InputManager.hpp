@@ -10,6 +10,7 @@
 #include "Singleton.hpp"
 #include "keyboard_view.hpp"
 #include "../features/input/ControllerBattery.hpp"
+#include "../features/input/StickDeadzone.hpp"
 #include <borealis.hpp>
 #include <chrono>
 #include <optional>

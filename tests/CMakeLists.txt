@@ -167,6 +167,18 @@ add_artemis_test(video_codec_formats_test
     app/src/features/stream/VideoCodecFormats.cpp
     app/src/features/stream)
 
+add_artemis_test(bitrate_steps_test
+    tests/bitrate_steps_test.cpp
+    app/src/features/stream/BitrateSteps.cpp
+    app/src/features/stream)
+
+add_executable(stick_deadzone_test
+    "${REPO_ROOT}/tests/stick_deadzone_test.cpp")
+target_include_directories(stick_deadzone_test PRIVATE
+    "${REPO_ROOT}/app/src/features/input")
+target_compile_features(stick_deadzone_test PRIVATE cxx_std_20)
+add_test(NAME stick_deadzone_test COMMAND stick_deadzone_test)
+
 add_artemis_test(switch_motion_policy_test
     tests/switch_motion_policy_test.cpp
     app/src/features/input/SwitchMotionPolicy.cpp
