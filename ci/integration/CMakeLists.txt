@@ -124,3 +124,8 @@ add_artemis_test(zoom_pan_state_test
     tests/zoom_pan_state_test.cpp
     app/src/features/video/ZoomPanState.cpp
     app/src/features/video)
+
+add_artemis_test(rotating_file_log_test
+    tests/rotating_file_log_test.cpp
+    app/src/features/diagnostics/RotatingFileLog.cpp
+    app/src)
