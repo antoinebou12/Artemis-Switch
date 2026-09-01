@@ -515,6 +515,12 @@ add_executable(vpn_file_logger_test
     "${REPO_ROOT}/tests/vpn_file_logger_test.cpp"
     "${REPO_ROOT}/app/src/vpn/VpnFileLogger.cpp")
 target_include_directories(vpn_file_logger_test PRIVATE
-    "${REPO_ROOT}/app/src/vpn")
+    "${REPO_ROOT}/app/src/vpn"
+    "${REPO_ROOT}/app/src")
 target_compile_features(vpn_file_logger_test PRIVATE cxx_std_20)
 add_test(NAME vpn_file_logger_test COMMAND vpn_file_logger_test)
+
+add_artemis_test(rotating_file_log_test
+    tests/rotating_file_log_test.cpp
+    app/src/features/diagnostics/RotatingFileLog.cpp
+    app/src)
