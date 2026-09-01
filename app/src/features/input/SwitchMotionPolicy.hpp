@@ -10,6 +10,33 @@ enum class MotionSource {
     Console,
 };
 
+// Which controller should provide the gyro/accel stream. Auto reproduces the
+// stock selection order exactly (handheld first, then full-key, then left
+// Joy-Con if connected, else right Joy-Con); the explicit choices override it.
+enum class MotionSourcePreference {
+    Auto,
+    Handheld,
+    JoyConLeft,
+    JoyConRight,
+};
+
+// Which Borealis sensor slot to read next.
+enum class MotionHandle {
+    None,
+    Handheld,
+    FullKey,
+    JoyLeft,
+    JoyRight,
+};
+
+// Resolves the preference against the live controller topology. Returns the
+// slot whose sixaxis input should be forwarded; Auto reproduces today's
+// behaviour with no user-visible change.
+MotionHandle selectMotionHandle(MotionSourcePreference preference,
+                                bool handheldActive,
+                                bool proConnected, bool leftConnected,
+                                bool rightConnected);
+
 struct SwitchMotionOptions {
     bool allowGamepadMotionSensors = true;
     // Console motion is intentionally opt-in and remains disabled unless the
