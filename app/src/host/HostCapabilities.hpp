@@ -4,6 +4,8 @@
 #include <cstdint>
 #include <vector>
 
+#include "../features/host/CodecCapabilities.hpp"
+
 namespace artemis::host {
 
 enum class HostKind {
@@ -45,6 +47,9 @@ struct HostCapabilities {
     uint32_t permissions = 0;
     std::vector<std::string> serverCommandList;
     std::string detectionReason;
+    // Encoder profiles advertised by the host via ServerCodecModeSupport.
+    // Advisory only: the manual Settings::video_codec() choice stays authoritative.
+    CodecCapabilities codecs;
 };
 
 struct HostMetadata {
