@@ -7,6 +7,7 @@
 #include "StreamDisconnectPolicy.hpp"
 #include "StreamProfileStore.hpp"
 #include "borealis.hpp"
+#include "../features/host/CodecCapabilities.hpp"
 #include <string.h>
 
 #if defined(PLATFORM_IOS) || defined(PLATFORM_VISIONOS)
@@ -358,6 +359,26 @@ void MoonlightSession::start(ServerCallback<bool> callback, bool is_sunshine) {
                 m_config = result.value();
                 brls::async([this, callback]() mutable {
                     auto m_data = GameStreamClient::instance().server_data(m_address);
+
+                    // Advisory: if the host does not advertise the requested
+                    // codec profile, warn without blocking the stream. The manual
+                    // codec choice remains authoritative.
+                    const auto codecs = artemis::host::decodeServerCodecMask(
+                        m_data.serverInfo.serverCodecModeSupport);
+                    const artemis::host::CodecKind chosen =
+                        Settings::instance().video_codec() == H264
+                            ? artemis::host::CodecKind::H264
+                            : (Settings::instance().video_codec() == AV1
+                                   ? artemis::host::CodecKind::AV1
+                                   : artemis::host::CodecKind::H265);
+                    if (!artemis::host::supportsCodec(
+                            codecs, chosen, Settings::instance().request_hdr())) {
+                        brls::Logger::warning(
+                            "MoonlightSession: host does not advertise the "
+                            "requested codec (mask 0x{:X}); falling back to the "
+                            "host's negotiated format",
+                            m_data.serverInfo.serverCodecModeSupport);
+                    }
 
                     int result = LiStartConnection(
                         &m_data.serverInfo, &m_config, &m_connection_callbacks,

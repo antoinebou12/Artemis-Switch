@@ -112,6 +112,11 @@ add_artemis_test(host_capability_tests
     app/src/host/HostCapabilities.cpp
     app/src/host)
 
+add_artemis_test(codec_capabilities_test
+    tests/codec_capabilities_test.cpp
+    app/src/features/host/CodecCapabilities.cpp
+    app/src/features/host)
+
 add_executable(host_identity_probe_test
     "${REPO_ROOT}/tests/host_identity_probe_test.cpp"
     "${REPO_ROOT}/app/src/host/HostIdentityProbe.cpp"

@@ -21,6 +21,9 @@ HostCapabilities detectServerCapabilities(const SERVER_DATA& server) {
         server.virtualDisplayCapable, server.virtualDisplayDriverReady,
         server.hasApolloPermissionField, server.permission,
         server.serverCommands, !server.currentGameUuid.empty());
+    // Encoder support is advisory; the manual codec choice stays authoritative.
+    capabilities.codecs =
+        decodeServerCodecMask(server.serverInfo.serverCodecModeSupport);
     return capabilities;
 }
 
