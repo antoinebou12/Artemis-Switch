@@ -25,6 +25,7 @@
 #include "video/VideoScaleStore.hpp"
 #include "features/ui/StatsOverlayLayout.hpp"
 #include "streaming/StreamConfigProfileStore.hpp"
+#include "streaming/HostProfileKey.hpp"
 #include "streaming/StreamDisconnectPolicy.hpp"
 #include "streaming/StreamProfileStore.hpp"
 #include "streaming/StreamUiLifecycle.hpp"
@@ -182,9 +183,8 @@ StreamingView::StreamingView(const Host& host, const AppInfo& app) : host(host),
             session->set_address(
                 GameStreamClient::instance().active_address(this->host));
 
-            const auto hostKey = is_usable_mac(result.value().mac)
-                                     ? result.value().mac
-                                     : this->host.preferred_address();
+            const auto hostKey = artemis::streaming::host_profile_key(
+                this->host, result.value().mac);
             auto& profileStore =
                 artemis::streaming::StreamConfigProfileStore::instance();
             const auto selectedProfileId =
@@ -719,9 +719,8 @@ void StreamingView::applyVirtualDisplay(
         return;
     }
 
-    const std::string hostKey = is_usable_mac(server.mac)
-        ? server.mac
-        : host.preferred_address();
+    const std::string hostKey =
+        artemis::streaming::host_profile_key(host, server.mac);
     auto& store = artemis::apollo::ApolloHostOptionsStore::instance();
     const auto previous = store.get(hostKey);
 
