@@ -72,4 +72,32 @@ bool shouldForwardMotion(MotionSource source,
     return controllerReportsMotion;
 }
 
+MotionHandle selectMotionHandle(MotionSourcePreference preference,
+                                bool handheldActive,
+                                bool proConnected, bool leftConnected,
+                                bool rightConnected) {
+    switch (preference) {
+    case MotionSourcePreference::Handheld:
+        return handheldActive ? MotionHandle::Handheld : MotionHandle::None;
+    case MotionSourcePreference::JoyConLeft:
+        return leftConnected ? MotionHandle::JoyLeft : MotionHandle::None;
+    case MotionSourcePreference::JoyConRight:
+        return rightConnected ? MotionHandle::JoyRight : MotionHandle::None;
+    case MotionSourcePreference::Auto:
+    default:
+        break;
+    }
+
+    // Auto: reproduce the stock selection order exactly.
+    if (handheldActive)
+        return MotionHandle::Handheld;
+    if (proConnected)
+        return MotionHandle::FullKey;
+    if (leftConnected)
+        return MotionHandle::JoyLeft;
+    if (rightConnected)
+        return MotionHandle::JoyRight;
+    return MotionHandle::None;
+}
+
 } // namespace artemis::input
