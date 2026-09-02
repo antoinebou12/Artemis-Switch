@@ -65,57 +65,30 @@ if (NOT MULTICAST_DISABLED)
     add_subdirectory(mdns)
 endif ()
 
-# NetBird is a per-application userspace VPN on Horizon. The pinned library
-# owns NetBird login/sync, relay transport, wg-nx, lwIP and the localhost
-# TCP/UDP proxy. Artemis only selects a peer and redirects GameStream's initial
-# gs_init() address to the proxy. This mirrors jmpangilinan/Moonlight-Switch.
-if (PLATFORM_SWITCH)
+# NetBird is built and linked by the top-level CMakeLists (staged backend in a
+# space-free directory). This block only publishes the gs_init redirect and the
+# extra static libs NetBird needs beyond libnetbird.a itself.
+if (PLATFORM_SWITCH AND ENABLE_NETBIRD)
     set(ARTEMIS_NETBIRD_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/netbird-switch")
-    set(ARTEMIS_NETBIRD_LIBRARY "${ARTEMIS_NETBIRD_ROOT}/libnetbird.a")
-    set(ARTEMIS_NETBIRD_FD_FIX "${ARTEMIS_NETBIRD_ROOT}/handle_full.o")
 
-    if (NOT EXISTS "${ARTEMIS_NETBIRD_ROOT}/Makefile")
+    if (NOT EXISTS "${ARTEMIS_NETBIRD_ROOT}/include/netbird.h")
         message(FATAL_ERROR
             "NetBird Switch dependency is missing. Clone Artemis with --recursive "
             "or run: git submodule update --init --recursive extern/netbird-switch")
     endif ()
 
-    find_program(ARTEMIS_BASH_EXECUTABLE bash)
-    if (NOT ARTEMIS_BASH_EXECUTABLE)
-        message(FATAL_ERROR
-            "bash is required to build extern/netbird-switch (use devkitPro MSYS2 on Windows)")
-    endif ()
-
-    add_custom_command(
-        OUTPUT "${ARTEMIS_NETBIRD_LIBRARY}" "${ARTEMIS_NETBIRD_FD_FIX}"
-        COMMAND ${CMAKE_COMMAND} -E env
-                TMP=/tmp TEMP=/tmp TMPDIR=/tmp
-                "${ARTEMIS_BASH_EXECUTABLE}" ./build.sh
-        WORKING_DIRECTORY "${ARTEMIS_NETBIRD_ROOT}"
-        DEPENDS "${ARTEMIS_NETBIRD_ROOT}/build.sh"
-                "${ARTEMIS_NETBIRD_ROOT}/Makefile"
-        COMMENT "Building NetBird userspace VPN for Switch"
-        VERBATIM)
-    add_custom_target(artemis_netbird_build
-        DEPENDS "${ARTEMIS_NETBIRD_LIBRARY}" "${ARTEMIS_NETBIRD_FD_FIX}")
-
     add_library(artemis_netbird INTERFACE)
-    add_dependencies(artemis_netbird artemis_netbird_build)
     target_include_directories(artemis_netbird INTERFACE
         "${ARTEMIS_NETBIRD_ROOT}/include")
 
-    # handle_full.o must be placed ahead of the normal toolchain libraries. It
-    # replaces newlib's fd-table handling and fixes concurrent close/I/O races.
     # --wrap redirects only gs_init() calls; the original implementation is
     # reached as __real_<mangled-name> from NetBirdManager.cpp.
     target_link_options(artemis_netbird INTERFACE
-        "${ARTEMIS_NETBIRD_FD_FIX}"
         "-Wl,--wrap=_Z7gs_initP12_SERVER_DATANSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEE")
 
     # Keep the dependency order documented by netbird-switch. libcurl is
     # repeated intentionally here because static-library resolution is ordered.
     target_link_libraries(artemis_netbird INTERFACE
-        "${ARTEMIS_NETBIRD_LIBRARY}"
         "${CMAKE_SOURCE_DIR}/lib/switch/libcurl.a"
         mbedtls
         mbedx509
@@ -123,7 +96,5 @@ if (PLATFORM_SWITCH)
         z
         nx)
 
-    # The parent links APP_PLATFORM_LIB after creating the Moonlight target, so
-    # the interface target also contributes headers and link options to sources.
     set(APP_PLATFORM_LIB artemis_netbird ${APP_PLATFORM_LIB} PARENT_SCOPE)
 endif ()

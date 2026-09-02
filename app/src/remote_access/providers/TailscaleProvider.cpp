@@ -172,11 +172,13 @@ bool TailscaleProvider::start() {
 
 void TailscaleProvider::stop() {
     std::lock_guard lock(mutex_);
+#if defined(__SWITCH__) && defined(ENABLE_TAILSCALE)
     if (core_) {
         core_->stop();
         core_.reset();
         logTs(VpnFileLogger::Severity::Info, "provider stopped");
     }
+#endif
     status_ = "Stopped";
     lastError_.clear();
     wipe(authKey_);
@@ -185,11 +187,12 @@ void TailscaleProvider::stop() {
 
 std::string TailscaleProvider::status() const {
     std::lock_guard lock(mutex_);
+#if !defined(__SWITCH__) || !defined(ENABLE_TAILSCALE)
+    return status_;
+#else
     if (!core_) {
-#if defined(__SWITCH__) && defined(ENABLE_TAILSCALE)
         if (compat::kAcceptedCapabilityVersion <= 0)
             return "Unavailable (live gate not passed)";
-#endif
         return status_;
     }
     const auto snapshot = core_->snapshot();
@@ -212,26 +215,38 @@ std::string TailscaleProvider::status() const {
         return snapshot.lastError.empty() ? "Error" : snapshot.lastError;
     }
     return status_;
+#endif
 }
 
 std::string TailscaleProvider::lastError() const {
     std::lock_guard lock(mutex_);
+#if !defined(__SWITCH__) || !defined(ENABLE_TAILSCALE)
+    return lastError_;
+#else
     if (core_) {
         const auto snapshot = core_->snapshot();
         if (snapshot.state == Snapshot::State::Error)
             return snapshot.lastError;
     }
     return lastError_;
+#endif
 }
 
 std::string TailscaleProvider::localAddress() const {
     std::lock_guard lock(mutex_);
+#if !defined(__SWITCH__) || !defined(ENABLE_TAILSCALE)
+    return {};
+#else
     return core_ ? core_->snapshot().localAddress : std::string{};
+#endif
 }
 
 std::vector<RemoteAccessPeer> TailscaleProvider::peers() const {
     std::vector<RemoteAccessPeer> result;
     std::lock_guard lock(mutex_);
+#if !defined(__SWITCH__) || !defined(ENABLE_TAILSCALE)
+    return result;
+#else
     if (!core_)
         return result;
     const auto snapshot = core_->snapshot();
@@ -249,38 +264,62 @@ std::vector<RemoteAccessPeer> TailscaleProvider::peers() const {
         result.push_back(std::move(entry));
     }
     return result;
+#endif
 }
 
 std::optional<RemoteRouteTarget>
 TailscaleProvider::resolveRoute(std::string_view address) const {
     std::lock_guard lock(mutex_);
+#if !defined(__SWITCH__) || !defined(ENABLE_TAILSCALE)
+    return std::nullopt;
+#else
     return core_ ? core_->resolveRoute(address) : std::nullopt;
+#endif
 }
 
 bool TailscaleProvider::activateRoute(const RemoteRouteTarget& target) {
     std::lock_guard lock(mutex_);
+#if !defined(__SWITCH__) || !defined(ENABLE_TAILSCALE)
+    (void)target;
+    return false;
+#else
     if (!core_)
         return false;
     return core_->activateRoute(target);
+#endif
 }
 
 bool TailscaleProvider::prepareRouteForStreaming(
     const RemoteRouteTarget& target) {
     std::lock_guard lock(mutex_);
+#if !defined(__SWITCH__) || !defined(ENABLE_TAILSCALE)
+    (void)target;
+    return false;
+#else
     if (!core_)
         return false;
     return core_->prepareRouteForStreaming(target);
+#endif
 }
 
 void TailscaleProvider::deactivateRoute(const RemoteRouteTarget& target) {
     std::lock_guard lock(mutex_);
+#if defined(__SWITCH__) && defined(ENABLE_TAILSCALE)
     if (core_)
         core_->deactivateRoute(target);
+#else
+    (void)target;
+#endif
 }
 
 RemotePathInfo TailscaleProvider::pathInfo(std::string_view peerId) const {
     std::lock_guard lock(mutex_);
+#if !defined(__SWITCH__) || !defined(ENABLE_TAILSCALE)
+    (void)peerId;
+    return RemotePathInfo{};
+#else
     return core_ ? core_->pathInfo(peerId) : RemotePathInfo{};
+#endif
 }
 
 void TailscaleProvider::setOneOffAuthKey(std::string key) {

@@ -394,14 +394,14 @@ elseif (PLATFORM_SWITCH)
             app/src/remote_access/tailscale/TailscaleAuthKeyFile.cpp
             app/src/vpn/VpnFileLogger.cpp
         )
-    endif ()
-
-    if (ENABLE_TAILSCALE)
         include(cmake/TailscaleCompatibility.cmake)
         set(TAILSCALE_GENERATED_INCLUDE_DIR
             "${CMAKE_CURRENT_BINARY_DIR}/generated/tailscale")
         artemis_generate_tailscale_compatibility(
             "${TAILSCALE_GENERATED_INCLUDE_DIR}")
+    endif ()
+
+    if (ENABLE_TAILSCALE)
         foreach (_tailscale_dependency tailscale-libsodium tailscale-nghttp2)
             if (NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/extern/${_tailscale_dependency}/.git")
                 message(FATAL_ERROR
@@ -593,9 +593,12 @@ if (ENABLE_NETBIRD)
         "${HANDLE_FULL_O}"
         "${LIBNETBIRD_A}")
 endif ()
+if (ENABLE_WIREGUARD OR ENABLE_NETBIRD OR ENABLE_TAILSCALE)
+    target_include_directories(${PROJECT_NAME} PRIVATE
+        "${TAILSCALE_GENERATED_INCLUDE_DIR}")
+endif ()
 if (ENABLE_TAILSCALE)
     target_include_directories(${PROJECT_NAME} PRIVATE
-        "${TAILSCALE_GENERATED_INCLUDE_DIR}"
         "${TAILSCALE_WGX_SOURCE_DIR}/include")
     add_dependencies(${PROJECT_NAME} artemis_tailscale_wgx_deps)
     target_link_libraries(${PROJECT_NAME} PRIVATE "${LIBTAILSCALE_WGX_A}")

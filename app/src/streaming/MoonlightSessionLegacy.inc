@@ -24,8 +24,12 @@ int m_video_format;
 static std::atomic<MoonlightSession*> m_active_session = nullptr;
 static MoonlightSessionDecoderAndRenderProvider* m_provider = nullptr;
 
+static MoonlightSession* active_session_ptr() noexcept {
+    return m_active_session.load(std::memory_order_acquire);
+}
+
 MoonlightSession* MoonlightSession::activeSession() {
-    return m_active_session;
+    return active_session_ptr();
 }
 
 void MoonlightSession::set_provider(
@@ -40,7 +44,7 @@ MoonlightSession::MoonlightSession(const std::string& address, int app_id,
     m_app_uuid = std::move(appUuid);
     m_input_only = m_app_uuid == ApolloRemoteInputUuid;
     m_apollo_launch_options.appUuid = m_app_uuid;
-    m_active_session = this;
+    m_active_session.store(this, std::memory_order_release);
 
     m_video_decoder = m_provider->video_decoder();
     m_video_renderer = m_provider->video_renderer();
@@ -60,7 +64,7 @@ MoonlightSession::~MoonlightSession() {
         delete m_audio_renderer;
     }
 
-    m_active_session = nullptr;
+    m_active_session.store(nullptr, std::memory_order_release);
 }
 
 // MARK: Connection callbacks
@@ -92,30 +96,30 @@ void MoonlightSession::connection_stage_failed(int stage, int error_code) {
 
 void MoonlightSession::connection_started() {
     brls::Logger::info("MoonlightSession: Connection started");
-    if (!m_active_session)
+    if (!active_session_ptr())
         return;
 
-    m_active_session->m_stop_requested = false;
-    m_active_session->m_is_active = true;
-    m_active_session->m_restart_in_progress = false;
+    active_session_ptr()->m_stop_requested = false;
+    active_session_ptr()->m_is_active = true;
+    active_session_ptr()->m_restart_in_progress = false;
 }
 
 void MoonlightSession::connection_terminated(int error_code) {
     brls::Logger::info("MoonlightSession: Connection terminated with code: {}", error_code);
 
-    if (!m_active_session)
+    if (!active_session_ptr())
         return;
 
     const auto action = artemis::streaming::connectionTerminatedAction(
-        m_active_session->m_stop_requested,
-        m_active_session->m_restart_in_progress.load(), error_code);
+        active_session_ptr()->m_stop_requested,
+        active_session_ptr()->m_restart_in_progress.load(), error_code);
 
     // Never LiStopConnection / start() here. This callback runs on a Moonlight
     // worker thread; tearing down deko3d there orange-screens the Switch when
     // the host deletes or closes the current app.
-    m_active_session->m_is_active = false;
+    active_session_ptr()->m_is_active = false;
     if (action == artemis::streaming::ConnectionTerminatedAction::MarkTerminated)
-        m_active_session->m_is_terminated = true;
+        active_session_ptr()->m_is_terminated = true;
 }
 
 void MoonlightSession::connection_log_message(const char* format, ...) {
@@ -143,15 +147,15 @@ void MoonlightSession::connection_rumble_triggers(uint16_t controllerNumber,
 }
 
 void MoonlightSession::connection_status_update(int connection_status) {
-    if (m_active_session) {
-        m_active_session->m_connection_status_is_poor =
+    if (active_session_ptr()) {
+        active_session_ptr()->m_connection_status_is_poor =
             connection_status == CONN_STATUS_POOR;
     }
 }
 
 void MoonlightSession::connection_set_hdr_mode(bool use_hdr) {
-    if (m_active_session) {
-        m_active_session->m_use_hdr = use_hdr;
+    if (active_session_ptr()) {
+        active_session_ptr()->m_use_hdr = use_hdr;
     }
 }
 
@@ -161,35 +165,35 @@ int MoonlightSession::video_decoder_setup(int video_format, int width,
                                           int height, int redraw_rate,
                                           void* context, int dr_flags) {
     m_video_format = video_format;
-    if (m_active_session && !m_active_session->m_input_only &&
-        m_active_session->m_video_decoder) {
-        return m_active_session->m_video_decoder->setup(
+    if (active_session_ptr() && !active_session_ptr()->m_input_only &&
+        active_session_ptr()->m_video_decoder) {
+        return active_session_ptr()->m_video_decoder->setup(
             video_format, width, height, redraw_rate, context, dr_flags);
     }
     return DR_OK;
 }
 
 void MoonlightSession::video_decoder_start() {
-    if (m_active_session && m_active_session->m_video_decoder) {
-        m_active_session->m_video_decoder->start();
+    if (active_session_ptr() && active_session_ptr()->m_video_decoder) {
+        active_session_ptr()->m_video_decoder->start();
     }
 }
 
 void MoonlightSession::video_decoder_stop() {
-    if (m_active_session && m_active_session->m_video_decoder) {
-        m_active_session->m_video_decoder->stop();
+    if (active_session_ptr() && active_session_ptr()->m_video_decoder) {
+        active_session_ptr()->m_video_decoder->stop();
     }
 }
 
 void MoonlightSession::video_decoder_cleanup() {
-    if (m_active_session && m_active_session->m_video_decoder) {
-        m_active_session->m_video_decoder->cleanup();
+    if (active_session_ptr() && active_session_ptr()->m_video_decoder) {
+        active_session_ptr()->m_video_decoder->cleanup();
     }
 }
 
 int MoonlightSession::video_decoder_submit_decode_unit(PDECODE_UNIT decode_unit) {
-    if (m_active_session && m_active_session->m_video_decoder) {
-        return m_active_session->m_video_decoder->submit_decode_unit(decode_unit);
+    if (active_session_ptr() && active_session_ptr()->m_video_decoder) {
+        return active_session_ptr()->m_video_decoder->submit_decode_unit(decode_unit);
     }
     return DR_OK;
 }
@@ -199,36 +203,36 @@ int MoonlightSession::video_decoder_submit_decode_unit(PDECODE_UNIT decode_unit)
 int MoonlightSession::audio_renderer_init(
     int audio_configuration, const POPUS_MULTISTREAM_CONFIGURATION opus_config,
     void* context, int ar_flags) {
-    if (m_active_session && !m_active_session->m_input_only &&
-        m_active_session->m_audio_renderer) {
-        return m_active_session->m_audio_renderer->init(
+    if (active_session_ptr() && !active_session_ptr()->m_input_only &&
+        active_session_ptr()->m_audio_renderer) {
+        return active_session_ptr()->m_audio_renderer->init(
             audio_configuration, opus_config, context, ar_flags);
     }
     return DR_OK;
 }
 
 void MoonlightSession::audio_renderer_start() {
-    if (m_active_session && m_active_session->m_audio_renderer) {
-        m_active_session->m_audio_renderer->start();
+    if (active_session_ptr() && active_session_ptr()->m_audio_renderer) {
+        active_session_ptr()->m_audio_renderer->start();
     }
 }
 
 void MoonlightSession::audio_renderer_stop() {
-    if (m_active_session && m_active_session->m_audio_renderer) {
-        m_active_session->m_audio_renderer->stop();
+    if (active_session_ptr() && active_session_ptr()->m_audio_renderer) {
+        active_session_ptr()->m_audio_renderer->stop();
     }
 }
 
 void MoonlightSession::audio_renderer_cleanup() {
-    if (m_active_session && m_active_session->m_audio_renderer) {
-        m_active_session->m_audio_renderer->cleanup();
+    if (active_session_ptr() && active_session_ptr()->m_audio_renderer) {
+        active_session_ptr()->m_audio_renderer->cleanup();
     }
 }
 
 void MoonlightSession::audio_renderer_decode_and_play_sample(
     char* sample_data, int sample_length) {
-    if (m_active_session && m_active_session->m_audio_renderer) {
-        m_active_session->m_audio_renderer->decode_and_play_sample(
+    if (active_session_ptr() && active_session_ptr()->m_audio_renderer) {
+        active_session_ptr()->m_audio_renderer->decode_and_play_sample(
             sample_data, sample_length);
     }
 }
@@ -393,9 +397,9 @@ void MoonlightSession::start(ServerCallback<bool> callback, bool is_sunshine) {
                             // Do not LiStopConnection here: this can still race
                             // the in-flight deko3d present. Mark dead and let
                             // StreamingView::terminate() stop on the next frame.
-                            if (m_active_session) {
-                                m_active_session->m_is_active = false;
-                                m_active_session->m_is_terminated = true;
+                            if (active_session_ptr()) {
+                                active_session_ptr()->m_is_active = false;
+                                active_session_ptr()->m_is_terminated = true;
                             }
                             if (Settings::instance().video_codec() == AV1) {
                                 callback(GSResult<bool>::failure(
@@ -428,7 +432,7 @@ void MoonlightSession::stop(int terminate_app, bool sync_host_quit) {
     // Stop dispatching to callbacks as early as possible: worker threads check
     // the active pointer, so clearing it here (not only in the destructor)
     // narrows the window in which they could keep dereferencing this session.
-    m_active_session = nullptr;
+    m_active_session.store(nullptr, std::memory_order_release);
 
     // Sunshine can leave the host session paused after LiStopConnection alone
     // (community report: Moonlight-Switch #215). Always cancel for Sunshine so
@@ -460,13 +464,13 @@ void MoonlightSession::restart() {
             brls::Logger::info("MoonlightSession: Reconnected");
         } else {
             brls::Logger::info("MoonlightSession: Reconnection failed");
-            if (m_active_session) {
-                m_active_session->m_restart_in_progress = false;
-                m_active_session->m_is_active = false;
-                m_active_session->m_is_terminated = true;
+            if (active_session_ptr()) {
+                active_session_ptr()->m_restart_in_progress = false;
+                active_session_ptr()->m_is_active = false;
+                active_session_ptr()->m_is_terminated = true;
             }
         }
-    }, m_active_session->m_is_sunshine);
+    }, active_session_ptr()->m_is_sunshine);
 }
 
 void MoonlightSession::restartWithApolloOptions(
@@ -478,8 +482,8 @@ void MoonlightSession::restartWithApolloOptions(
     m_apollo_launch_options = std::move(options);
 
     start([callback](const GSResult<bool>& result) {
-        if (m_active_session)
-            m_active_session->m_restart_in_progress = false;
+        if (active_session_ptr())
+            active_session_ptr()->m_restart_in_progress = false;
         callback(result);
     }, m_is_sunshine);
 }
