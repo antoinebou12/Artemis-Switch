@@ -596,7 +596,13 @@
         "host_device_macos": "macOS",
         "host_device_linux": "Linux",
         "swap_ui_ab": "Swap / (A/B) for UI",
-        "swap_ui_xy": "Swap / (X/Y) for UI"
+        "swap_ui_xy": "Swap / (X/Y) for UI",
+        "vpn_config_browse": "Choose a different file",
+        "vpn_config_view": "View config",
+        "vpn_config_missing": "Config file not found.",
+        "vpn_config_unreadable": "Config file could not be read.",
+        "vpn_config_empty": "Config file is empty.",
+        "vpn_config_truncated": "… file truncated for display."
     },
     "streaming": {
         "connection": "Connection",

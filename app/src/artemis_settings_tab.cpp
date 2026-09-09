@@ -35,6 +35,7 @@
 #if defined(__SWITCH__) && (defined(ENABLE_NETBIRD) || defined(ENABLE_WIREGUARD) || defined(ENABLE_TAILSCALE))
 #include "remote_access/RemoteAccessManager.hpp"
 #include "remote_access/RemoteAccessSelection.hpp"
+#include "remote_access/VpnConfigPreview.hpp"
 #include "remote_access/tailscale/TailscaleAuthKeyFile.hpp"
 #include "remote_access_provider_id.hpp"
 #include "streaming/JsonFileBrowser.hpp"
@@ -101,6 +102,98 @@ class RemoteAccessStatusTask : public brls::RepeatingTask {
   private:
     std::function<void()> onTick_;
 };
+
+#if defined(__SWITCH__) && (defined(ENABLE_NETBIRD) || defined(ENABLE_WIREGUARD) || defined(ENABLE_TAILSCALE))
+
+// These helpers sit above the file's `using namespace brls;`, so the _i18n
+// literal has to be pulled in explicitly here.
+using namespace brls::literals;
+
+// Surfaces why a config could not be shown. The preview loader already
+// distinguishes these cases, so the user is told which one applies instead of
+// getting a generic failure.
+void showVpnConfigError(artemis::remote_access::VpnConfigLoadStatus status) {
+    switch (status) {
+    case artemis::remote_access::VpnConfigLoadStatus::Missing:
+        brls::Application::notify("settings/vpn_config_missing"_i18n);
+        break;
+    case artemis::remote_access::VpnConfigLoadStatus::Unreadable:
+        brls::Application::notify("settings/vpn_config_unreadable"_i18n);
+        break;
+    case artemis::remote_access::VpnConfigLoadStatus::Empty:
+        brls::Application::notify("settings/vpn_config_empty"_i18n);
+        break;
+    case artemis::remote_access::VpnConfigLoadStatus::Ok:
+        break;
+    }
+}
+
+// Read-only view of the selected tunnel config. loadVpnConfigPreview redacts
+// private keys and caps the text, so nothing secret reaches the screen and a
+// large file cannot stall the UI.
+void openVpnConfigViewer(const std::string& title, const std::string& path) {
+    auto preview = artemis::remote_access::loadVpnConfigPreview(path);
+    if (preview.status != artemis::remote_access::VpnConfigLoadStatus::Ok) {
+        showVpnConfigError(preview.status);
+        return;
+    }
+
+    if (preview.truncated) {
+        preview.text += "
+
+";
+        preview.text += "settings/vpn_config_truncated"_i18n;
+    }
+
+    auto* content = new brls::Box(brls::Axis::COLUMN);
+    content->setAlignItems(brls::AlignItems::STRETCH);
+    content->setWidth(brls::View::AUTO);
+    content->setPadding(24, 32, 32, 32);
+
+    auto* pathLabel = new brls::Label();
+    pathLabel->setText(path);
+    pathLabel->setFontSize(16);
+    pathLabel->setWidth(brls::View::AUTO);
+    pathLabel->setHeight(brls::View::AUTO);
+    pathLabel->setMarginBottom(18);
+    content->addView(pathLabel);
+
+    auto* configLabel = new brls::Label();
+    configLabel->setText(preview.text);
+    configLabel->setFontSize(17);
+    configLabel->setHorizontalAlign(brls::HorizontalAlign::LEFT);
+    configLabel->setWidth(brls::View::AUTO);
+    configLabel->setHeight(brls::View::AUTO);
+    content->addView(configLabel);
+
+    auto* scroll = new brls::ScrollingFrame();
+    scroll->setContentView(content);
+    auto* frame = new brls::AppletFrame(scroll);
+    frame->setTitle(title);
+    brls::Application::pushActivity(new brls::Activity(frame));
+}
+
+// Browsing and viewing both push an activity, so the choice is handled in the
+// dismiss callback: Dropdown fires its value callback and only then pops, which
+// would otherwise pop whatever we just pushed.
+void openVpnConfigActions(const std::string& title, const std::string& path,
+                          std::function<void()> browse) {
+    std::vector<std::string> options = {"settings/vpn_config_browse"_i18n,
+                                        "settings/vpn_config_view"_i18n};
+    auto* dropdown = new brls::Dropdown(
+        title, options, [](int) {}, 0,
+        [title, path, browse = std::move(browse)](int selected) {
+            if (selected == 0) {
+                if (browse)
+                    browse();
+            } else if (selected == 1) {
+                openVpnConfigViewer(title, path);
+            }
+        });
+    brls::Application::pushActivity(new brls::Activity(dropdown));
+}
+
+#endif
 
 } // namespace
 #endif
@@ -470,26 +563,42 @@ ArtemisSettingsTab::ArtemisSettingsTab() {
     showConfigPath(Settings::instance().wireguard_config_path());
     wireguardConfigPath->registerClickAction([this, showConfigPath](View*) {
         // Browse for the file instead of retyping a long sdmc: path by hand.
-        artemis::streaming::openFileBrowser(
-            artemis::streaming::JsonFileBrowserMode::Import, {".conf"},
-            "settings/wireguard_config_path_title"_i18n,
-            [this, showConfigPath](const std::string& path) {
-                if (path.empty())
-                    return;
-                Settings::instance().set_wireguard_config_path(path);
-                Settings::instance().save();
-                showConfigPath(path);
-                // Re-apply immediately so a corrected file takes effect without
-                // toggling the provider off and on again.
-                if (Settings::instance().remote_access_provider() ==
-                    RemoteAccessProviderId::WireGuard) {
-                    applyRemoteAccessSelectionAsync(
-                        RemoteAccessProviderId::WireGuard, alive_,
-                        [this](const RemoteAccessSelectionResult&) {
-                            refreshRemoteAccessRows();
-                        });
-                }
-            });
+        auto browse = [this, showConfigPath]() {
+            artemis::streaming::openFileBrowser(
+                artemis::streaming::JsonFileBrowserMode::Import, {".conf"},
+                "settings/wireguard_config_path_title"_i18n,
+                [this, showConfigPath](const std::string& path) {
+                    if (path.empty())
+                        return;
+                    Settings::instance().set_wireguard_config_path(path);
+                    Settings::instance().save();
+                    showConfigPath(path);
+                    // Re-apply immediately so a corrected file takes effect
+                    // without toggling the provider off and on again.
+                    if (Settings::instance().remote_access_provider() ==
+                        RemoteAccessProviderId::WireGuard) {
+                        applyRemoteAccessSelectionAsync(
+                            RemoteAccessProviderId::WireGuard, alive_,
+                            [this](const RemoteAccessSelectionResult&) {
+                                refreshRemoteAccessRows();
+                            });
+                    }
+                });
+        };
+
+        // With no file chosen yet there is nothing to inspect, so go straight
+        // to the browser rather than offering an action that would only report
+        // a missing file.
+        const std::string current = Settings::instance().wireguard_config_path();
+        const std::string effective =
+            current.empty() ? WireGuardManager::default_config_path() : current;
+        if (effective.empty()) {
+            browse();
+            return true;
+        }
+
+        openVpnConfigActions("settings/wireguard_config_path_title"_i18n,
+                             effective, browse);
         return true;
     });
 
