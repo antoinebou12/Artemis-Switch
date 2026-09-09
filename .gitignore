@@ -26,3 +26,6 @@ artemis_*.json
 /netbird_switch_config.json
 /netbird.conf
 /wg0.conf
+
+# Local archive of exported stashes / scratch patches (never committed)
+.archive/

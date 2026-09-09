@@ -220,6 +220,46 @@ The Performance page exposes live streaming and renderer information:
 | French Artemis UI | ✅ Integrated | Settings, overlay tabs, and Performance UI use Borealis i18n |
 | CI / Release CD | ✅ Integrated | Unit, sanitizer, i18n, release-contract, Switch NRO publish |
 
+### What's new in 1.5.4
+
+This cycle landed as PRs #60–#68 on `main`.
+
+**Remote access**
+
+- **NetBird userspace VPN** integrated behind a pinned `extern/netbird-switch`
+  dependency, with a manager interface, connection lifecycle and GameStream proxy
+  routing. Discovered NetBird peers now appear directly in **Add Host**, so a remote
+  host can be paired without typing an address by hand. See
+  [`docs/NETBIRD_SWITCH.md`](docs/NETBIRD_SWITCH.md) for setup and current limitations.
+
+**Hosts and streaming**
+
+- **Host codec detection** reads `ServerCodecModeSupport` and surfaces what the host
+  actually advertises, instead of assuming a codec set.
+- **Wake-on-LAN overrides**: enter a MAC manually, aim the magic packet at a custom
+  target and port, and resend without leaving the host entry.
+
+**Input and video**
+
+- **Motion-source selection** now follows an explicit decision rule rather than
+  implicit precedence, so Joy-Con, Pro Controller and console-motion sources resolve
+  predictably.
+- The **bitrate slider is quantized** to meaningful steps, and **stick deadzones were
+  rescaled** so the usable range is no longer compressed at low settings.
+
+**Diagnostics**
+
+- VPN file logging was generalized into a reusable **`RotatingFileLog`**, so
+  diagnostics no longer grow unbounded.
+
+**Stability fixes**
+
+- The active-session pointer is guarded against teardown races.
+- Controllers are re-announced and rumble is stopped on session teardown, fixing pads
+  left buzzing or unregistered after a disconnect.
+- Stream profile lookups are bound under a stable host key, so profiles stay attached
+  to the right host across address changes.
+
 ---
 
 ## Nintendo Switch
@@ -510,8 +550,23 @@ Several Artemis Switch features were implemented from ideas raised on [XITRIX/Mo
 | [#252](https://github.com/XITRIX/Moonlight-Switch/issues/252) | [@Befeeter](https://github.com/Befeeter) | Experimental AV1 codec support |
 | [#58](https://github.com/XITRIX/Moonlight-Switch/issues/58) | [@gcseed](https://github.com/gcseed) | Debug / FPS overlay corner placement |
 | [#239](https://github.com/XITRIX/Moonlight-Switch/issues/239) / [#283](https://github.com/XITRIX/Moonlight-Switch/issues/283) | [@HackZy01](https://github.com/HackZy01) / [@AquaSteam](https://github.com/AquaSteam) | UI language selection and keyboard layout |
+| [#26](https://github.com/XITRIX/Moonlight-Switch/issues/26) | [@Ticamus](https://github.com/Ticamus) | French UI localization — shipped as `resources/i18n/fr/` |
+| [#46](https://github.com/XITRIX/Moonlight-Switch/issues/46) | [@nik2143](https://github.com/nik2143) | Italian UI localization — shipped as `resources/i18n/it/` |
+| [#48](https://github.com/XITRIX/Moonlight-Switch/issues/48) | [@4K045M](https://github.com/4K045M) | German UI localization — shipped as `resources/i18n/de/` |
 | [#266](https://github.com/XITRIX/Moonlight-Switch/issues/266) | [@Moby812](https://github.com/Moby812) | Virtual display (Apollo-gated path) |
 | [#323](https://github.com/XITRIX/Moonlight-Switch/issues/323) | [@nyanpasu64](https://github.com/nyanpasu64) | Low-latency frame pacing (algorithm inspiration; opt-in) |
+
+Artemis Switch currently ships these locales: `de`, `en-US`, `es`, `fr`, `it`, `ja`,
+`ko`, `pt-BR`, `ru`, `zh-Hans`, `zh-Hant`.
+
+#### Still open
+
+These upstream requests are acknowledged but **not** implemented in this fork:
+
+| Upstream issue | Reporter | Current status |
+|---|---|---|
+| [#51](https://github.com/XITRIX/Moonlight-Switch/issues/51) | [@Engen-Sindre](https://github.com/Engen-Sindre) | Norwegian localization — no `nb` / `no` locale exists yet. Contributions welcome; see [Localization](#localization). |
+| [#65](https://github.com/XITRIX/Moonlight-Switch/issues/65) | [@Kennnwxyz](https://github.com/Kennnwxyz) | A bundle of several separate requests. Some overlap features already listed above; the remainder still needs per-item triage. |
 
 Related discussion on Moonlight Qt: [moonlight-qt#1557](https://github.com/moonlight-stream/moonlight-qt/issues/1557) (upscaling).
 
