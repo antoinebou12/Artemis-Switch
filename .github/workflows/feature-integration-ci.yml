@@ -1,11 +1,11 @@
 name: Feature and Integration CI
 
 on:
+  # Topic branches run through pull_request. Keeping agent/** and feature/**
+  # here as well meant two runs per update on any branch with an open PR.
   push:
     branches:
       - main
-      - agent/artemis-switch-integration
-      - feature/**
   pull_request:
     branches:
       - main

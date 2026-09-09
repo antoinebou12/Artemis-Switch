@@ -1,8 +1,10 @@
 name: Lint
 
 on:
+  # Topic branches are linted through pull_request; a feature/** push would
+  # only duplicate that run.
   push:
-    branches: ["main", "feature/**"]
+    branches: ["main"]
   pull_request:
     branches: ["main"]
   workflow_dispatch:

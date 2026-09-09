@@ -1,12 +1,24 @@
 name: All Builds
 
 on:
+  # This workflow fans out to six reusable cross-platform builds, so every
+  # trigger is expensive. Pushes are limited to main: a topic branch with an
+  # open PR would otherwise fire this twice per update, once for push and once
+  # for pull_request. Use workflow_dispatch to build a branch before it has a
+  # PR.
   push:
-    branches: [ main, "feature/**" ]
+    branches: [ main ]
   pull_request:
     branches: [ main ]
   workflow_dispatch:
   workflow_call:
+
+# Supersede in-flight runs for the same branch or PR instead of letting a burst
+# of updates queue a full matrix each. Skipped for main so release history is
+# not cancelled mid-build.
+concurrency:
+  group: artemis-all-builds-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   switch:

@@ -1,10 +1,18 @@
 name: Unit tests
 
 on:
+  # agent/** and feature/** pushes were the bulk of the August 8 run burst.
+  # Topic branches are covered by pull_request; pushing to one no longer starts
+  # a second, duplicate run.
   push:
-    branches: ["main", "agent/**", "feature/**"]
+    branches: ["main"]
   pull_request:
     branches: ["main"]
+  workflow_dispatch:
+
+concurrency:
+  group: artemis-unit-tests-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   portable-tests:
