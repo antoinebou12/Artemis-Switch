@@ -511,9 +511,12 @@ target_compile_features(remote_access_provider_selection_test PRIVATE cxx_std_20
 add_test(NAME remote_access_provider_selection_test
          COMMAND remote_access_provider_selection_test)
 
+# VpnFileLogger is a thin forwarder over RotatingFileLog, so the backing
+# implementation has to be compiled in too or the target fails to link.
 add_executable(vpn_file_logger_test
     "${REPO_ROOT}/tests/vpn_file_logger_test.cpp"
-    "${REPO_ROOT}/app/src/vpn/VpnFileLogger.cpp")
+    "${REPO_ROOT}/app/src/vpn/VpnFileLogger.cpp"
+    "${REPO_ROOT}/app/src/features/diagnostics/RotatingFileLog.cpp")
 target_include_directories(vpn_file_logger_test PRIVATE
     "${REPO_ROOT}/app/src/vpn"
     "${REPO_ROOT}/app/src")

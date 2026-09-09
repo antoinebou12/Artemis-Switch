@@ -102,12 +102,18 @@ void AddHostTab::fillSearchBox(const GSResult<std::vector<Host>>& hostsRes) {
 
     if (hostsRes.isSuccess()) {
         appendSearchHosts(hostsRes.value());
-        appendRemoteAccessPeers();
     } else {
         loader->setVisibility(brls::Visibility::GONE);
         searchHeader->setTitle("add_host/search"_i18n + " - " +
                                hostsRes.error());
     }
+
+    // Remote peers do not come from LAN discovery, so they must not be gated on
+    // it. DiscoverManager reports failure ("no_host") whenever no LAN host
+    // answers, which is the normal case when streaming from away -- precisely
+    // when the tunnel peers are the only reachable hosts. Appending them only
+    // on the success branch hid them exactly when they mattered most.
+    appendRemoteAccessPeers();
 }
 
 void AddHostTab::appendSearchHosts(const std::vector<Host>& hosts) {
@@ -238,6 +244,19 @@ void AddHostTab::findHost() {
             });
         });
     }
+
+    // The provider-based directory covers every configured remote-access stack
+    // (NetBird, WireGuard, Tailscale) and drops peers whose authenticated
+    // identity does not check out. Its only other call site sits behind
+    // MULTICAST_DISABLED, which is set for PS Vita alone, so on Switch it never
+    // ran and WireGuard/Tailscale peers were never offered here.
+    //
+    // This runs alongside the NetBird block above rather than replacing it: the
+    // legacy path calls ensure_connected() and so brings the tunnel up on
+    // demand, whereas the provider cache is only populated once a provider is
+    // started and ready. appendSearchHosts() skips addresses already listed, so
+    // whichever resolves first wins and the other is deduplicated.
+    appendRemoteAccessPeers();
 #endif
 
     ASYNC_RETAIN

@@ -139,9 +139,7 @@ void openVpnConfigViewer(const std::string& title, const std::string& path) {
     }
 
     if (preview.truncated) {
-        preview.text += "
-
-";
+        preview.text += "\n\n";
         preview.text += "settings/vpn_config_truncated"_i18n;
     }
 
