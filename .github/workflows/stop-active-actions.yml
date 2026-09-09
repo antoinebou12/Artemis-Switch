@@ -1,13 +1,22 @@
 name: Stop active Actions
 
-# One-shot trigger: merged to master to guarantee a normal push event.
+# Emergency lever: cancels every other queued or running workflow in this repo.
+# Normally run from the Actions tab (workflow_dispatch). The push trigger is a
+# fallback that fires when this file itself changes on the default branch.
 on:
   push:
     branches:
-      - master
+      - main
     paths:
       - .github/workflows/stop-active-actions.yml
   workflow_dispatch:
+    inputs:
+      remove_after_run:
+        description: >-
+          Delete this workflow file afterwards, making it single-use. Leave
+          false to keep the lever available for next time.
+        type: boolean
+        default: false
 
 permissions:
   actions: write
@@ -59,8 +68,11 @@ jobs:
             sleep 5
           done
 
-      - name: Remove this one-shot workflow
-        if: always()
+      - name: Remove this workflow file
+        if: >-
+          success() &&
+          github.event_name == 'workflow_dispatch' &&
+          inputs.remove_after_run
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -75,10 +87,10 @@ jobs:
           )
 
           file_json="$(curl -fsSL "${headers[@]}" \
-            "https://api.github.com/repos/${GITHUB_REPOSITORY}/contents/${path}?ref=master")"
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/contents/${path}?ref=main")"
           sha="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["sha"])' <<< "$file_json")"
 
-          payload="$(python3 -c 'import json,sys; print(json.dumps({"message":"ci: remove one-shot Actions stopper [skip ci]","sha":sys.argv[1],"branch":"master"}))' "$sha")"
+          payload="$(python3 -c 'import json,sys; print(json.dumps({"message":"ci: remove one-shot Actions stopper [skip ci]","sha":sys.argv[1],"branch":"main"}))' "$sha")"
           curl -fsSL -X DELETE "${headers[@]}" \
             -H "Content-Type: application/json" \
             "https://api.github.com/repos/${GITHUB_REPOSITORY}/contents/${path}" \
