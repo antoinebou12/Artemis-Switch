@@ -2,23 +2,30 @@ name: All Builds
 
 on:
   # This workflow fans out to six reusable cross-platform builds, so every
-  # trigger is expensive. Pushes are limited to main: a topic branch with an
-  # open PR would otherwise fire this twice per update, once for push and once
-  # for pull_request. Use workflow_dispatch to build a branch before it has a
-  # PR.
-  push:
-    branches: [ main ]
+  # trigger is expensive and it is kept off the routine path.
+  #
+  # Pull requests are the gate: branches are validated before they land. There
+  # is deliberately no push trigger for main -- PRs are rebase-merged, so the
+  # exact commits have already been built here and a main build would only
+  # repeat that work.
+  #
+  # Release tags do build the full matrix. release.yml covers the shipping
+  # Switch NRO only, so this is where the other platforms get verified before
+  # a version goes out.
   pull_request:
     branches: [ main ]
+  push:
+    tags:
+      - 'v*'
   workflow_dispatch:
   workflow_call:
 
-# Supersede in-flight runs for the same branch or PR instead of letting a burst
-# of updates queue a full matrix each. Skipped for main so release history is
-# not cancelled mid-build.
+# Supersede in-flight runs for the same PR instead of letting a burst of
+# updates queue a full matrix each. Tag builds are never cancelled: a release
+# must finish.
 concurrency:
   group: artemis-all-builds-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
 
 jobs:
   switch:
