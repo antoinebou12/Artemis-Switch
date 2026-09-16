@@ -10,6 +10,7 @@
 
 #include "AVFrameHolder.hpp"
 #include "FramePipelineTelemetry.hpp"
+#include "LowLatencyFrameSelection.hpp"
 #include "PresentDeadline.hpp"
 
 #include <algorithm>
@@ -224,16 +225,6 @@ AVFrame* AVFrameQueue::pop(bool* consumed) {
     // LOW-LATENCY PATH
     // ========================================================================
     if (lowLatency) {
-        // Aggressive latest-frame-wins: if the renderer is behind, skip
-        // straight to the newest complete frame.
-        while (queue.size() > 1) {
-            AVFrame* dropped = queue.front().frame;
-            queue.pop_front();
-            recycleFrame(freeQueue, dropped);
-            framesDroppedStat++;
-            pacingSkipStat++;
-        }
-
         if (queue.empty()) {
             if (bufferFrame) {
                 fakeFrameUsedStat++;
@@ -248,7 +239,13 @@ AVFrame* AVFrameQueue::pop(bool* consumed) {
         const auto gateNs = std::chrono::nanoseconds(
             static_cast<int64_t>(std::max(0.0, leadMs) * 1.0e6));
 
-        if (now < queue.front().timeEstimate - gateNs) {
+        if (!artemis::streaming::prepareLatestFrame(
+                queue, now, gateNs, targetBufferedFrames,
+                [this](TimedFrame& dropped) {
+                    recycleFrame(freeQueue, dropped.frame);
+                    framesDroppedStat++;
+                    pacingSkipStat++;
+                })) {
             scheduledHoldStat++;
             return bufferFrame;
         }

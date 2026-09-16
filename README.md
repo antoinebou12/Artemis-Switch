@@ -6,19 +6,18 @@
 [![Release CD](https://github.com/antoinebou12/Artemis-Switch/actions/workflows/release.yml/badge.svg)](https://github.com/antoinebou12/Artemis-Switch/actions/workflows/release.yml)
 [![Latest Release](https://img.shields.io/github/v/release/antoinebou12/Artemis-Switch?display_name=tag&sort=semver)](https://github.com/antoinebou12/Artemis-Switch/releases/latest)
 [![License](https://img.shields.io/github/license/antoinebou12/Artemis-Switch)](LICENSE)
-[![Stars](https://img.shields.io/github/stars/antoinebou12/Artemis-Switch?style=flat)](https://github.com/antoinebou12/Artemis-Switch/stargazers)
-[![Platform](https://img.shields.io/badge/platform-Nintendo%20Switch-E60012)](#nintendo-switch)
-[![Moonlight](https://img.shields.io/badge/compatible-Moonlight%20%2F%20Sunshine-4caf50)](#compatibility)
-[![C++20](https://img.shields.io/badge/C%2B%2B-20-00599C)](CMakeLists.txt)
-[![Languages](https://img.shields.io/badge/UI-English%20%7C%20Fran%C3%A7ais-4c8bf5)](#localization)
-[![Status](https://img.shields.io/badge/status-experimental-orange)](#project-status)
 [![Docs](https://img.shields.io/badge/docs-GitHub%20Pages-2196F3)](https://antoinebou12.github.io/Artemis-Switch/)
 
 **Native Moonlight-compatible game streaming for Nintendo Switch / Horizon OS.**
 
-<img width="1080" height="607" alt="image" src="https://github.com/user-attachments/assets/8d5c5659-5331-451d-8690-ddab305036ab" />
+<details>
+<summary>Screenshots</summary>
 
-<img width="1080" height="607" alt="image" src="https://github.com/user-attachments/assets/2dcdb96f-2d12-4d61-84ba-b3957b8a20dc" />
+<img width="1080" height="607" alt="Artemis Switch application library" src="https://github.com/user-attachments/assets/8d5c5659-5331-451d-8690-ddab305036ab" />
+
+<img width="1080" height="607" alt="Artemis Switch streaming interface" src="https://github.com/user-attachments/assets/2dcdb96f-2d12-4d61-84ba-b3957b8a20dc" />
+
+</details>
 
 Author: [antoinebou12](https://github.com/antoinebou12)
 
@@ -27,7 +26,19 @@ Artemis Switch is based on [Moonlight-Switch](https://github.com/XITRIX/Moonligh
 > [!IMPORTANT]
 > Artemis Switch is under active development. Portable tests, GitHub Actions jobs, and the Nintendo Switch release build run before release packages are published. Items marked **device validation** still need confirmation on real Sunshine/Apollo streams.
 
----
+## Start here
+
+| Goal | Go to |
+|---|---|
+| Install on Nintendo Switch | [Installation](#installation) |
+| Configure the app | [Settings documentation](https://antoinebou12.github.io/Artemis-Switch/settings.html) |
+| Create stream profiles | [Stream profile guide](https://antoinebou12.github.io/Artemis-Switch/profiles.html) |
+| Build from source | [Developer build](#developer-build) |
+| Run checks locally | [Developer validation](#developer-validation) |
+| Check support and open issues | [Project status and limitations](#project-status-and-limitations) |
+
+<details>
+<summary><strong>Documentation index</strong></summary>
 
 ## Documentation
 
@@ -46,7 +57,10 @@ Settings help is on GitHub Pages ([IPC Toolkit](https://ipctk.xyz)-style **blue*
 
 Source: [`docs/source/`](docs/source/).
 
----
+</details>
+
+<details>
+<summary><strong>Recommended PC hosts and device clients</strong></summary>
 
 ## Recommended host and clients
 
@@ -96,7 +110,7 @@ Artemis probes only unauthenticated product/version surfaces and stores no host 
 
 **Why this stack:** Vibeshine, Vibepollo, Apollo, or GameStream-enabled Punktfunk on the PC plus Artemide on Android (and Artemis Switch on the docked/handheld Switch) is the closest to a console-like session: the host manages display behavior, while the client stays low-latency and can upscale a smaller stream with FSR. Host capabilities vary; Artemis shows the detected integration in Host settings.
 
----
+</details>
 
 ## Feature overview
 
@@ -107,9 +121,10 @@ Artemis probes only unauthenticated product/version surfaces and stores no host 
 | **Stream profiles** | Named full settings profiles (`profile.json`); per-host assign; import/export; 30–120 FPS |
 | **Cleaner controls** | Slim Quick Actions; Options for rotation, filters, pointer, host shortcuts, and more |
 | **Performance & diagnostics** | Actual vs configured bitrate, queue wait / jitter, receive→present pipeline ms, startup timing, Benchmark export |
-| **Switch optimizations** | Adaptive low-latency pacing (deadline + latest-frame-wins), WLAN priority, frame-queue telemetry, NVDEC + deko3d |
+| **Switch optimizations** | Optional low-latency pacing, WLAN priority, frame-queue telemetry, NVDEC + deko3d |
 
----
+<details>
+<summary><strong>Feature details and implementation notes</strong></summary>
 
 ## Features
 
@@ -182,6 +197,33 @@ The Performance page exposes live streaming and renderer information:
 
 ### Nintendo Switch optimizations
 
+#### Optional low-latency frame pacing
+
+Low-latency pacing is **Off by default**. Enable the existing Low-latency pacing
+option to use adaptive presentation deadlines and latest-frame-wins selection.
+The normal pacing path remains available by turning this option off.
+
+The queue now checks the oldest waiting frame's deadline **before** discarding
+older frames. While waiting, it preserves the queue; once that deadline is due,
+it releases the newest complete frame. This prevents new arrivals from repeatedly
+moving the deadline forward and causing a hold/drop/hold cycle. If the queue grows
+beyond its target buffer plus one frame, it bypasses the hold to catch up after a
+renderer stall. Catch-up favors freshness: the newest frame can be released before
+its own predicted deadline, and superseded frames are intentionally dropped.
+
+Presentation lead and jitter constants are unchanged. The proposed larger base
+lead and smaller jitter allowance need separate on-device comparison at 30 and
+60 fps before adoption; this fix does not claim a measured latency improvement.
+
+Portable regression tests cover held-frame preservation, deadline equality,
+30/60 fps timelines, burst selection, zero-buffer targets, and stall recovery.
+The existing unit-test sanitizer jobs and PR Switch build cover this feature;
+no separate pacing build workflow is required. For hardware validation, compare
+pacing Off/On at 30 and 60 fps in handheld and docked modes, including network
+jitter and renderer stalls. Check visual cadence alongside the existing hold,
+pacing-drop, and rendered-frame counters; fewer holds alone do not prove smoother
+playback.
+
 | Optimization | Detail |
 |---|---|
 | WLAN priority | Optimized WLAN priority mode for streaming |
@@ -190,9 +232,12 @@ The Performance page exposes live streaming and renderer information:
 | Decode | Existing NVDEC hardware decoding |
 | Render | deko3d GPU rendering and post-processing |
 
----
+</details>
 
-## Project status
+<details>
+<summary><strong>Project status and limitations</strong></summary>
+
+## Project status and limitations
 
 | Area | Status | Current state |
 |---|---|---|
@@ -219,6 +264,22 @@ The Performance page exposes live streaming and renderer information:
 | Punktfunk integration | ✅ GameStream plane | Product/version probe, host-managed display model, `:47992` console; native protocol/admin APIs excluded |
 | French Artemis UI | ✅ Integrated | Settings, overlay tabs, and Performance UI use Borealis i18n |
 | CI / Release CD | ✅ Integrated | Unit, sanitizer, i18n, release-contract, Switch NRO publish |
+
+### Known limitations
+
+- Multiple simultaneous controllers need multiplayer confirmation against each supported host.
+- Full-range output still benefits from visual verification across host resolutions.
+- Console-motion fallback remains disabled until libnx console sensor vectors are mapped safely.
+- Apollo virtual-display, server-command, and clipboard operations are capability-gated.
+- Punktfunk's native QUIC protocol and authenticated administration APIs are outside Artemis Switch's scope; enable its GameStream plane before connecting.
+- Benchmark scoring still needs tuning from real Switch measurements.
+
+See [`docs/ARTEMIS_SWITCH_INTEGRATION_PLAN.md`](docs/ARTEMIS_SWITCH_INTEGRATION_PLAN.md) for release acceptance criteria.
+
+</details>
+
+<details>
+<summary><strong>Release notes: what's new in 1.5.4</strong></summary>
 
 ### What's new in 1.5.4
 
@@ -260,7 +321,10 @@ This cycle landed as PRs #60–#68 on `main`.
 - Stream profile lookups are bound under a stable host key, so profiles stay attached
   to the right host across address changes.
 
----
+</details>
+
+<details>
+<summary><strong>Nintendo Switch architecture and motion notes</strong></summary>
 
 ## Nintendo Switch
 
@@ -303,9 +367,9 @@ Joy-Con and compatible controller motion continues to use Moonlight-Switch's exi
 
 **Console-motion fallback is OFF by default.** Artemis can detect whether the libnx SevenSixAxis API is available, but does not treat opaque/undocumented sensor fields as acceleration or gyro data until vectors are mapped and validated.
 
----
+</details>
 
-## Installing
+## Installation
 
 ### Switch
 
@@ -327,7 +391,8 @@ For the easiest local install, extract `dist/nro/Artemis-Switch-SD.zip` to the r
 > [!WARNING]
 > The author is not responsible for damage to your console if overclocking or unofficial firmware use goes wrong. Think carefully and take responsibility for what you do with your devices.
 
----
+<details>
+<summary><strong>Controls</strong></summary>
 
 ## Controls
 
@@ -342,7 +407,10 @@ For the easiest local install, extract `dist/nro/Artemis-Switch-SD.zip` to the r
 | **SixAxis** | Configure Sunshine to expose a DS4-style controller for gyro / accelerometer (player 1) |
 | **In-game overlay** | `-` + `+` together by default (or hold ESC on keyboard); combination and hold time are configurable |
 
----
+</details>
+
+<details>
+<summary><strong>Localization</strong></summary>
 
 ## Localization
 
@@ -354,7 +422,10 @@ For the easiest local install, extract `dist/nro/Artemis-Switch-SD.zip` to the r
 
 Language follows system settings (and in-app selection where available). French covers Artemis settings, presentation/motion options, overlay tabs, Performance controls, and benchmark actions.
 
----
+</details>
+
+<details>
+<summary><strong>Continuous integration and release process</strong></summary>
 
 ## Continuous Integration
 
@@ -370,8 +441,6 @@ Language follows system settings (and in-app selection where available). French 
 | **Release CD** | Quality gates + Switch build before publishing a `v*` GitHub Release |
 
 Moonlight/GameStream negotiates bitrate during setup. Artemis saves bitrate changes for the **next** stream connection and does not restart an active stream.
-
----
 
 ## Automatic releases
 
@@ -402,11 +471,13 @@ Tags such as `v0.1.0-beta.1` are published as **pre-releases**. Re-running a tag
 
 `SOURCE_INFO.txt` records the project name, author `antoinebou12`, version, commit, and generation time.
 
----
+</details>
 
-## Build
+## Developer build
 
-Clone recursively with a standard [devkitPro](https://devkitpro.org/wiki/Getting_Started) Switch environment:
+Prerequisites: Git, CMake 3.20 or newer, and a standard
+[devkitPro](https://devkitpro.org/wiki/Getting_Started) `devkitA64` environment.
+Clone recursively so every dependency under `extern/` is initialized:
 
 ```bash
 git clone --recursive https://github.com/antoinebou12/Artemis-Switch.git
@@ -415,6 +486,25 @@ cmake -B build/switch -DCMAKE_BUILD_TYPE=Release -DPLATFORM_SWITCH=ON -DUSE_DEKO
 cmake --build build/switch --target Moonlight.nro --parallel
 ```
 
+<details>
+<summary><strong>Repository layout</strong></summary>
+
+| Path | Purpose |
+|---|---|
+| `app/src/` | Application, streaming, renderer, input, and feature implementation |
+| `app/include/` | UI and application declarations |
+| `resources/` | Borealis XML, images, shaders, and translations |
+| `tests/` | Portable unit and contract tests |
+| `ci/integration/` | Cross-feature integration test build |
+| `docs/` | GitHub Pages source and engineering notes |
+| `.github/workflows/` | Build, test, sanitizer, and release automation |
+| `extern/` | Pinned third-party dependencies and Git submodules |
+
+Keep Switch-specific behavior behind the existing platform and capability gates.
+Do not make project-specific changes inside vendored `extern/` dependencies.
+
+</details>
+
 `Moonlight.nro` and `Moonlight.elf` remain internal upstream-compatible build targets. CI exports user-facing artifacts as:
 
 | Artifact | Role |
@@ -422,7 +512,7 @@ cmake --build build/switch --target Moonlight.nro --parallel
 | `Artemis-Switch.nro` | Release / install binary |
 | `Artemis-Switch.elf` | Symbols / debug |
 
-### Validation
+### Developer validation
 
 ```bash
 python tests/i18n_consistency_test.py
@@ -458,13 +548,17 @@ Artemis is Switch-first. Desktop and other ports keep Sunshine/GameStream stream
 
 See **[docs/OTHER_PLATFORMS.md](docs/OTHER_PLATFORMS.md)** for flags, build sketches, and Linux packaging docs.
 
----
+<details>
+<summary><strong>Safety and clock behavior</strong></summary>
 
 ## Safety and clocks
 
 Artemis benchmark metadata performs **read-only** clock queries. It does not set CPU, GPU, or EMC/RAM clocks. If the relevant service is unavailable, clock metadata remains unavailable/zero rather than modifying the system.
 
----
+</details>
+
+<details>
+<summary><strong>Compatibility reference</strong></summary>
 
 ## Compatibility
 
@@ -480,20 +574,10 @@ Sunshine and standard Moonlight/GameStream behavior remain the compatibility bas
 | [Nonary/Vibepollo](https://github.com/Nonary/Vibepollo) | Apollo-fork host (virtual display / HDR) | Host |
 | [moonlight-stream](https://github.com/moonlight-stream) | Moonlight ecosystem | Protocol |
 
----
+</details>
 
-## Known limitations
-
-- Multiple simultaneous controllers need multiplayer confirmation against each supported host.
-- Full-range output still benefits from visual verification across host resolutions.
-- Console-motion fallback remains disabled until libnx console sensor vectors are mapped safely.
-- Apollo virtual-display, server-command, and clipboard operations are capability-gated (shown when the host advertises them).
-- Punktfunk's native QUIC protocol and authenticated host administration APIs are outside Artemis Switch's scope; enable its GameStream plane before connecting.
-- Benchmark scoring still needs tuning from real Switch measurements.
-
-See [`docs/ARTEMIS_SWITCH_INTEGRATION_PLAN.md`](docs/ARTEMIS_SWITCH_INTEGRATION_PLAN.md) for release acceptance criteria.
-
----
+<details>
+<summary><strong>Credits and license — based on XITRIX/Moonlight-Switch</strong></summary>
 
 ## Credits and license
 
@@ -571,3 +655,5 @@ These upstream requests are acknowledged but **not** implemented in this fork:
 Related discussion on Moonlight Qt: [moonlight-qt#1557](https://github.com/moonlight-stream/moonlight-qt/issues/1557) (upscaling).
 
 This fork follows the licensing requirements of Moonlight-Switch and the upstream components it incorporates (including Apollo/Sunshine/GameStream, Borealis, FFmpeg/NVDEC, deko3d, and libnx). See [`LICENSE`](LICENSE) and relevant source-file notices for details.
+
+</details>

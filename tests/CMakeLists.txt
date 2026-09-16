@@ -146,6 +146,12 @@ target_include_directories(present_deadline_test PRIVATE
 target_compile_features(present_deadline_test PRIVATE cxx_std_20)
 add_test(NAME present_deadline_test COMMAND present_deadline_test)
 
+add_executable(low_latency_frame_selection_test low_latency_frame_selection_test.cpp)
+target_include_directories(low_latency_frame_selection_test PRIVATE
+    "${REPO_ROOT}/app/src/streaming")
+target_compile_features(low_latency_frame_selection_test PRIVATE cxx_std_20)
+add_test(NAME low_latency_frame_selection_test COMMAND low_latency_frame_selection_test)
+
 add_executable(frame_color_range_test
     "${REPO_ROOT}/tests/frame_color_range_test.cpp"
 )
