@@ -146,10 +146,13 @@ static int load_serverinfo(PSERVER_DATA server, bool https) {
     // HTTPS request fails. We can't just use HTTP for everything because it
     // doesn't accurately tell us if we're paired.
 
-    // TLS to the host does not complete through the relay, so a proxied session
-    // always uses plain HTTP on the standard port.
+    // HTTPS must be tried through the relay too: only the HTTPS serverinfo
+    // reports PairStatus=1. Answering from HTTP alone made a paired tunnel host
+    // look unpaired, so every connect re-ran pairing, and a failed re-pair
+    // unpaired the client again. load_server_status() falls back to HTTP when
+    // the HTTPS request fails (unpaired client).
     const bool proxied = is_proxied_session(server);
-    const bool useHttps = https && !proxied;
+    const bool useHttps = https;
 
     snprintf(url, sizeof(url), "%s://%s:%d/serverinfo?uniqueid=%s",
              useHttps ? "https" : "http", server->serverInfo.address,

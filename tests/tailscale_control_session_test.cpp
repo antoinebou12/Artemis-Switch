@@ -80,16 +80,19 @@ int main() {
     PeerDelta delta;
     std::optional<std::vector<Peer>> fullPeers;
     std::string localAddress;
-    assert(session.poll(&delta, &fullPeers, &localAddress, &error));
+    std::optional<std::vector<artemis::tailscale::DerpRegion>> derpMap;
+    assert(session.poll(&delta, &fullPeers, &localAddress, &derpMap, &error));
     assert(fullPeers.has_value());
     assert(fullPeers->size() == 2);
     assert((*fullPeers)[0].stableId == "ts-alpha");
     assert((*fullPeers)[1].stableId == "ts-beta");
     assert(localAddress == "100.101.102.103");
     assert(delta.changed.empty());
+    // No DERPMap section in this frame: the out-param stays disengaged.
+    assert(!derpMap.has_value());
 
     // Second poll delivers the incremental delta (beta removed, gamma added).
-    assert(session.poll(&delta, &fullPeers, &localAddress, &error));
+    assert(session.poll(&delta, &fullPeers, &localAddress, &derpMap, &error));
     assert(!fullPeers.has_value());
     assert(delta.removedStableIds.size() == 1);
     assert(delta.removedStableIds[0] == "ts-beta");
@@ -99,7 +102,7 @@ int main() {
     // Third poll is a keep-alive: empty contract, still healthy.
     delta.changed.clear();
     delta.removedStableIds.clear();
-    assert(session.poll(&delta, &fullPeers, &localAddress, &error));
+    assert(session.poll(&delta, &fullPeers, &localAddress, &derpMap, &error));
     assert(!fullPeers.has_value() && delta.changed.empty() &&
            delta.removedStableIds.empty());
 

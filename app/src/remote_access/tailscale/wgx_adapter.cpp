@@ -26,6 +26,15 @@ int tailscale_internal_wg_send_to_peer(WgTunnel*, WgPeer*, const void*, size_t);
 int tailscale_internal_wg_set_relay_send(
     WgTunnel*, void (*)(void*, const uint8_t*, const void*, size_t), void*);
 int tailscale_internal_wg_relay_input(WgTunnel*, const void*, size_t);
+
+// wgx_relay_shim.cpp, compiled into the Tailscale archive and renamed there.
+void* tailscale_internal_wgx_lwip_relay_new(WgTunnel*,
+                                            void (*)(int, const char*));
+int tailscale_internal_wgx_lwip_relay_begin(void*, const char*, const char*);
+int tailscale_internal_wgx_lwip_relay_tcp(void*, uint16_t);
+int tailscale_internal_wgx_lwip_relay_udp(void*, uint16_t);
+int tailscale_internal_wgx_lwip_relay_running(void*);
+void tailscale_internal_wgx_lwip_relay_delete(void*);
 }
 
 struct WgxContext {
@@ -138,10 +147,20 @@ extern "C" int wgx_start(WgxContext* context) {
 
 extern "C" int wgx_connect_peer(WgxContext* context, uint32_t peerId) {
     if (!context) return -1;
-    std::lock_guard lock(context->mutex);
-    auto* peer = findPeer(context, peerId);
-    return peer ? tailscale_internal_wg_connect_peer(context->tunnel, peer)
-                : -1;
+    WgPeer* peer = nullptr;
+    {
+        std::lock_guard lock(context->mutex);
+        peer = findPeer(context, peerId);
+    }
+    if (!peer) return -1;
+    // The handshake blocks for up to ~20 s while it polls for the peer's
+    // response. It must NOT hold context->mutex: the response arrives via
+    // wgx_inject_encrypted on the DERP reader thread, which takes the same
+    // mutex, so holding it here held every reply back until the handshake
+    // had already timed out. The peer cannot be removed meanwhile: add,
+    // remove, connect and destroy are all serialized by the route mutex in
+    // TailscaleWgxRoute.
+    return tailscale_internal_wg_connect_peer(context->tunnel, peer);
 }
 
 extern "C" int wgx_send_plaintext(WgxContext* context, uint32_t peerId,
@@ -173,4 +192,47 @@ extern "C" void wgx_destroy(WgxContext* context) {
     tailscale_internal_wg_stop(context->tunnel);
     tailscale_internal_wg_close(context->tunnel);
     delete context;
+}
+
+// ---- Loopback relay on the Tailscale wg-nx/lwIP copy ----
+
+struct WgxRelay {
+    void* impl = nullptr;
+};
+
+extern "C" WgxRelay* wgx_relay_create(WgxContext* context, WgxRelayLog log) {
+    if (!context || !context->tunnel) return nullptr;
+    auto* relay = new (std::nothrow) WgxRelay;
+    if (!relay) return nullptr;
+    relay->impl = tailscale_internal_wgx_lwip_relay_new(context->tunnel, log);
+    if (!relay->impl) {
+        delete relay;
+        return nullptr;
+    }
+    return relay;
+}
+
+extern "C" int wgx_relay_start(WgxRelay* relay, const char* localIp,
+                               const char* peerIp) {
+    return relay ? tailscale_internal_wgx_lwip_relay_begin(relay->impl, localIp,
+                                                           peerIp)
+                 : -1;
+}
+
+extern "C" int wgx_relay_add_tcp(WgxRelay* relay, uint16_t port) {
+    return relay ? tailscale_internal_wgx_lwip_relay_tcp(relay->impl, port) : -1;
+}
+
+extern "C" int wgx_relay_add_udp(WgxRelay* relay, uint16_t port) {
+    return relay ? tailscale_internal_wgx_lwip_relay_udp(relay->impl, port) : -1;
+}
+
+extern "C" int wgx_relay_is_running(WgxRelay* relay) {
+    return relay ? tailscale_internal_wgx_lwip_relay_running(relay->impl) : 0;
+}
+
+extern "C" void wgx_relay_destroy(WgxRelay* relay) {
+    if (!relay) return;
+    tailscale_internal_wgx_lwip_relay_delete(relay->impl);
+    delete relay;
 }

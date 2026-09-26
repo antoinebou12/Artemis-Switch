@@ -1,6 +1,7 @@
 name: Build Artemis Switch
 
 on:
+  workflow_dispatch:
   workflow_call:
 
 jobs:
@@ -30,10 +31,10 @@ jobs:
       # has been fully cleaned up. The second pass remains the required one.
       - name: Configure (compatibility pass)
         continue-on-error: true
-        run: cmake -B build/switch -DCMAKE_BUILD_TYPE=Release -DPLATFORM_SWITCH=ON -DUSE_DEKO3D=ON
+        run: cmake -B build/switch -DCMAKE_BUILD_TYPE=Release -DPLATFORM_SWITCH=ON -DUSE_DEKO3D=ON -DENABLE_TAILSCALE=ON
 
       - name: Configure
-        run: cmake -B build/switch -DCMAKE_BUILD_TYPE=Release -DPLATFORM_SWITCH=ON -DUSE_DEKO3D=ON
+        run: cmake -B build/switch -DCMAKE_BUILD_TYPE=Release -DPLATFORM_SWITCH=ON -DUSE_DEKO3D=ON -DENABLE_TAILSCALE=ON
 
       - name: Build Nintendo Switch NRO
         run: cmake --build build/switch --target Moonlight.nro --parallel 8

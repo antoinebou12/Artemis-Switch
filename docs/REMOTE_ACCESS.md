@@ -132,6 +132,25 @@ Default location: `sdmc:/switch/Artemis-Switch/wg0.conf`.
 > Keep credential files out of the repository. `netbird_config.json`,
 > `netbird_switch_config.json`, `netbird.conf` and `wg0.conf` are gitignored.
 
+### Tailscale
+
+Configured with a control host, port, control public key (`mkey:`), hostname,
+and a one-off auth key file. The control plane (TS2021 Noise + netmap stream)
+is implemented in-app; the encrypted packet path is **DERP-relayed only**.
+There is no direct-UDP/STUN path yet, so both of these must hold or the route
+is refused with an explanatory error instead of hanging the handshake:
+
+- the control netmap carries a `DERPMap` with at least the peer's home region,
+- the peer advertises a non-zero home DERP region (`HomeDERP`).
+
+On route activation Artemis dials the home region over verified TLS, performs
+the `GET /derp` upgrade, authenticates as the local node key, and bridges
+WireGuard packets as `SendPacket`/`RecvPacket` frames addressed by node key.
+Moonlight still dials `127.0.0.1`; the lwIP proxy from the NetBird/WireGuard
+path is reused unchanged. Relay loss mid-stream drops egress fast and the next
+activation reconnects; `vpn.log` (tag `TS`) records control, DERP, and route
+events for on-device debugging.
+
 ## Verifying a build has the real backend
 
 ```bash

@@ -17,21 +17,47 @@ int main() {
     Peer second;
     second.stableId = "node-2";
     second.addresses = {"100.64.0.11"};
+    Peer openwrt;
+    openwrt.stableId = "openwrt-router";
+    openwrt.addresses = {"100.64.0.1"};
+    openwrt.allowedIPs = {"192.168.1.0/24"};
+
     std::string error;
-    assert(peers.replace({first, second}, &error));
+    assert(peers.replace({first, second, openwrt}, &error));
     assert(peers.resolveIPv4("100.64.0.10")->peerId == "node-1");
     assert(!peers.resolveIPv4("fd7a:115c:a1e0::10"));
     assert(!peers.resolveIPv4("host.example"));
     assert(!PeerDirectory::isLiteralIPv4("100.64.0.999"));
 
+    // Subnet route test: LAN IP resolves through OpenWrt router peer
+    auto resolvedLan = peers.resolveIPv4("192.168.1.50");
+    assert(resolvedLan.has_value());
+    assert(resolvedLan->peerId == "openwrt-router");
+    assert(resolvedLan->peerAddress == "100.64.0.1");
+    assert(resolvedLan->targetAddress == "192.168.1.50");
+    assert(!peers.resolveIPv4("192.168.2.50"));
+
     PeerDelta delta;
     first.addresses = {"100.64.0.12"};
     delta.changed.push_back(first);
     delta.removedStableIds.push_back("node-2");
+    delta.removedStableIds.push_back("openwrt-router");
     assert(peers.apply(delta, &error));
     assert(!peers.resolveIPv4("100.64.0.10"));
     assert(peers.resolveIPv4("100.64.0.12"));
     assert(peers.snapshot().size() == 1);
+
+    // Presence patches flip the online flag without touching addresses.
+    // Unknown IDs are stale races and must not fail the update.
+    PeerDelta presence;
+    presence.onlineChanges.push_back({"node-1", true});
+    presence.onlineChanges.push_back({"gone-node", false});
+    assert(peers.apply(presence, &error));
+    assert(peers.findByStableId("node-1")->online);
+    presence.onlineChanges.clear();
+    presence.onlineChanges.push_back({"node-1", false});
+    assert(peers.apply(presence, &error));
+    assert(!peers.findByStableId("node-1")->online);
 
     // A full directory may replace one peer with another in a single delta.
     std::vector<Peer> full;

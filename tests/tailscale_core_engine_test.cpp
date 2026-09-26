@@ -47,7 +47,9 @@ public:
 
     bool poll(PeerDelta* delta,
               std::optional<std::vector<Peer>>* fullPeers,
-              std::string* localAddress, std::string* error) override {
+              std::string* localAddress,
+              std::optional<std::vector<artemis::tailscale::DerpRegion>>* derpMap,
+              std::string* error) override {
         if (!connected_) {
             if (error) *error = "not connected";
             return false;
@@ -65,6 +67,11 @@ public:
             beta.homeDerp = 3;
             *fullPeers = std::vector<Peer>{alpha, beta};
             *localAddress = "100.101.102.103";
+            artemis::tailscale::DerpRegion region;
+            region.regionId = 3;
+            region.regionCode = "test";
+            region.nodes.push_back({"derp3.example", 443});
+            *derpMap = std::vector<artemis::tailscale::DerpRegion>{region};
             pollCount_ = 1;
             return true;
         }
@@ -171,6 +178,12 @@ int main() {
         auto snapshot = core.snapshot();
         assert(snapshot.localAddress == "100.101.102.103");
         assert(findPeer(snapshot, "ts-alpha").has_value());
+        // The full netmap's DERP region map must reach the snapshot the
+        // relay selector reads.
+        assert(snapshot.derpMap.size() == 1);
+        assert(snapshot.derpMap.front().regionId == 3);
+        assert(snapshot.derpMap.front().nodes.size() == 1);
+        assert(snapshot.derpMap.front().nodes.front().host == "derp3.example");
     }
 
     // The delta poll replaces beta with gamma: after it settles the directory

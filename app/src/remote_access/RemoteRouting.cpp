@@ -79,6 +79,18 @@ std::string connectAddressFor(const RemoteRouteLease& lease,
     return kProxyAddress;
 }
 
+std::string routeRefusalReason(const RemoteRouteLease& lease) {
+    if (!lease.refused() || lease.providerId().empty())
+        return {};
+    if (auto* provider =
+            RemoteAccessManager::instance().provider(lease.providerId())) {
+        const std::string reason = provider->lastError();
+        if (!reason.empty())
+            return reason;
+    }
+    return "tunnel route refused for peer " + lease.peerId();
+}
+
 void logConnectionAttempt(const RemoteRouteLease& lease,
                            const std::string& requestedAddress,
                            const std::string& dialAddress) {
@@ -96,7 +108,7 @@ void logConnectionAttempt(const RemoteRouteLease& lease,
 void logConnectionResult(const RemoteRouteLease& lease,
                          const std::string& dialAddress, bool succeeded,
                          const std::string& detail) {
-    if (!lease.isActive())
+    if (!lease.isActive() && !lease.refused())
         return;
 
     std::string oneLineDetail = detail;
@@ -115,6 +127,45 @@ void logConnectionResult(const RemoteRouteLease& lease,
         succeeded ? VpnFileLogger::Severity::Info
                   : VpnFileLogger::Severity::Error,
         message);
+}
+
+void logProxiedPairingResult(const std::string& dialAddress, bool succeeded,
+                             const std::string& detail) {
+    if (dialAddress != kProxyAddress)
+        return;
+    std::string oneLineDetail = detail;
+    std::replace(oneLineDetail.begin(), oneLineDetail.end(), '\n', ' ');
+    std::replace(oneLineDetail.begin(), oneLineDetail.end(), '\r', ' ');
+    std::string message = std::string("Pairing through tunnel ") +
+                          (succeeded ? "succeeded" : "failed");
+    if (!oneLineDetail.empty())
+        message += ": " + oneLineDetail;
+    VpnFileLogger::append(Settings::instance().working_dir() + "/vpn.log",
+                          "Remote",
+                          succeeded ? VpnFileLogger::Severity::Info
+                                    : VpnFileLogger::Severity::Error,
+                          message);
+}
+
+void logHostSaveResult(const std::string& hostname, const std::string& address,
+                       const std::string& mac, size_t hostsBefore,
+                       size_t hostsAfter, bool foundAfterSave) {
+    std::string message = "host save: name=" + hostname +
+                          " address=" + address +
+                          " mac=" + (mac.empty() ? std::string("none") : mac) +
+                          " hosts " + std::to_string(hostsBefore) + " -> " +
+                          std::to_string(hostsAfter);
+    if (!foundAfterSave)
+        message += " (NOT in the saved list)";
+    else if (hostsAfter == hostsBefore)
+        message += " (merged into an existing host with the same name/address)";
+    else
+        message += " (added)";
+    VpnFileLogger::append(Settings::instance().working_dir() + "/vpn.log",
+                          "Remote",
+                          foundAfterSave ? VpnFileLogger::Severity::Info
+                                         : VpnFileLogger::Severity::Error,
+                          message);
 }
 
 } // namespace artemis::remote

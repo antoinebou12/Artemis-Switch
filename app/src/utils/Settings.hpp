@@ -615,9 +615,9 @@ class Settings : public Singleton<Settings> {
     std::string m_netbird_server = "https://api.netbird.io:443";
     std::string m_netbird_setup_key;
     std::string m_netbird_config_path;
-    std::string m_tailscale_control_host;
+    std::string m_tailscale_control_host = "controlplane.tailscale.com";
     std::uint16_t m_tailscale_control_port = 443;
-    std::string m_tailscale_control_public_key;
+    std::string m_tailscale_control_public_key = "mkey:7d2792f9c98d753d2042471536801949104c247f95eac770f8fb321595e2173b";
     std::string m_tailscale_hostname = "artemis-switch";
     std::string m_tailscale_auth_key_path;
     bool m_remote_access_prefer_lan = true;

@@ -109,7 +109,11 @@ void Settings::add_host(const Host& host) {
     if (Host* existing = find_host_for_upsert(m_hosts, incoming)) {
         merge_host(*existing, incoming);
         existing->ensure_endpoints();
-    } else if (!incoming.preferred_address().empty() && is_usable_mac(incoming.mac)) {
+    } else if (!incoming.preferred_address().empty()) {
+        // No usable MAC is normal for tunnel hosts: Sunshine reports an
+        // all-zero MAC when reached over a Tailscale/WireGuard/NetBird
+        // interface. hosts_match() already falls back to address identity,
+        // so the address is enough to store and find the host again.
         m_hosts.push_back(incoming);
     }
 

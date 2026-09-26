@@ -113,8 +113,11 @@ authKeyCandidatePaths(const std::string& workingDir,
     const auto directory = std::filesystem::path(workingDir) / "tailscale";
     appendUnique((directory / "auth.key").generic_string());
     appendUnique((directory / "auth-key.txt").generic_string());
-    appendUnique((std::filesystem::path(workingDir) / "tailscale.key")
-                     .generic_string());
+    appendUnique((directory / "tailscale.key").generic_string());
+    appendUnique((directory / "tailscale.key.txt").generic_string());
+    appendUnique((std::filesystem::path(workingDir) / "tailscale.key").generic_string());
+    appendUnique((std::filesystem::path(workingDir) / "tailscale.key.txt").generic_string());
+    appendUnique((std::filesystem::path(workingDir) / "tailscale.txt").generic_string());
     return result;
 }
 

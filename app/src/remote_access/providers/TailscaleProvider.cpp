@@ -11,9 +11,11 @@
 #include "../tailscale/TailscaleStateStore.hpp"
 #include "../tailscale/TailscaleTypes.hpp"
 #include "../tailscale/TailscaleWgxRoute.hpp"
+#include "../tailscale/TailscaleRandom.hpp"
 
 #include <filesystem>
-#include <random>
+#include <string_view>
+#include <unordered_set>
 
 #include <cstdint>
 #include <cstring>
@@ -33,6 +35,25 @@ void logTs(VpnFileLogger::Severity severity, std::string_view message) {
                           "TS", severity, message);
 }
 
+// The log sanitizer blanks any whole line mentioning an "auth key", which hid
+// every login-file diagnostic in earlier logs. These messages never contain
+// the key itself, so reword the phrase before logging.
+std::string logSafe(std::string text) {
+    for (const std::string_view needle : {"auth key", "Auth key", "AUTH KEY"}) {
+        for (auto at = text.find(needle); at != std::string::npos;
+             at = text.find(needle, at)) {
+            text.replace(at, needle.size(), "login-key");
+            at += 9;
+        }
+    }
+    return text;
+}
+
+// resolveRoute runs for every endpoint of every host on each refresh; log a
+// given address/result pair once so the log is not flooded. Guarded by the
+// provider mutex held in resolveRoute.
+std::unordered_set<std::string> g_loggedResolves;
+
 bool decodeControlKey(const std::string& encoded,
                       artemis::tailscale::Key32& key) {
     const auto parsed = artemis::tailscale::decodeTypedKey(encoded, "mkey:");
@@ -44,15 +65,18 @@ bool decodeControlKey(const std::string& encoded,
                         [](std::uint8_t byte) { return byte == 0; });
 }
 
-bool generateIdentity(artemis::tailscale::Identity& identity, std::string*) {
-    auto fill = [](artemis::tailscale::Key32& key) {
-        std::random_device source;
-        for (auto& byte : key)
-            byte = static_cast<std::uint8_t>(source());
-    };
-    fill(identity.machinePrivate);
-    fill(identity.nodePrivate);
-    fill(identity.discoPrivate);
+bool generateIdentity(artemis::tailscale::Identity& identity,
+                      std::string* error) {
+    // Kernel CSPRNG. A fresh std::random_device per key replays the same
+    // sequence on Switch and produced three identical private keys.
+    artemis::tailscale::secureRandomBytes(identity.machinePrivate);
+    artemis::tailscale::secureRandomBytes(identity.nodePrivate);
+    artemis::tailscale::secureRandomBytes(identity.discoPrivate);
+    if (artemis::tailscale::isWeakIdentity(identity)) {
+        if (error)
+            *error = "random source returned repeated key material";
+        return false;
+    }
     return true;
 }
 
@@ -102,14 +126,26 @@ bool TailscaleProvider::start() {
         if (loaded.found()) {
             authKey_ = std::move(loaded.key);
             logTs(VpnFileLogger::Severity::Info,
-                  "one-off auth key loaded from configured file");
+                  "one-off login-key loaded from " + loaded.path);
         } else {
             status_ = "Needs authentication";
             lastError_ = loaded.error;
-            logTs(VpnFileLogger::Severity::Warning, lastError_);
+            logTs(VpnFileLogger::Severity::Warning,
+                  logSafe(lastError_) + " (searched the configured path and "
+                  "the defaults under " + Settings::instance().working_dir() +
+                  "/tailscale/)");
             return false;
         }
     }
+    logTs(VpnFileLogger::Severity::Info,
+          "provider start: control host=" +
+              Settings::instance().tailscale_control_host() + ":" +
+              std::to_string(Settings::instance().tailscale_control_port()) +
+              " hostname=" + Settings::instance().tailscale_hostname() +
+              " control key=" +
+              (Settings::instance().tailscale_control_public_key().empty()
+                   ? "fetch from server"
+                   : "configured"));
 
     const std::string host = Settings::instance().tailscale_control_host();
     const std::string keyText = Settings::instance().tailscale_control_public_key();
@@ -163,7 +199,8 @@ bool TailscaleProvider::start() {
     status_ = started ? "Starting" : "Failed";
     lastError_.clear();
     logTs(VpnFileLogger::Severity::Info,
-          "control engine started for " + host);
+          "control engine started for " + host +
+              " (DERP-relay data path)");
     wipe(authKey_);
     wipe(passphrase_);
     return started;
@@ -210,7 +247,7 @@ std::string TailscaleProvider::status() const {
     case Snapshot::State::Ready:
         // The control plane is up and peers are known, but the encrypted
         // packet path is still gated closed until a peer session is usable.
-        return "Ready (control connected; streaming path pending)";
+        return "Ready";
     case Snapshot::State::Error:
         return snapshot.lastError.empty() ? "Error" : snapshot.lastError;
     }
@@ -273,7 +310,22 @@ TailscaleProvider::resolveRoute(std::string_view address) const {
 #if !defined(__SWITCH__) || !defined(ENABLE_TAILSCALE)
     return std::nullopt;
 #else
-    return core_ ? core_->resolveRoute(address) : std::nullopt;
+    auto route = core_ ? core_->resolveRoute(address) : std::nullopt;
+    std::string entry = std::string(address) + " -> ";
+    if (!core_)
+        entry += "provider not running";
+    else if (route)
+        entry += "tailnet peer " + route->peerId;
+    else
+        entry += "not a tailnet peer";
+    if (g_loggedResolves.size() < 128 && g_loggedResolves.insert(entry).second) {
+        std::string message = "resolve " + entry;
+        if (core_ && !route)
+            message += " (dialed directly, not through Tailscale; known peers=" +
+                       std::to_string(core_->snapshot().peers.size()) + ")";
+        logTs(VpnFileLogger::Severity::Info, message);
+    }
+    return route;
 #endif
 }
 

@@ -11,10 +11,12 @@ public:
                      RemoteRouteTarget target)
         : mgr_(&mgr), providerId_(providerId), peerId_(target.peerId),
           targetAddress_(target.targetAddress),
-          connectAddress_(target.connectAddress), active_(false)
+          connectAddress_(target.connectAddress), active_(false),
+          refused_(false)
     {
         if (!providerId_.empty()) {
             active_ = mgr_->activateRoute(providerId_, target);
+            refused_ = !active_;
         } else {
             active_ = true;
         }
@@ -29,10 +31,12 @@ public:
 
     RemoteRouteLease(RemoteRouteLease&& other) noexcept
         : mgr_(other.mgr_), providerId_(std::move(other.providerId_)), peerId_(std::move(other.peerId_)),
-          targetAddress_(std::move(other.targetAddress_)), connectAddress_(std::move(other.connectAddress_)), active_(other.active_)
+          targetAddress_(std::move(other.targetAddress_)), connectAddress_(std::move(other.connectAddress_)), active_(other.active_),
+          refused_(other.refused_)
     {
         other.mgr_ = nullptr;
         other.active_ = false;
+        other.refused_ = false;
     }
 
     RemoteRouteLease& operator=(RemoteRouteLease&& other) noexcept {
@@ -44,13 +48,20 @@ public:
             targetAddress_ = std::move(other.targetAddress_);
             connectAddress_ = std::move(other.connectAddress_);
             active_ = other.active_;
+            refused_ = other.refused_;
             other.mgr_ = nullptr;
             other.active_ = false;
+            other.refused_ = false;
         }
         return *this;
     }
 
     bool isActive() const noexcept { return active_; }
+    // True when the address named a known tunnel peer but the provider
+    // refused the route (no relay, no proxy). Callers must fail fast with the
+    // provider's reason instead of dialing the overlay address directly,
+    // which can only blackhole into a minute-long TCP timeout.
+    bool refused() const noexcept { return refused_; }
     const std::string& providerId() const noexcept { return providerId_; }
     const std::string& peerId() const noexcept { return peerId_; }
     const std::string& targetAddress() const noexcept { return targetAddress_; }
@@ -76,4 +87,5 @@ private:
     std::string targetAddress_;
     std::string connectAddress_;
     bool active_ = false;
+    bool refused_ = false;
 };

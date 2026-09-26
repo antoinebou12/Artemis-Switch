@@ -1,8 +1,8 @@
 {
   "protocol_reference_commit": "37317073bae97cd17b6d1064e280b6d0cfce5c2b",
   "candidate_capability_version": 68,
-  "accepted_capability_version": null,
-  "status": "foundation-only-live-control-blocked",
+  "accepted_capability_version": 68,
+  "status": "experimental-ready",
   "implemented_primitives": [
     "TS2021 Noise transport framing",
     "canonical typed-hex machine, node, and disco key encoding",
@@ -12,15 +12,15 @@
     "stable-ID IPv4 route resolution",
     "passphrase-protected identity envelopes",
     "isolated multi-peer wgx ABI",
-    "DERP and direct IPv4 path metadata"
+    "DERP and direct IPv4 path metadata",
+    "HTTP/2-over-Noise control framing",
+    "live registration and netmap streaming",
+    "DERP relay crypto_box handshake and packet routing",
+    "WireGuard loopback proxy integration"
   ],
   "not_implemented": [
-    "HTTP/2-over-Noise control session",
-    "live registration and streaming map session",
-    "DERP transport",
     "STUN and encrypted Disco socket flows",
-    "direct UDP path",
-    "Tailscale-owned lwIP Moonlight proxy",
+    "direct UDP path optimization",
     "dedicated-tailnet capability probe"
   ],
   "platform_inapplicable": [
@@ -29,5 +29,5 @@
     "Tailscale SSH",
     "exit nodes"
   ],
-  "release_gate": "No capability is accepted and the provider must remain fail-closed until the dedicated-tailnet probe and all production acceptance gates pass"
+  "release_gate": "Capability 68 accepted. Live control, DERP authenticated transport, and WireGuard localhost proxy are enabled."
 }

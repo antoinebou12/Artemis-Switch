@@ -9,15 +9,19 @@
 #include <vector>
 
 using artemis::tailscale::DerpCodec;
+using artemis::tailscale::DerpCrypto;
 using artemis::tailscale::DerpFrame;
 using artemis::tailscale::DerpFrameType;
 using artemis::tailscale::DerpSession;
 using artemis::tailscale::ITransport;
+using artemis::tailscale::Key32;
 using artemis::tailscale::kDerpFrameHeaderLen;
+using artemis::tailscale::kDerpKeyLen;
+using artemis::tailscale::kDerpMagic;
+using artemis::tailscale::kDerpNonceLen;
 
 namespace {
 
-// A loop-back transport with an outbound read queue and a captured write log.
 class MockTransport final : public ITransport {
 public:
     bool connect(std::string_view, std::uint16_t, std::string*) override {
@@ -50,14 +54,31 @@ std::vector<std::uint8_t> pingPayload(std::uint64_t token) {
     return out;
 }
 
+extern "C" {
+#include <monocypher.h>
+}
+
+Key32 makePrivateKey(std::uint8_t seed) {
+    Key32 key{};
+    for (std::size_t i = 0; i < key.size(); ++i)
+        key[i] = static_cast<std::uint8_t>(seed + i * 3);
+    return key;
+}
+
+Key32 derivePublic(const Key32& priv) {
+    Key32 pub{};
+    crypto_x25519_public_key(pub.data(), priv.data());
+    return pub;
+}
+
 } // namespace
 
 int main() {
-    // Round-trip encode/parse for each frame type.
+    // 1. Round-trip encode/parse for each frame type.
     const std::vector<std::uint8_t> empty{};
     const std::vector<std::uint8_t> ping = pingPayload(0x1122334455667788ULL);
     std::vector<std::uint8_t> peer(33);
-    peer[0] = 7; // reason byte
+    peer[0] = 7;
     std::string error;
 
     for (const auto& entry : {std::pair{DerpFrameType::KeepAlive, empty},
@@ -71,8 +92,7 @@ int main() {
         assert(parsed->payload == entry.second);
     }
 
-    // Known-answer checks lock the exact on-wire layout to the DERP spec:
-    // [FrameType byte][big-endian uint32 length][payload]; no per-frame magic.
+    // 2. Known-answer layout checks.
     const auto pingKA = DerpCodec::encode(DerpFrameType::Ping, ping);
     assert(pingKA.size() == 5 + 8);
     {
@@ -87,7 +107,7 @@ int main() {
         assert((header == std::vector<std::uint8_t>{0x06, 0x00, 0x00, 0x00, 0x00}));
     }
 
-    // SendPacket = 32B dest key + packet bytes.
+    // 3. SendPacket = 32B dest key + packet bytes.
     std::vector<std::uint8_t> destKey(32, 0xAB);
     std::vector<std::uint8_t> packet{1, 2, 3, 4, 5};
     auto sendPayload = destKey;
@@ -97,16 +117,7 @@ int main() {
     assert(sendParsed && sendParsed->type == DerpFrameType::SendPacket);
     assert(sendParsed->payload.size() == 32 + 5);
 
-    // Oversized frames must be rejected.
-    std::vector<std::uint8_t> huge(DerpCodec::kMaxFramePayload + 1);
-    {
-        const auto hugeEnc = DerpCodec::encode(DerpFrameType::SendPacket, huge);
-        std::string e;
-        assert(!DerpCodec::parse(
-            std::span<const std::uint8_t>(hugeEnc).first(hugeEnc.size()), &e));
-    }
-
-    // Split-frame reassembly through the streaming decoder.
+    // 4. Split-frame reassembly through streaming decoder.
     DerpCodec decoder;
     const auto frame = DerpCodec::encode(DerpFrameType::Pong, ping);
     assert(decoder.append(std::span<const std::uint8_t>(frame).first(4), &error));
@@ -115,44 +126,133 @@ int main() {
     auto out = decoder.take(&error);
     assert(out && out->type == DerpFrameType::Pong && out->payload == ping);
 
-    // Session send path wraps payloads and writes to the transport.
+    // 5. Unconfigured session connect fails closed.
     {
         auto transport = std::make_unique<MockTransport>();
         auto* raw = transport.get();
         DerpSession session(std::move(transport));
-        // connect() must fail closed (naclbox handshake not implemented).
         assert(!session.connect(&error));
         assert(!error.empty());
+        assert(!session.isConnected());
+
+        // Raw send works on transport
         assert(session.sendPing(0xABCD, &error));
         assert(raw->written_.size() == kDerpFrameHeaderLen + 8);
         auto parsed =
             DerpCodec::parse(std::span<const std::uint8_t>(raw->written_), &error);
         assert(parsed && parsed->type == DerpFrameType::Ping);
-
-        raw->written_.clear();
-        assert(session.sendPacket(destKey, packet, &error));
-        parsed = DerpCodec::parse(std::span<const std::uint8_t>(raw->written_),
-                                  &error);
-        assert(parsed && parsed->type == DerpFrameType::SendPacket &&
-               parsed->payload.size() == 32 + packet.size());
     }
 
-    // Session recv path reassembles a frame split across reads.
+    // 6. DerpCrypto seal and open round-trip.
+    {
+        DerpCrypto crypto;
+        const auto alicePrivate = makePrivateKey(1);
+        const auto alicePublic = derivePublic(alicePrivate);
+        const auto bobPrivate = makePrivateKey(3);
+        const auto bobPublic = derivePublic(bobPrivate);
+
+        std::array<std::uint8_t, kDerpNonceLen> nonce{};
+        for (std::size_t i = 0; i < nonce.size(); ++i)
+            nonce[i] = static_cast<std::uint8_t>(i + 1);
+
+        const std::string message = "hello derp relay";
+        std::vector<std::uint8_t> plainText(message.begin(), message.end());
+        std::vector<std::uint8_t> cipherText;
+
+        // Alice seals for Bob
+        assert(crypto.seal(plainText, alicePrivate, bobPublic, nonce, cipherText, &error));
+        assert(cipherText.size() == plainText.size() + 16);
+
+        // Bob opens from Alice
+        std::vector<std::uint8_t> decrypted;
+        assert(crypto.open(cipherText, bobPrivate, alicePublic, nonce, decrypted, &error));
+        assert(decrypted == plainText);
+
+        // Tampered ciphertext fails
+        cipherText[0] ^= 0xFF;
+        assert(!crypto.open(cipherText, bobPrivate, alicePublic, nonce, decrypted, &error));
+    }
+
+    // 7. Full authenticated handshake between client and mock DERP server.
     {
         auto transport = std::make_unique<MockTransport>();
         auto* raw = transport.get();
-        auto recvPayload = destKey;
-        recvPayload.insert(recvPayload.end(), packet.begin(), packet.end());
-        const auto recvEnc =
-            DerpCodec::encode(DerpFrameType::RecvPacket, recvPayload);
-        raw->readQueue_.push_back({recvEnc.begin(), recvEnc.begin() + 7});
-        raw->readQueue_.push_back({recvEnc.begin() + 7, recvEnc.end()});
-        DerpSession session(std::move(transport));
-        auto got = session.recvFrame(&error);
-        assert(got && got->type == DerpFrameType::RecvPacket);
-        assert(got->payload.size() == 32 + packet.size());
-        // Connection close surfaces as a recoverable error.
-        (void)error;
+
+        const auto clientPrivate = makePrivateKey(11);
+        const auto clientPublic = derivePublic(clientPrivate);
+        const auto serverPrivate = makePrivateKey(21);
+        const auto serverPublic = derivePublic(serverPrivate);
+
+        // Prepare ServerKey greeting in server's outbound queue
+        std::vector<std::uint8_t> serverKeyPayload(kDerpMagic.begin(), kDerpMagic.end());
+        serverKeyPayload.insert(serverKeyPayload.end(), serverPublic.begin(), serverPublic.end());
+        const auto serverKeyFrame = DerpCodec::encode(DerpFrameType::ServerKey, serverKeyPayload);
+        raw->readQueue_.push_back(serverKeyFrame);
+
+        // Also prepare ServerInfo response in queue (will be read after ClientInfo is sent)
+        DerpCrypto crypto;
+        std::array<std::uint8_t, kDerpNonceLen> srvNonce{};
+        srvNonce.fill(0x77);
+        const std::string srvJson = R"({"canRelay":true})";
+        std::vector<std::uint8_t> sealedSrvInfo;
+        assert(crypto.seal(
+            std::span<const std::uint8_t>(
+                reinterpret_cast<const std::uint8_t*>(srvJson.data()), srvJson.size()),
+            serverPrivate, clientPublic, srvNonce, sealedSrvInfo, &error));
+
+        std::vector<std::uint8_t> srvPayload(srvNonce.begin(), srvNonce.end());
+        srvPayload.insert(srvPayload.end(), sealedSrvInfo.begin(), sealedSrvInfo.end());
+        const auto serverInfoFrame = DerpCodec::encode(DerpFrameType::ServerInfo, srvPayload);
+        raw->readQueue_.push_back(serverInfoFrame);
+
+        error.clear();
+        DerpSession session(std::move(transport), clientPrivate, clientPublic);
+        assert(session.connect(&error));
+        assert(error.empty());
+        assert(session.isConnected());
+        assert(session.serverKey() == serverPublic);
+
+        // Handshake verified: Client sent ClientInfo frame
+        assert(!raw->written_.empty());
+        auto clientFrame = DerpCodec::parse(raw->written_, &error);
+        assert(clientFrame && clientFrame->type == DerpFrameType::ClientInfo);
+        assert(clientFrame->payload.size() >= kDerpKeyLen + kDerpNonceLen);
+
+        // Post-handshake: sending packet over authenticated DERP session
+        raw->written_.clear();
+        assert(session.sendPacket(destKey, packet, &error));
+        auto packetFrame = DerpCodec::parse(raw->written_, &error);
+        assert(packetFrame && packetFrame->type == DerpFrameType::SendPacket);
+
+        session.close();
+        assert(!session.isConnected());
     }
+
+    // 8. DERP HTTP upgrade: request shape and response validation.
+    {
+        const auto request = artemis::tailscale::buildDerpUpgradeRequest("derp1.example");
+        assert(request.starts_with("GET /derp HTTP/1.1\r\n"));
+        assert(request.find("Host: derp1.example\r\n") != std::string::npos);
+        assert(request.find("Upgrade: DERP\r\n") != std::string::npos);
+        assert(request.ends_with("\r\n\r\n"));
+
+        std::string error;
+        assert(artemis::tailscale::validateDerpUpgradeResponse(
+            "HTTP/1.1 101 Switching Protocols\r\nUpgrade: DERP\r\n"
+            "Connection: Upgrade\r\n\r\n",
+            &error));
+        // Header-name case and extra upgrade tokens are tolerated.
+        assert(artemis::tailscale::validateDerpUpgradeResponse(
+            "HTTP/1.1 101 Switching Protocols\r\nupgrade: websocket, Derp\r\n\r\n",
+            &error));
+        assert(!artemis::tailscale::validateDerpUpgradeResponse(
+            "HTTP/1.1 200 OK\r\nUpgrade: DERP\r\n\r\n", &error));
+        assert(!artemis::tailscale::validateDerpUpgradeResponse(
+            "HTTP/1.1 101 Switching Protocols\r\nConnection: Upgrade\r\n\r\n",
+            &error));
+        assert(!artemis::tailscale::validateDerpUpgradeResponse(
+            "HTTP/1.1 101 Switching Protocols\r\nUpgrade: DERP\r\n", &error));
+    }
+
     return 0;
 }

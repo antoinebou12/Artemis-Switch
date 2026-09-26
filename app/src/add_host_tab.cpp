@@ -9,6 +9,7 @@
 
 #if defined(__SWITCH__) && (defined(ENABLE_NETBIRD) || defined(ENABLE_WIREGUARD) || defined(ENABLE_TAILSCALE))
 #include "remote_access/RemoteAccessManager.hpp"
+#include "remote_access/RemoteRouting.hpp"
 #include "remote_access_provider_id.hpp"
 #endif
 #include "DiscoverManager.hpp"
@@ -293,6 +294,26 @@ void AddHostTab::stopSearchHost() {
 #endif
 }
 
+namespace {
+// Saves a newly paired host and records the outcome in vpn.log on VPN builds,
+// so a host that fails to reach the list is visible instead of silent.
+void savePairedHost(const Host& host) {
+#if defined(__SWITCH__) && (defined(ENABLE_NETBIRD) || defined(ENABLE_WIREGUARD) || defined(ENABLE_TAILSCALE))
+    const size_t before = Settings::instance().hosts().size();
+#endif
+    Settings::instance().add_host(host);
+#if defined(__SWITCH__) && (defined(ENABLE_NETBIRD) || defined(ENABLE_WIREGUARD) || defined(ENABLE_TAILSCALE))
+    const auto saved = Settings::instance().hosts();
+    const bool found = std::any_of(saved.begin(), saved.end(),
+                                   [&host](const Host& candidate) {
+                                       return hosts_match(candidate, host);
+                                   });
+    artemis::remote::logHostSaveResult(host.hostname, host.preferred_address(),
+                                       host.mac, before, saved.size(), found);
+#endif
+}
+} // namespace
+
 void AddHostTab::connectHost(const Host& host) {
     pauseSearching();
 
@@ -309,7 +330,7 @@ void AddHostTab::connectHost(const Host& host) {
 
                     if (result.value().paired) {
                         showAlert("add_host/paired_error"_i18n, [pairedHost] {
-                            Settings::instance().add_host(pairedHost);
+                            savePairedHost(pairedHost);
                             MainTabs::getInstanse()->refillTabs();
                         });
 
@@ -343,7 +364,7 @@ void AddHostTab::connectHost(const Host& host) {
                             }
                             const auto finish = [result, pairedHost] {
                                 if (result.isSuccess()) {
-                                    Settings::instance().add_host(pairedHost);
+                                    savePairedHost(pairedHost);
                                     MainTabs::getInstanse()->refillTabs();
                                     AddHostTab::startSearching();
                                 } else {

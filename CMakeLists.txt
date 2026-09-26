@@ -111,7 +111,7 @@ endif ()
 if (PLATFORM_SWITCH)
     option(ENABLE_WIREGUARD "Enable WireGuard support" ON)
     option(ENABLE_NETBIRD "Enable NetBird VPN support" ON)
-    option(ENABLE_TAILSCALE "Enable experimental Tailscale support" OFF)
+    option(ENABLE_TAILSCALE "Enable experimental Tailscale support" ON)
 else ()
     set(ENABLE_WIREGUARD OFF)
     set(ENABLE_NETBIRD OFF)
@@ -410,11 +410,13 @@ elseif (PLATFORM_SWITCH)
             endif ()
         endforeach ()
         list(APPEND MAIN_SRC
+            app/src/remote_access/tailscale/TailscaleBox.cpp
             app/src/remote_access/tailscale/TailscaleControlCodec.cpp
             app/src/remote_access/tailscale/TailscaleControlKey.cpp
             app/src/remote_access/tailscale/TailscaleControlSession.cpp
             app/src/remote_access/tailscale/TailscaleDerp.cpp
             app/src/remote_access/tailscale/TailscaleHttpUpgrade.cpp
+            app/src/remote_access/tailscale/TailscaleHttp2.cpp
             app/src/remote_access/tailscale/TailscaleNoise.cpp
             app/src/remote_access/tailscale/TailscalePathManager.cpp
             app/src/remote_access/tailscale/TailscalePeerDirectory.cpp
@@ -437,12 +439,18 @@ elseif (PLATFORM_SWITCH)
                     -DTAILSCALE_WGX_NM=${CMAKE_NM}
                     -DTAILSCALE_WGX_OBJCOPY=${CMAKE_OBJCOPY}
                     -DTAILSCALE_WGX_PATCH=${CMAKE_CURRENT_SOURCE_DIR}/patches/wg-nx-tailscale-multipeer.patch
+                    -DTAILSCALE_WGX_CXX=${CMAKE_CXX_COMPILER}
+                    -DTAILSCALE_WGX_SHIM=${CMAKE_CURRENT_SOURCE_DIR}/app/src/remote_access/tailscale/wgx_relay_shim.cpp
+                    -DTAILSCALE_WGX_RELAY=${CMAKE_CURRENT_SOURCE_DIR}/app/src/remote_access/tailscale/relay
                     -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/TailscaleWgxBackend.cmake
             DEPENDS
                     ${CMAKE_CURRENT_SOURCE_DIR}/cmake/TailscaleWgxBackend.cmake
                     ${CMAKE_CURRENT_SOURCE_DIR}/patches/wg-nx-tailscale-multipeer.patch
                     ${CMAKE_CURRENT_SOURCE_DIR}/patches/wg-nx-tailscale-instance-transport.patch
                     ${CMAKE_CURRENT_SOURCE_DIR}/patches/wg-nx-tailscale-instance-socket.patch
+                    ${CMAKE_CURRENT_SOURCE_DIR}/app/src/remote_access/tailscale/wgx_relay_shim.cpp
+                    ${CMAKE_CURRENT_SOURCE_DIR}/app/src/remote_access/tailscale/relay/TsLwipRelay.cpp
+                    ${CMAKE_CURRENT_SOURCE_DIR}/app/src/remote_access/tailscale/relay/TsLwipRelay.hpp
             COMMENT "Building isolated Tailscale wgx backend"
             VERBATIM)
         add_custom_target(artemis_tailscale_wgx_deps DEPENDS ${LIBTAILSCALE_WGX_A})

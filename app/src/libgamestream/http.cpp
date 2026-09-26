@@ -143,6 +143,12 @@ int http_request(const std::string& url, Data* data,
 
     if (options.sensitive) curl_easy_setopt(curl, CURLOPT_VERBOSE, 0L);
 
+    // curl_easy_strerror() only names the error class ("Failure when
+    // receiving data from the peer"); the error buffer carries the socket
+    // detail ("Recv failure: Connection reset by peer", errno, ...).
+    char curlDetail[CURL_ERROR_SIZE] = {0};
+    curl_easy_setopt(curl, CURLOPT_ERRORBUFFER, curlDetail);
+
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, http_data);
     curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
     curl_easy_setopt(curl, CURLOPT_TIMEOUT, timeout);
@@ -182,12 +188,15 @@ int http_request(const std::string& url, Data* data,
         const bool cancelled =
             res == CURLE_ABORTED_BY_CALLBACK &&
             options.cancellation.isCancellationRequested();
-        const char* message = tooLarge
+        std::string message = tooLarge
                                   ? "HTTP response exceeded configured limit"
                               : cancelled ? "Request cancelled"
                                           : curl_easy_strerror(res);
+        if (!tooLarge && !cancelled && curlDetail[0] != '\0' &&
+            message != curlDetail)
+            message += std::string(" (") + curlDetail + ")";
         if (!options.suppressErrors)
-            gs_set_error(message);
+            gs_set_error(message.c_str());
         brls::Logger::error("Curl: error: {}", message);
         free(http_data->memory);
         free(http_data);

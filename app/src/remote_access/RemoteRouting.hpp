@@ -27,6 +27,10 @@ RemoteRouteLease acquireRouteFor(const std::string& address);
 std::string connectAddressFor(const RemoteRouteLease& lease,
                               const std::string& address);
 
+// Why the provider refused the route (its last error, or a generic reason).
+// Only meaningful when lease.refused() is true.
+std::string routeRefusalReason(const RemoteRouteLease& lease);
+
 void logConnectionAttempt(const RemoteRouteLease& lease,
                           const std::string& requestedAddress,
                           const std::string& dialAddress);
@@ -34,5 +38,16 @@ void logConnectionAttempt(const RemoteRouteLease& lease,
 void logConnectionResult(const RemoteRouteLease& lease,
                          const std::string& dialAddress, bool succeeded,
                          const std::string& detail = {});
+
+// Records a pairing outcome in vpn.log when it ran through the loopback proxy
+// (`dialAddress` == kProxyAddress); no-op for LAN/direct pairing.
+void logProxiedPairingResult(const std::string& dialAddress, bool succeeded,
+                             const std::string& detail = {});
+
+// Records in vpn.log whether a host that was just paired/added ended up in the
+// saved host list, so a silently dropped host is visible in the log.
+void logHostSaveResult(const std::string& hostname, const std::string& address,
+                       const std::string& mac, size_t hostsBefore,
+                       size_t hostsAfter, bool foundAfterSave);
 
 } // namespace artemis::remote
