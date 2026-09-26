@@ -29,12 +29,13 @@ void* wgx_lwip_relay_new(WgTunnel* tunnel, RelayLog log) {
     return new (std::nothrow) artemis_tsrelay::TsLwipRelay(tunnel, sink);
 }
 
+// viaPeerIp may be null or equal to targetIp for a directly addressed peer.
 int wgx_lwip_relay_begin(void* relay, const char* tunnelIp,
-                         const char* targetIp) {
+                         const char* targetIp, const char* viaPeerIp) {
     if (!relay || !tunnelIp || !targetIp)
         return -1;
-    return static_cast<artemis_tsrelay::TsLwipRelay*>(relay)->start(tunnelIp,
-                                                                   targetIp)
+    return static_cast<artemis_tsrelay::TsLwipRelay*>(relay)->start(
+               tunnelIp, targetIp, viaPeerIp)
                ? 0
                : -1;
 }

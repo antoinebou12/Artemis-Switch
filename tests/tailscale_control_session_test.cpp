@@ -39,7 +39,10 @@ std::string fullNetmap() {
            hexKey(11) + R"(","DiscoKey":"discokey:)" + hexKey(22) +
            R"(","Addresses":["100.64.0.1/32"],"Endpoints":["1.2.3.4:41641"],"HomeDERP":3,"Online":true},)"
            R"({"StableID":"ts-beta","ID":2,"Name":"beta","Key":"nodekey:)" +
-           hexKey(33) + R"(","Addresses":["100.64.0.2/32"],"HomeDERP":3,"Online":false}]})";
+           hexKey(33) + R"(","Addresses":["100.64.0.2/32"],)"
+           // beta is a subnet router (e.g. OpenWrt) that is also an exit node.
+           R"("AllowedIPs":["100.64.0.2/32","fd7a:115c:a1e0::2/128","192.168.1.0/24","0.0.0.0/0","::/0"],)"
+           R"("HomeDERP":3,"Online":false}]})";
 }
 
 std::string deltaNetmap() {
@@ -86,6 +89,13 @@ int main() {
     assert(fullPeers->size() == 2);
     assert((*fullPeers)[0].stableId == "ts-alpha");
     assert((*fullPeers)[1].stableId == "ts-beta");
+    // Only the LAN subnet is kept as a route: the peer's own addresses, IPv6
+    // and exit-node defaults are dropped. Addresses are left untouched.
+    assert((*fullPeers)[0].allowedIPs.empty());
+    assert((*fullPeers)[1].allowedIPs ==
+           std::vector<std::string>{"192.168.1.0/24"});
+    assert((*fullPeers)[1].addresses ==
+           std::vector<std::string>{"100.64.0.2"});
     assert(localAddress == "100.101.102.103");
     assert(delta.changed.empty());
     // No DERPMap section in this frame: the out-param stays disengaged.

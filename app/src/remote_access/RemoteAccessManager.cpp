@@ -205,7 +205,7 @@ bool RemoteAccessManager::activateRoute(const std::string& providerId,
         return false;
 
     const bool exclusive = selected->provider->routesAreExclusive();
-    const RouteKey key{providerId, target.peerId};
+    const RouteKey key{providerId, target.peerId, target.targetAddress};
     std::shared_ptr<RouteEntry> entry;
     std::vector<RemoteRouteTarget> retiredTargets;
     {
@@ -277,15 +277,29 @@ bool RemoteAccessManager::activateRoute(const std::string& providerId,
     return activated && !staleActivation;
 }
 
+RemoteAccessManager::RouteMap::iterator RemoteAccessManager::findRouteLocked(
+    const std::string& providerId, const std::string& peerId,
+    const std::string& targetAddress) {
+    const auto exact =
+        activeRoutes_.find(RouteKey{providerId, peerId, targetAddress});
+    if (exact != activeRoutes_.end() || !targetAddress.empty())
+        return exact;
+    return std::find_if(activeRoutes_.begin(), activeRoutes_.end(),
+                        [&](const auto& route) {
+                            return route.first.providerId == providerId &&
+                                   route.first.peerId == peerId;
+                        });
+}
+
 bool RemoteAccessManager::prepareRouteForStreaming(
-    const std::string& providerId, const std::string& peerId) {
+    const std::string& providerId, const std::string& peerId,
+    const std::string& targetAddress) {
     std::shared_ptr<ProviderSlot> selected;
     RemoteRouteTarget target;
     std::uint64_t generation = 0;
     {
         std::lock_guard<std::mutex> lock(mutex_);
-        const RouteKey key{providerId, peerId};
-        const auto route = activeRoutes_.find(key);
+        const auto route = findRouteLocked(providerId, peerId, targetAddress);
         if (route == activeRoutes_.end() ||
             route->second->state != RouteState::Active)
             return false;
@@ -307,14 +321,15 @@ bool RemoteAccessManager::prepareRouteForStreaming(
            generation == providerGeneration_;
 }
 
-void RemoteAccessManager::deactivateRoute(const std::string& providerId, const std::string& peerId) {
+void RemoteAccessManager::deactivateRoute(const std::string& providerId,
+                                          const std::string& peerId,
+                                          const std::string& targetAddress) {
     std::shared_ptr<ProviderSlot> selected;
     RemoteRouteTarget target;
     bool shouldDeactivate = false;
     {
         std::lock_guard<std::mutex> lock(mutex_);
-        const RouteKey key{providerId, peerId};
-        const auto route = activeRoutes_.find(key);
+        const auto route = findRouteLocked(providerId, peerId, targetAddress);
         if (route == activeRoutes_.end() ||
             route->second->state != RouteState::Active)
             return;

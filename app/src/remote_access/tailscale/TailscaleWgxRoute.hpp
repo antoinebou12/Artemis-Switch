@@ -27,7 +27,11 @@ public:
                              std::string* error) = 0;
     virtual bool addOrUpdatePeer(uint32_t peerId, const Key32& publicKey,
                                  const std::string& peerIp, std::string* error) = 0;
+    // peerIp is the WireGuard peer's tailnet address; hostIp is the GameStream
+    // host the relay dials. They differ when the peer is a subnet router and
+    // the host sits on the LAN behind it.
     virtual bool startTcpProxy(const std::string& peerIp,
+                               const std::string& hostIp,
                                std::span<const std::uint16_t> ports,
                                std::string* error) = 0;
     virtual bool startUdpRelay(const std::string& peerIp,
@@ -59,9 +63,12 @@ public:
                      std::string* error) override;
     bool addOrUpdatePeer(uint32_t peerId, const Key32& publicKey,
                          const std::string& peerIp, std::string* error) override;
-    bool startTcpProxy(const std::string& peerIp,
+    bool startTcpProxy(const std::string& peerIp, const std::string& hostIp,
                        std::span<const std::uint16_t> ports,
                        std::string* error) override;
+    [[nodiscard]] const std::string& activeHostIp() const noexcept {
+        return activeHostIp_;
+    }
     bool startUdpRelay(const std::string& peerIp,
                        std::span<const std::uint16_t> ports,
                        std::string* error) override;
@@ -84,6 +91,7 @@ private:
     Key32 privateKey_{};
     std::string localIp_;
     std::string activePeerIp_;
+    std::string activeHostIp_;
     std::vector<uint16_t> tcpPorts_;
     std::vector<uint16_t> udpPorts_;
 };

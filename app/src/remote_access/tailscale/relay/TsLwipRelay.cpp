@@ -118,7 +118,22 @@ void TsLwipRelay::log(int level, const char* fmt, ...) {
     log_(level, buffer);
 }
 
-bool TsLwipRelay::start(const char* tunnelIp, const char* targetIp) {
+// wg-nx picks the WireGuard peer by the packet's destination IP, which only
+// knows peers' own tailnet addresses. For a host behind a subnet router, hand
+// wg-nx the router's address as the lookup key; the IP packet itself still
+// carries the LAN host as its destination, which the router forwards.
+err_t TsLwipRelay::onNetifOutput(netif* nif, pbuf* p, const ip4_addr_t* dest) {
+    auto* wrapped = reinterpret_cast<RelayNetif*>(nif);
+    TsLwipRelay* self = wrapped->owner;
+    if (!self || !self->wgOutput_)
+        return ERR_IF;
+    if (self->viaSubnetRouter_ && dest && dest->addr == self->targetAddr_.addr)
+        return self->wgOutput_(nif, p, &self->viaAddr_);
+    return self->wgOutput_(nif, p, dest);
+}
+
+bool TsLwipRelay::start(const char* tunnelIp, const char* targetIp,
+                        const char* viaPeerIp) {
     std::lock_guard lock(mutex_);
     if (running_ || !tunnel_)
         return false;
@@ -126,20 +141,28 @@ bool TsLwipRelay::start(const char* tunnelIp, const char* targetIp) {
         lwip_init();
         initialized_ = true;
     }
+    if (!viaPeerIp || !*viaPeerIp)
+        viaPeerIp = targetIp;
     if (inet_pton(AF_INET, tunnelIp, &tunnelAddr_) != 1 ||
-        inet_pton(AF_INET, targetIp, &targetAddr_) != 1) {
-        log(2, "invalid address (local %s, host %s)", tunnelIp, targetIp);
+        inet_pton(AF_INET, targetIp, &targetAddr_) != 1 ||
+        inet_pton(AF_INET, viaPeerIp, &viaAddr_) != 1) {
+        log(2, "invalid address (local %s, host %s, via %s)", tunnelIp,
+            targetIp, viaPeerIp);
         return false;
     }
+    viaSubnetRouter_ = viaAddr_.addr != targetAddr_.addr;
 
     ip4_addr_t netmask;
     ip4_addr_t gateway;
     IP4_ADDR(&netmask, 255, 255, 255, 0);
     IP4_ADDR(&gateway, 0, 0, 0, 0);
-    netif_add(&netif_, &tunnelAddr_, &netmask, &gateway, tunnel_,
+    netif_.owner = this;
+    netif_add(&netif_.base, &tunnelAddr_, &netmask, &gateway, tunnel_,
               wg_netif_init, ip_input);
-    netif_set_default(&netif_);
-    netif_set_up(&netif_);
+    wgOutput_ = netif_.base.output;
+    netif_.base.output = &TsLwipRelay::onNetifOutput;
+    netif_set_default(&netif_.base);
+    netif_set_up(&netif_.base);
 
     wakeFd_[0] = socket(AF_INET, SOCK_DGRAM, 0);
     wakeFd_[1] = socket(AF_INET, SOCK_DGRAM, 0);
@@ -159,8 +182,8 @@ bool TsLwipRelay::start(const char* tunnelIp, const char* targetIp) {
             if (fd >= 0) close(fd);
             fd = -1;
         }
-        netif_set_down(&netif_);
-        netif_remove(&netif_);
+        netif_set_down(&netif_.base);
+        netif_remove(&netif_.base);
         return false;
     }
     fcntl(wakeFd_[0], F_SETFL, fcntl(wakeFd_[0], F_GETFL, 0) | O_NONBLOCK);
@@ -170,8 +193,15 @@ bool TsLwipRelay::start(const char* tunnelIp, const char* targetIp) {
     running_ = true;
     wg_set_recv_callback(tunnel_, &TsLwipRelay::onTunnelRecv, this);
     loopThread_ = std::thread(&TsLwipRelay::runLoop, this);
-    log(1, "started (relay rev 4, upstream socket model): local %s <-> host %s",
-        tunnelIp, targetIp);
+    if (viaSubnetRouter_)
+        log(1,
+            "started (relay rev 5, upstream socket model): local %s <-> host %s "
+            "via subnet router %s",
+            tunnelIp, targetIp, viaPeerIp);
+    else
+        log(1,
+            "started (relay rev 5, upstream socket model): local %s <-> host %s",
+            tunnelIp, targetIp);
     return true;
 }
 
@@ -222,9 +252,9 @@ void TsLwipRelay::stop() {
             udp_remove(binding->pcb);
     }
     udpBindings_.clear();
-    if (netif_.flags & NETIF_FLAG_UP) {
-        netif_set_down(&netif_);
-        netif_remove(&netif_);
+    if (netif_.base.flags & NETIF_FLAG_UP) {
+        netif_set_down(&netif_.base);
+        netif_remove(&netif_.base);
     }
     if (wasRunning)
         log(1, "stopped");
@@ -325,7 +355,7 @@ void TsLwipRelay::processIncomingQueue() {
             wg_recv_slot_release(tunnel_, packet.slot);
             continue;
         }
-        wg_netif_input_slot(&netif_, tunnel_, packet.slot, packet.data,
+        wg_netif_input_slot(&netif_.base, tunnel_, packet.slot, packet.data,
                             packet.len, holder);
     }
     if (more)

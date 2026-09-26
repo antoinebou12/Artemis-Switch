@@ -36,7 +36,11 @@ typedef struct WgxRelay WgxRelay;
 typedef void (*WgxRelayLog)(int level, const char* message);
 
 WgxRelay* wgx_relay_create(WgxContext* context, WgxRelayLog log);
-int wgx_relay_start(WgxRelay* relay, const char* local_ip, const char* peer_ip);
+// host_ip is the GameStream host the relay dials. via_peer_ip is the tailnet
+// address of the WireGuard peer that carries it: the host itself, or a subnet
+// router when the host is on the LAN behind that router.
+int wgx_relay_start(WgxRelay* relay, const char* local_ip, const char* host_ip,
+                    const char* via_peer_ip);
 int wgx_relay_add_tcp(WgxRelay* relay, uint16_t port);
 int wgx_relay_add_udp(WgxRelay* relay, uint16_t port);
 int wgx_relay_is_running(WgxRelay* relay);

@@ -86,6 +86,7 @@ bool SimulatedWgxBackend::addOrUpdatePeer(uint32_t peerId,
 }
 
 bool SimulatedWgxBackend::startTcpProxy(const std::string& peerIp,
+                                        const std::string& hostIp,
                                         std::span<const std::uint16_t> ports,
                                         std::string* error) {
     if (!running_) {
@@ -99,6 +100,7 @@ bool SimulatedWgxBackend::startTcpProxy(const std::string& peerIp,
         return false;
     }
     activePeerIp_ = peerIp;
+    activeHostIp_ = hostIp;
     tcpPorts_.assign(ports.begin(), ports.end());
     tcpActive_ = true;
     return true;
@@ -165,6 +167,7 @@ void SimulatedWgxBackend::stop() noexcept {
     running_ = false;
     derpReady_ = false;
     activePeerIp_.clear();
+    activeHostIp_.clear();
 }
 
 bool SimulatedWgxBackend::isRunning() const noexcept { return running_; }
@@ -806,7 +809,7 @@ public:
         return false;
     }
 
-    bool startTcpProxy(const std::string& peerIp,
+    bool startTcpProxy(const std::string& peerIp, const std::string& hostIp,
                        std::span<const std::uint16_t> ports,
                        std::string* error) override {
         if (!context_ || !running_) {
@@ -830,12 +833,16 @@ public:
         }
 
         auto guard = SocketFdLock::instance().guard();
-        if (wgx_relay_start(relay_.get(), localIp_.c_str(), peerIp.c_str()) != 0) {
+        // For a subnet route the relay dials the LAN host, but every packet
+        // is still sent to (and handshaken with) the subnet router's peer.
+        const bool viaSubnetRouter = hostIp != peerIp;
+        if (wgx_relay_start(relay_.get(), localIp_.c_str(), hostIp.c_str(),
+                            peerIp.c_str()) != 0) {
             relay_.reset();
-            if (error) *error = "LwipRelay start failed for " + peerIp;
+            if (error) *error = "LwipRelay start failed for " + hostIp;
             logTsRoute(VpnFileLogger::Severity::Error,
                        "lwIP relay start failed (local " + localIp_ +
-                           " -> peer " + peerIp + ")");
+                           " -> host " + hostIp + " via peer " + peerIp + ")");
             return false;
         }
 
@@ -858,7 +865,11 @@ public:
         activePeerIp_ = peerIp;
         logTsRoute(VpnFileLogger::Severity::Info,
                    "TCP proxy ready: 127.0.0.1:{" + portList + "} -> " +
-                       peerIp + " through the tunnel; " + counterLine());
+                       hostIp +
+                       (viaSubnetRouter
+                            ? " via subnet router " + peerIp
+                            : std::string{}) +
+                       " through the tunnel; " + counterLine());
         return true;
     }
 
@@ -1219,7 +1230,9 @@ bool TailscaleWgxRoute::start(const RemoteRouteTarget& target,
 #if defined(__SWITCH__) && defined(ENABLE_TAILSCALE)
     logTsRoute(VpnFileLogger::Severity::Info,
                "route start: peer=" + target.peerId +
-                   " addr=" + target.peerAddress);
+                   " addr=" + target.peerAddress + " host=" +
+                   (target.targetAddress.empty() ? target.peerAddress
+                                                 : target.targetAddress));
 #endif
     if (!backend_) {
         if (error)
@@ -1234,6 +1247,17 @@ bool TailscaleWgxRoute::start(const RemoteRouteTarget& target,
         if (error)
             *error = "Tailscale route target has no valid IPv4 address: " +
                      target.peerAddress;
+        return false;
+    }
+    // The GameStream host. Equal to the peer for a tailnet address; a LAN
+    // address behind the peer when the peer is a subnet router.
+    const std::string hostIp = target.targetAddress.empty()
+                                   ? target.peerAddress
+                                   : target.targetAddress;
+    if (!PeerDirectory::isLiteralIPv4(hostIp)) {
+        if (error)
+            *error = "Tailscale route host is not a valid IPv4 address: " +
+                     hostIp;
         return false;
     }
 
@@ -1352,7 +1376,8 @@ bool TailscaleWgxRoute::start(const RemoteRouteTarget& target,
     logTsRoute(VpnFileLogger::Severity::Info,
                "route step 4/4: TCP proxy for GameStream ports");
 #endif
-    if (!backend_->startTcpProxy(target.peerAddress, kTailscaleTcpPorts, error))
+    if (!backend_->startTcpProxy(target.peerAddress, hostIp, kTailscaleTcpPorts,
+                                 error))
         return false;
 
     activeTarget_ = target;

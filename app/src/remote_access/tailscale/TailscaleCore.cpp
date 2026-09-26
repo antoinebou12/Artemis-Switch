@@ -104,12 +104,19 @@ bool TailscaleCore::activateRoute(const RemoteRouteTarget& target) {
     std::lock_guard lock(routeMutex_);
     if (!overlay_)
         return false;
-    if (activeRoute_ && activeRoute_->peerId == target.peerId) {
+    // A subnet router peer can front several LAN hosts, so the route is only
+    // reusable when it also dials the same host.
+    if (activeRoute_ && activeRoute_->peerId == target.peerId &&
+        activeRoute_->targetAddress == target.targetAddress) {
         LOG_CORE_INFO("route already active for peer " + target.peerId);
         return true;
     }
     LOG_CORE_INFO("route activation begin: peer=" + target.peerId +
-                  " addr=" + target.peerAddress);
+                  " addr=" + target.peerAddress +
+                  (target.targetAddress.empty() ||
+                           target.targetAddress == target.peerAddress
+                       ? std::string{}
+                       : " host=" + target.targetAddress + " (subnet route)"));
     const auto started = std::chrono::steady_clock::now();
     // The relay connects to the peer's home region; advertise that same
     // region as ours so the peer's replies are sent where we are listening.
@@ -131,7 +138,9 @@ bool TailscaleCore::activateRoute(const RemoteRouteTarget& target) {
         return false;
     }
     LOG_CORE_INFO("route activation succeeded in " + std::to_string(elapsedMs) +
-                  " ms: GameStream traffic to " + target.peerAddress +
+                  " ms: GameStream traffic to " +
+                  (target.targetAddress.empty() ? target.peerAddress
+                                                : target.targetAddress) +
                   " now goes through the tunnel");
     activeRoute_ = target;
     return true;
@@ -155,7 +164,8 @@ bool TailscaleCore::prepareRouteForStreaming(
 
 void TailscaleCore::deactivateRoute(const RemoteRouteTarget& target) noexcept {
     std::lock_guard lock(routeMutex_);
-    if (overlay_ && activeRoute_ && activeRoute_->peerId == target.peerId) {
+    if (overlay_ && activeRoute_ && activeRoute_->peerId == target.peerId &&
+        activeRoute_->targetAddress == target.targetAddress) {
         LOG_CORE_INFO("route released for peer " + target.peerId);
         overlay_->stop();
         activeRoute_.reset();

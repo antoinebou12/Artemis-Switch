@@ -17,6 +17,76 @@ bool parseOctet(std::string_view value) {
            octet <= 255;
 }
 
+bool parseIPv4Value(std::string_view ip, std::uint32_t* out) {
+    std::size_t begin = 0;
+    int components = 0;
+    std::uint32_t val = 0;
+    while (begin <= ip.size()) {
+        const auto dot = ip.find('.', begin);
+        const auto end = dot == std::string_view::npos ? ip.size() : dot;
+        const auto piece = ip.substr(begin, end - begin);
+        if (!parseOctet(piece))
+            return false;
+        unsigned int octet = 0;
+        std::from_chars(piece.data(), piece.data() + piece.size(), octet);
+        val = (val << 8U) | static_cast<std::uint8_t>(octet);
+        ++components;
+        if (dot == std::string_view::npos)
+            break;
+        begin = dot + 1;
+    }
+    if (components != 4)
+        return false;
+    *out = val;
+    return true;
+}
+
+// Parses "a.b.c.d/n" (or a bare "a.b.c.d" as /32). Rejects anything else,
+// including IPv6 and trailing garbage after the prefix length.
+bool parseIPv4Cidr(std::string_view cidr, std::uint32_t* network, int* prefix) {
+    const auto slash = cidr.find('/');
+    int bits = 32;
+    if (slash != std::string_view::npos) {
+        const auto prefixText = cidr.substr(slash + 1);
+        if (prefixText.empty() || prefixText.size() > 2)
+            return false;
+        const auto result = std::from_chars(
+            prefixText.data(), prefixText.data() + prefixText.size(), bits);
+        if (result.ec != std::errc{} ||
+            result.ptr != prefixText.data() + prefixText.size() || bits < 0 ||
+            bits > 32)
+            return false;
+    }
+    std::uint32_t value = 0;
+    if (!parseIPv4Value(cidr.substr(0, slash), &value))
+        return false;
+    *network = value;
+    *prefix = bits;
+    return true;
+}
+
+std::uint32_t prefixMask(int prefix) {
+    return prefix == 0 ? 0U : (~0U << (32 - prefix));
+}
+
+// Longest-prefix length of `cidr` covering `candidate`, or -1.
+int cidrMatchLength(std::uint32_t candidate, std::string_view cidr) {
+    std::uint32_t network = 0;
+    int prefix = 0;
+    if (!parseIPv4Cidr(cidr, &network, &prefix))
+        return -1;
+    const auto mask = prefixMask(prefix);
+    return (candidate & mask) == (network & mask) ? prefix : -1;
+}
+
+std::string firstIPv4(const std::vector<std::string>& addresses) {
+    for (const auto& address : addresses) {
+        if (PeerDirectory::isLiteralIPv4(address))
+            return address;
+    }
+    return {};
+}
+
 } // namespace
 
 bool PeerDirectory::isLiteralIPv4(std::string_view address) {
@@ -35,6 +105,26 @@ bool PeerDirectory::isLiteralIPv4(std::string_view address) {
     return components == 4;
 }
 
+bool PeerDirectory::isRoutableIPv4Subnet(
+    std::string_view cidr, const std::vector<std::string>& ownAddresses) {
+    std::uint32_t network = 0;
+    int prefix = 0;
+    if (!parseIPv4Cidr(cidr, &network, &prefix))
+        return false;
+    // 0.0.0.0/0 is an exit-node route; routing every address through it would
+    // also capture hosts on the Switch's own LAN.
+    if (prefix == 0)
+        return false;
+    if (prefix == 32) {
+        for (const auto& own : ownAddresses) {
+            std::uint32_t ownValue = 0;
+            if (parseIPv4Value(own, &ownValue) && ownValue == network)
+                return false;
+        }
+    }
+    return true;
+}
+
 bool PeerDirectory::validatePeer(const Peer& peer, std::string* error) {
     if (peer.stableId.empty()) {
         if (error) *error = "peer has no stable ID";
@@ -42,6 +132,10 @@ bool PeerDirectory::validatePeer(const Peer& peer, std::string* error) {
     }
     if (peer.endpoints.size() > kMaxEndpointsPerPeer) {
         if (error) *error = "peer endpoint limit exceeded";
+        return false;
+    }
+    if (peer.allowedIPs.size() > kMaxAllowedIPsPerPeer) {
+        if (error) *error = "peer allowed IP limit exceeded";
         return false;
     }
     for (const auto& address : peer.addresses) {
@@ -137,88 +231,48 @@ std::optional<Peer> PeerDirectory::findByStableId(
                                  : std::optional<Peer>(found->second);
 }
 
-bool cidrMatches(std::string_view candidateIp, std::string_view cidr) {
-    const auto slash = cidr.find('/');
-    const auto netStr = cidr.substr(0, slash);
-    int prefix = 32;
-    if (slash != std::string_view::npos) {
-        prefix = 0;
-        for (std::size_t i = slash + 1; i < cidr.size(); ++i) {
-            if (cidr[i] >= '0' && cidr[i] <= '9')
-                prefix = prefix * 10 + (cidr[i] - '0');
-            else
-                break;
-        }
-    }
-    if (prefix < 0 || prefix > 32)
-        return false;
-
-    auto parseIp = [](std::string_view ip, std::uint32_t* out) -> bool {
-        std::size_t begin = 0;
-        int components = 0;
-        std::uint32_t val = 0;
-        while (begin <= ip.size()) {
-            const auto dot = ip.find('.', begin);
-            const auto end = dot == std::string_view::npos ? ip.size() : dot;
-            const auto piece = ip.substr(begin, end - begin);
-            if (piece.empty() || piece.size() > 3)
-                return false;
-            unsigned int octet = 0;
-            const auto res =
-                std::from_chars(piece.data(), piece.data() + piece.size(), octet);
-            if (res.ec != std::errc{} ||
-                res.ptr != piece.data() + piece.size() || octet > 255)
-                return false;
-            val = (val << 8U) | static_cast<std::uint8_t>(octet);
-            ++components;
-            if (dot == std::string_view::npos)
-                break;
-            begin = dot + 1;
-        }
-        if (components != 4)
-            return false;
-        *out = val;
-        return true;
-    };
-
-    std::uint32_t candVal = 0;
-    std::uint32_t netVal = 0;
-    if (!parseIp(candidateIp, &candVal) || !parseIp(netStr, &netVal))
-        return false;
-
-    const std::uint32_t mask = prefix == 0 ? 0U : (~0U << (32 - prefix));
-    return (candVal & mask) == (netVal & mask);
-}
-
 std::optional<RemoteRouteTarget> PeerDirectory::resolveIPv4(
     std::string_view address) const {
-    if (!isLiteralIPv4(address))
+    std::uint32_t candidate = 0;
+    if (!parseIPv4Value(address, &candidate))
         return std::nullopt;
     std::shared_lock lock(mutex_);
     const std::string addrStr(address);
 
-    // 1. Direct match on peer's Tailscale addresses (100.x.y.z)
+    // 1. Direct match on a peer's own tailnet address (100.x.y.z).
     for (const auto& [id, peer] : peers_) {
-        for (const auto& candidate : peer.addresses) {
-            if (candidate == address) {
-                return RemoteRouteTarget{id, candidate, addrStr,
-                                         "127.0.0.1",
+        for (const auto& own : peer.addresses) {
+            if (own == address) {
+                return RemoteRouteTarget{id, own, addrStr, "127.0.0.1",
                                          RemoteRouteMode::Proxy};
             }
         }
     }
 
-    // 2. Subnet route match on advertised routes (e.g. OpenWrt router)
+    // 2. Subnet route advertised by a peer (e.g. an OpenWrt subnet router
+    //    sharing its LAN). The WireGuard session is with the router
+    //    (peerAddress); the relay dials the LAN host (targetAddress) and the
+    //    router forwards it. Longest prefix wins, as in Tailscale itself.
+    const Peer* best = nullptr;
+    const std::string* bestId = nullptr;
+    int bestPrefix = -1;
     for (const auto& [id, peer] : peers_) {
         for (const auto& subnet : peer.allowedIPs) {
-            if (cidrMatches(address, subnet)) {
-                const std::string peerAddr =
-                    peer.addresses.empty() ? addrStr : peer.addresses.front();
-                return RemoteRouteTarget{id, peerAddr, addrStr,
-                                         "127.0.0.1",
-                                         RemoteRouteMode::Proxy};
+            const int prefix = cidrMatchLength(candidate, subnet);
+            if (prefix > bestPrefix ||
+                (prefix == bestPrefix && prefix >= 0 && best &&
+                 !best->online && peer.online)) {
+                if (firstIPv4(peer.addresses).empty())
+                    continue;
+                best = &peer;
+                bestId = &id;
+                bestPrefix = prefix;
             }
         }
+    }
+    if (best) {
+        return RemoteRouteTarget{*bestId, firstIPv4(best->addresses), addrStr,
+                                 "127.0.0.1", RemoteRouteMode::Proxy};
     }
 
     return std::nullopt;

@@ -36,6 +36,41 @@ int main() {
     assert(resolvedLan->peerAddress == "100.64.0.1");
     assert(resolvedLan->targetAddress == "192.168.1.50");
     assert(!peers.resolveIPv4("192.168.2.50"));
+    // A peer's own tailnet address still wins over any subnet route.
+    assert(peers.resolveIPv4("100.64.0.1")->targetAddress == "100.64.0.1");
+
+    // Subnet route classification used when parsing the netmap.
+    const std::vector<std::string> own{"100.64.0.1", "fd7a:115c:a1e0::1"};
+    assert(PeerDirectory::isRoutableIPv4Subnet("192.168.1.0/24", own));
+    assert(PeerDirectory::isRoutableIPv4Subnet("10.0.0.5/32", own));
+    assert(!PeerDirectory::isRoutableIPv4Subnet("100.64.0.1/32", own));
+    assert(!PeerDirectory::isRoutableIPv4Subnet("0.0.0.0/0", own));
+    assert(!PeerDirectory::isRoutableIPv4Subnet("::/0", own));
+    assert(!PeerDirectory::isRoutableIPv4Subnet("fd00::/8", own));
+    assert(!PeerDirectory::isRoutableIPv4Subnet("192.168.1.0/33", own));
+    assert(!PeerDirectory::isRoutableIPv4Subnet("192.168.1.0/24x", own));
+
+    // Longest prefix wins across routers; an IPv6-first address list still
+    // yields the router's IPv4 as the WireGuard peer address.
+    {
+        PeerDirectory lpm;
+        Peer wide;
+        wide.stableId = "wide-router";
+        wide.addresses = {"fd7a:115c:a1e0::20", "100.64.0.20"};
+        wide.allowedIPs = {"10.0.0.0/8"};
+        Peer narrow;
+        narrow.stableId = "narrow-router";
+        narrow.addresses = {"100.64.0.21"};
+        narrow.allowedIPs = {"10.1.2.0/24"};
+        assert(lpm.replace({wide, narrow}, &error));
+        auto viaNarrow = lpm.resolveIPv4("10.1.2.3");
+        assert(viaNarrow && viaNarrow->peerId == "narrow-router");
+        assert(viaNarrow->peerAddress == "100.64.0.21");
+        auto viaWide = lpm.resolveIPv4("10.9.9.9");
+        assert(viaWide && viaWide->peerId == "wide-router");
+        assert(viaWide->peerAddress == "100.64.0.20");
+        assert(viaWide->targetAddress == "10.9.9.9");
+    }
 
     PeerDelta delta;
     first.addresses = {"100.64.0.12"};

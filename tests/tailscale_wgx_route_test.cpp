@@ -80,6 +80,7 @@ int main() {
         assert(backend->isDerpReady());
         assert(backend->isTcpActive());
         assert(!backend->isUdpActive());
+        assert(backend->activeHostIp() == "100.64.0.10");
 
         // Prepare streaming activates UDP media relays
         assert(route.prepareForStreaming(target, &error));
@@ -95,6 +96,22 @@ int main() {
         assert(!backend->isTcpActive());
         assert(!backend->isUdpActive());
         assert(!backend->isDerpReady());
+
+        // Subnet route: WireGuard stays with the router peer while the relay
+        // dials the LAN host behind it.
+        RemoteRouteTarget lanTarget;
+        lanTarget.peerId = "ts-peer-valid";
+        lanTarget.peerAddress = "100.64.0.10";
+        lanTarget.targetAddress = "192.168.1.50";
+        assert(route.start(lanTarget, &error));
+        assert(route.isActive());
+        assert(backend->activeHostIp() == "192.168.1.50");
+        route.stop();
+
+        // A non-IPv4 host is refused before any tunnel work.
+        lanTarget.targetAddress = "pc.lan";
+        assert(!route.start(lanTarget, &error));
+        assert(!route.isActive());
     }
 
     // 3. Validation guards against malformed/missing data:

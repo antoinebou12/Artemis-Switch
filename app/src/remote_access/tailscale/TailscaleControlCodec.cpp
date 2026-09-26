@@ -62,17 +62,31 @@ std::optional<Peer> parsePeer(
                 peer.addresses.push_back(stripPrefix(value.get<std::string>()));
         }
     }
-    if (peer.addresses.empty()) {
-        if (const auto allowed = node.find("AllowedIPs");
-            allowed != node.end() && allowed->is_array()) {
-            if (allowed->size() > 32) {
-                if (error) *error = "netmap peer address limit exceeded";
-                return std::nullopt;
+    if (const auto allowed = node.find("AllowedIPs");
+        allowed != node.end() && allowed->is_array()) {
+        const bool addressesFromAllowed = peer.addresses.empty();
+        if (addressesFromAllowed && allowed->size() > 32) {
+            if (error) *error = "netmap peer address limit exceeded";
+            return std::nullopt;
+        }
+        for (const auto& value : *allowed) {
+            if (!value.is_string())
+                continue;
+            // A subnet router can advertise many routes; keep a bounded set
+            // instead of rejecting the whole peer.
+            if (!addressesFromAllowed &&
+                peer.allowedIPs.size() >= PeerDirectory::kMaxAllowedIPsPerPeer)
+                break;
+            const auto cidr = value.get<std::string>();
+            if (addressesFromAllowed) {
+                peer.addresses.push_back(stripPrefix(cidr));
+                continue;
             }
-            for (const auto& value : *allowed) {
-                if (value.is_string())
-                    peer.addresses.push_back(stripPrefix(value.get<std::string>()));
-            }
+            // Subnet routes advertised by this peer (e.g. an OpenWrt subnet
+            // router sharing 192.168.1.0/24). Exit-node default routes and
+            // the peer's own /32 are not LAN subnets and are skipped.
+            if (PeerDirectory::isRoutableIPv4Subnet(cidr, peer.addresses))
+                peer.allowedIPs.push_back(cidr);
         }
     }
     if (const auto endpoints = node.find("Endpoints");

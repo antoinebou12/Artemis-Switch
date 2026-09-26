@@ -30,7 +30,8 @@ int tailscale_internal_wg_relay_input(WgTunnel*, const void*, size_t);
 // wgx_relay_shim.cpp, compiled into the Tailscale archive and renamed there.
 void* tailscale_internal_wgx_lwip_relay_new(WgTunnel*,
                                             void (*)(int, const char*));
-int tailscale_internal_wgx_lwip_relay_begin(void*, const char*, const char*);
+int tailscale_internal_wgx_lwip_relay_begin(void*, const char*, const char*,
+                                            const char*);
 int tailscale_internal_wgx_lwip_relay_tcp(void*, uint16_t);
 int tailscale_internal_wgx_lwip_relay_udp(void*, uint16_t);
 int tailscale_internal_wgx_lwip_relay_running(void*);
@@ -213,9 +214,9 @@ extern "C" WgxRelay* wgx_relay_create(WgxContext* context, WgxRelayLog log) {
 }
 
 extern "C" int wgx_relay_start(WgxRelay* relay, const char* localIp,
-                               const char* peerIp) {
+                               const char* hostIp, const char* viaPeerIp) {
     return relay ? tailscale_internal_wgx_lwip_relay_begin(relay->impl, localIp,
-                                                           peerIp)
+                                                           hostIp, viaPeerIp)
                  : -1;
 }
 

@@ -47,21 +47,29 @@ public:
 
     bool activateRoute(const std::string& providerId,
                        const RemoteRouteTarget& target);
+    // targetAddress distinguishes hosts reached through the same peer (a
+    // subnet router). Empty matches the first route to that peer.
     bool prepareRouteForStreaming(const std::string& providerId,
-                                  const std::string& peerId);
-    void deactivateRoute(const std::string& providerId, const std::string& peerId);
+                                  const std::string& peerId,
+                                  const std::string& targetAddress = {});
+    void deactivateRoute(const std::string& providerId, const std::string& peerId,
+                         const std::string& targetAddress = {});
 
     // Reference counted route activation
     struct RouteKey {
         std::string providerId;
         std::string peerId;
+        std::string targetAddress;
         bool operator==(const RouteKey& o) const noexcept {
-            return providerId == o.providerId && peerId == o.peerId;
+            return providerId == o.providerId && peerId == o.peerId &&
+                   targetAddress == o.targetAddress;
         }
     };
     struct RouteKeyHash {
         std::size_t operator()(const RouteKey& k) const noexcept {
-            return std::hash<std::string>{}(k.providerId) ^ (std::hash<std::string>{}(k.peerId) << 1);
+            return std::hash<std::string>{}(k.providerId) ^
+                   (std::hash<std::string>{}(k.peerId) << 1) ^
+                   (std::hash<std::string>{}(k.targetAddress) << 2);
         }
     };
 
@@ -84,6 +92,8 @@ private:
         RouteState state = RouteState::Activating;
         std::condition_variable changed;
     };
+    using RouteMap =
+        std::unordered_map<RouteKey, std::shared_ptr<RouteEntry>, RouteKeyHash>;
 
     RemoteAccessManager() = default;
     std::shared_ptr<ProviderSlot> providerSlot(const std::string& id) const;
@@ -91,6 +101,11 @@ private:
     std::shared_ptr<IRemoteAccessProvider>
     providerShared(const std::string& id) const;
     void stopActiveProviderLocked();
+    // Caller holds mutex_. Exact key first; an empty targetAddress falls back
+    // to any route for providerId/peerId.
+    RouteMap::iterator findRouteLocked(
+        const std::string& providerId, const std::string& peerId,
+        const std::string& targetAddress);
 
     // Serializes provider selection/restart transactions. It is distinct from
     // mutex_, which protects only short-lived manager bookkeeping.
@@ -99,6 +114,5 @@ private:
     std::vector<std::shared_ptr<ProviderSlot>> providers_;
     std::string activeProviderId_;
     std::uint64_t providerGeneration_ = 0;
-    std::unordered_map<RouteKey, std::shared_ptr<RouteEntry>, RouteKeyHash>
-        activeRoutes_;
+    RouteMap activeRoutes_;
 };

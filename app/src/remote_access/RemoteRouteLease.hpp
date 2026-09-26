@@ -70,12 +70,13 @@ public:
     bool prepareForStreaming() {
         return active_ && mgr_ &&
                (providerId_.empty() ||
-                mgr_->prepareRouteForStreaming(providerId_, peerId_));
+                mgr_->prepareRouteForStreaming(providerId_, peerId_,
+                                               targetAddress_));
     }
 
     void release() noexcept {
         if (active_ && mgr_ && !providerId_.empty()) {
-            mgr_->deactivateRoute(providerId_, peerId_);
+            mgr_->deactivateRoute(providerId_, peerId_, targetAddress_);
             active_ = false;
         }
     }

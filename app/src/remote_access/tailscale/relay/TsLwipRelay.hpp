@@ -51,7 +51,11 @@ public:
     TsLwipRelay(const TsLwipRelay&) = delete;
     TsLwipRelay& operator=(const TsLwipRelay&) = delete;
 
-    bool start(const char* tunnelIp, const char* targetIp);
+    // viaPeerIp: tailnet address of the WireGuard peer carrying targetIp.
+    // Null/empty or equal to targetIp for a directly addressed peer; a subnet
+    // router's address when targetIp is a LAN host behind it.
+    bool start(const char* tunnelIp, const char* targetIp,
+               const char* viaPeerIp = nullptr);
     void stop();
     bool addTcp(std::uint16_t port);
     bool addUdp(std::uint16_t port);
@@ -110,11 +114,22 @@ private:
     static void onUdpRecv(void* arg, udp_pcb* pcb, pbuf* p,
                           const ip_addr_t* addr, u16_t port);
 
+    // `base` must stay the first member: lwIP hands back netif*, which is
+    // cast to RelayNetif* to find the owning relay.
+    struct RelayNetif {
+        netif base;
+        TsLwipRelay* owner;
+    };
+    static err_t onNetifOutput(netif* nif, pbuf* p, const ip4_addr_t* dest);
+
     WgTunnel* tunnel_;
     LogFn log_;
-    netif netif_{};
+    RelayNetif netif_{};
+    netif_output_fn wgOutput_ = nullptr;
     ip4_addr_t tunnelAddr_{};
     ip4_addr_t targetAddr_{};
+    ip4_addr_t viaAddr_{};
+    bool viaSubnetRouter_ = false;
 
     std::atomic<bool> running_{false};
     bool initialized_ = false;
