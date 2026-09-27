@@ -42,12 +42,42 @@ std::vector<std::uint8_t> buildHttp2ClientPreface() {
     static const char kPreface[] = "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n";
     std::vector<std::uint8_t> out(reinterpret_cast<const std::uint8_t*>(kPreface),
                                   reinterpret_cast<const std::uint8_t*>(kPreface) + 24);
-    // Initial empty SETTINGS frame (type 0x04, stream 0, length 0)
-    write24(out, 0);
+    // Initial SETTINGS frame: SETTINGS_INITIAL_WINDOW_SIZE (0x4).
+    write24(out, 6);
     out.push_back(0x04); // Type: SETTINGS
     out.push_back(0x00); // Flags: 0
     write32(out, 0);     // Stream ID: 0
+    out.push_back(0x00);
+    out.push_back(0x04); // Identifier: INITIAL_WINDOW_SIZE
+    write32(out, kHttp2ClientStreamWindow);
+    // The connection window is not covered by SETTINGS; raise it explicitly.
+    const auto connectionUpdate = buildHttp2WindowUpdate(
+        0, kHttp2ClientConnectionWindow - kHttp2DefaultWindow);
+    out.insert(out.end(), connectionUpdate.begin(), connectionUpdate.end());
     return out;
+}
+
+std::vector<std::uint8_t> buildHttp2WindowUpdate(std::uint32_t streamId,
+                                                 std::uint32_t increment) {
+    std::vector<std::uint8_t> out;
+    out.reserve(kHttp2HeaderLen + 4);
+    write24(out, 4);
+    out.push_back(0x08); // Type: WINDOW_UPDATE
+    out.push_back(0x00); // Flags: none
+    write32(out, streamId & 0x7fffffffU);
+    write32(out, increment & 0x7fffffffU);
+    return out;
+}
+
+std::optional<std::uint32_t> Http2ReceiveWindow::consume(
+    std::uint32_t flowControlledBytes) {
+    unacknowledged_ += flowControlledBytes;
+    if (unacknowledged_ == 0 || unacknowledged_ < size_ / 2)
+        return std::nullopt;
+    const auto increment = static_cast<std::uint32_t>(
+        std::min<std::uint64_t>(unacknowledged_, 0x7fffffffU));
+    unacknowledged_ -= increment;
+    return increment;
 }
 
 std::vector<std::uint8_t> buildHttp2SettingsAck() {

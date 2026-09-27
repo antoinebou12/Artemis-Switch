@@ -1,10 +1,15 @@
 #include "TailscaleCore.hpp"
 
 #include <array>
+#include <atomic>
 #include <cassert>
+#include <chrono>
 #include <cstdint>
 #include <cstdio>
 #include <filesystem>
+#include <fstream>
+#include <functional>
+#include <memory>
 #include <optional>
 #include <string>
 #include <thread>
@@ -97,6 +102,65 @@ public:
 private:
     bool connected_ = false;
     int pollCount_ = 0;
+};
+
+// Delivers a full netmap, then drops the stream. Every later connection
+// works. Records what the engine passes on each connect.
+class FlakyControl final : public artemis::tailscale::IControlSession {
+public:
+    struct Shared {
+        std::atomic<int> connects{0};
+        std::atomic<int> closes{0};
+        std::atomic<int> lastInitialDerp{-1};
+        std::atomic<bool> lastConnectHadAuthKey{false};
+    };
+    explicit FlakyControl(std::shared_ptr<Shared> shared)
+        : shared_(std::move(shared)) {}
+
+    bool connect(const Identity&, std::span<const std::uint8_t> authKey,
+                 std::string*) override {
+        shared_->lastConnectHadAuthKey = !authKey.empty();
+        shared_->lastInitialDerp = initialDerp_;
+        ++shared_->connects;
+        pollsThisSession_ = 0;
+        return true;
+    }
+    void setInitialPreferredDerp(int region) noexcept override {
+        initialDerp_ = region;
+    }
+    bool poll(PeerDelta*, std::optional<std::vector<Peer>>* fullPeers,
+              std::string* localAddress,
+              std::optional<std::vector<artemis::tailscale::DerpRegion>>* derpMap,
+              std::string* error) override {
+        const int poll = pollsThisSession_++;
+        if (poll == 0) {
+            Peer alpha;
+            alpha.stableId = "ts-alpha";
+            alpha.nodeKey = sequential(1);
+            alpha.addresses = {"100.64.0.1"};
+            alpha.homeDerp = 7;
+            *fullPeers = std::vector<Peer>{alpha};
+            *localAddress = "100.101.102.103";
+            artemis::tailscale::DerpRegion region;
+            region.regionId = 7;
+            region.regionCode = "test";
+            region.nodes.push_back({"derp7.example", 443});
+            *derpMap = std::vector<artemis::tailscale::DerpRegion>{region};
+            return true;
+        }
+        if (shared_->connects == 1) {
+            if (error) *error = "control connection closed";
+            return false;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(2));
+        return true;
+    }
+    void close() noexcept override { ++shared_->closes; }
+
+private:
+    std::shared_ptr<Shared> shared_;
+    int initialDerp_ = 0;
+    int pollsThisSession_ = 0;
 };
 
 class FakeOverlay final : public artemis::tailscale::IOverlayRoute {
@@ -219,5 +283,50 @@ int main() {
     assert(core.snapshot().state == Snapshot::State::Stopped);
 
     std::filesystem::remove(statePath);
+    std::filesystem::remove(statePath.string() + ".homederp");
+
+    // A dropped control stream reconnects without a login key, keeps the
+    // route, and advertises the known home region in the first MapRequest.
+    {
+        const auto flakyState =
+            std::filesystem::temp_directory_path() /
+            ("artemis-tailscale-reconnect-test-" +
+             std::to_string(
+                 std::chrono::steady_clock::now().time_since_epoch().count()) +
+             ".state");
+        auto shared = std::make_shared<FlakyControl::Shared>();
+        auto* flakyOverlay = new FakeOverlay;
+        TailscaleCore flaky(
+            flakyState, std::make_unique<FlakyControl>(shared),
+            std::unique_ptr<FakeOverlay>(flakyOverlay),
+            [](Identity& identity, std::string*) {
+                identity.machinePrivate = sequential(12);
+                identity.nodePrivate = sequential(56);
+                identity.discoPrivate = sequential(100);
+                return true;
+            });
+        assert(flaky.start(SecureBytes("tskey-auth-test"), SecureBytes{}));
+        assert(waitFor([&] { return shared->connects.load() >= 2; }, 5000));
+        assert(!shared->lastConnectHadAuthKey);  // reused registration
+        assert(shared->lastInitialDerp == 7);     // hint from session one
+        assert(shared->closes.load() >= 1);
+        assert(waitFor(
+            [&] { return flaky.snapshot().state == Snapshot::State::Ready; },
+            3000));
+        const auto alpha = flaky.resolveRoute("100.64.0.1");
+        assert(alpha && flaky.activateRoute(*alpha));
+        assert(flakyOverlay->wasStarted());
+        flaky.stop();
+        assert(flaky.snapshot().state == Snapshot::State::Stopped);
+
+        // The hint survives a restart so even the first MapRequest has it.
+        std::ifstream hint(flakyState.string() + ".homederp");
+        int saved = 0;
+        assert(hint >> saved);
+        assert(saved == 7);
+        hint.close();
+        std::filesystem::remove(flakyState);
+        std::filesystem::remove(flakyState.string() + ".homederp");
+    }
     return 0;
 }

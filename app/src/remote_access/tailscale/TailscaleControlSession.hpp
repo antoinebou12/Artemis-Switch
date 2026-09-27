@@ -44,6 +44,7 @@ public:
               std::optional<std::vector<DerpRegion>>* derpMap,
               std::string* error) override;
     bool sendHostinfoUpdate(int preferredDerp, std::string* error) override;
+    void setInitialPreferredDerp(int region) noexcept override;
     void close() noexcept override;
     void interrupt() noexcept override;
 
@@ -53,6 +54,10 @@ private:
     // Diagnostics only: logs HTTP/2 status, resets, GOAWAY, and receive
     // window usage so vpn.log shows why a control stream stopped.
     void traceFrame(const Http2Frame& frame);
+    // Replenishes the connection and map-stream receive windows for a DATA
+    // frame. Without this the server stops sending once the window is used
+    // up and the long poll stalls until the connection drops.
+    bool creditData(const Http2Frame& frame, std::string* error);
     void logRegisterResponse(std::span<const std::uint8_t> payload);
 
     std::function<std::unique_ptr<ITransport>()> transportFactory_;
@@ -88,6 +93,10 @@ private:
     int mapHttpStatus_ = 0;
     std::uint64_t dataBytesReceived_ = 0;
     bool windowWarned_ = false;
+    std::uint64_t windowUpdatesSent_ = 0;
+    Http2ReceiveWindow connectionWindow_{kHttp2ClientConnectionWindow};
+    Http2ReceiveWindow mapStreamWindow_{kHttp2ClientStreamWindow};
+    int initialPreferredDerp_ = 0;
 };
 
 } // namespace artemis::tailscale

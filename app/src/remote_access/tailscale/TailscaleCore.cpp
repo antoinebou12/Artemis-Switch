@@ -19,8 +19,10 @@ void logTsCore(VpnFileLogger::Severity severity, std::string_view message) {
 #include "TailscaleWgxRoute.hpp"
 #include "TailscaleCore.hpp"
 
+#include <algorithm>
 #include <chrono>
 #include <cstdint>
+#include <fstream>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -32,9 +34,10 @@ TailscaleCore::TailscaleCore(std::filesystem::path statePath,
                              std::unique_ptr<IControlSession> control,
                              std::unique_ptr<IOverlayRoute> overlay,
                              IdentityGenerator identityGenerator)
-    : stateStore_(std::move(statePath)), control_(std::move(control)),
+    : stateStore_(statePath), control_(std::move(control)),
       overlay_(std::move(overlay)),
-      identityGenerator_(std::move(identityGenerator)) {
+      identityGenerator_(std::move(identityGenerator)),
+      homeDerpPath_(statePath.string() + ".homederp") {
     if (auto* wgxRoute = dynamic_cast<TailscaleWgxRoute*>(overlay_.get())) {
         wgxRoute->setPeerResolver([this](std::string_view peerId) {
             return peers_.findByStableId(peerId);
@@ -68,7 +71,11 @@ bool TailscaleCore::start(SecureBytes authKey, SecureBytes passphrase) {
 }
 
 void TailscaleCore::stop() noexcept {
-    stopRequested_ = true;
+    {
+        std::lock_guard lock(stopMutex_);
+        stopRequested_ = true;
+    }
+    stopSignal_.notify_all(); // wakes a reconnect backoff wait
     // Wake the worker out of its blocking control read. Closing the session
     // from here instead raced the worker and, on Switch, sslConnectionClose
     // waited for the pending read, so Disconnect hung until the control
@@ -263,24 +270,89 @@ void TailscaleCore::workerMain(SecureBytes authKey, SecureBytes passphrase) {
                  "Tailscale control transport is not linked");
         return;
     }
-    setState(Snapshot::State::ConnectingControl, "Connecting control");
-    LOG_CORE_INFO("Attempting control connection...");
-    const bool hadAuthKey = !authKey.view().empty();
-    if (!control_->connect(*identity, authKey.view(), &error)) {
-        LOG_CORE_ERROR("control connect failed: " + error);
-        authKey.clear();
-        setState(hadAuthKey ? Snapshot::State::Error
-                            : Snapshot::State::NeedsAuthentication,
-                 "Authentication failed", error);
-        return;
-    }
-    authKey.clear();
-    setState(Snapshot::State::ConnectedControl, "Control connected");
-    LOG_CORE_INFO("control connect succeeded. Polling netmap stream...");
-    controlConnected_ = true;
     {
         std::lock_guard lock(advertiseMutex_);
-        advertisedDerp_ = 0; // a new map session starts with no NetInfo
+        if (homeDerpHint_ == 0)
+            homeDerpHint_ = loadHomeDerpHint();
+    }
+
+    // The control long poll can drop (network change, server restart, an
+    // idle NAT timeout). The DERP relay and the WireGuard route do not depend
+    // on it, so reconnect with backoff instead of tearing the provider down.
+    // Only a session that never worked at all ends the worker, so a bad
+    // login key still surfaces as an error instead of retrying forever.
+    constexpr auto kInitialBackoff = std::chrono::seconds(1);
+    constexpr auto kMaxBackoff = std::chrono::seconds(30);
+    auto backoff = kInitialBackoff;
+    bool firstSession = true;
+    bool everProductive = false;
+    unsigned attempt = 0;
+    while (!stopRequested_) {
+        const auto result = runControlSession(authKey, *identity, firstSession);
+        if (result == SessionResult::Stopped || stopRequested_)
+            break;
+        if (result == SessionResult::Fatal)
+            return;
+        if (result == SessionResult::DroppedAfterData) {
+            everProductive = true;
+            backoff = kInitialBackoff;
+            attempt = 0;
+        }
+        if (!everProductive) {
+            // Nothing ever worked: keep the original fail-fast behaviour.
+            // runControlSession already set the error state.
+            return;
+        }
+        firstSession = false;
+        ++attempt;
+        LOG_CORE_WARN("control reconnect attempt " + std::to_string(attempt) +
+                      " in " + std::to_string(backoff.count()) +
+                      " s (the tunnel and any active route stay up)");
+        if (!waitBeforeReconnect(backoff))
+            break;
+        backoff = std::min(backoff * 2, kMaxBackoff);
+    }
+}
+
+TailscaleCore::SessionResult TailscaleCore::runControlSession(
+    SecureBytes& authKey, const Identity& identity, bool firstSession) {
+    int hint = 0;
+    {
+        std::lock_guard lock(advertiseMutex_);
+        hint = homeDerpHint_;
+    }
+    control_->setInitialPreferredDerp(hint);
+    setState(Snapshot::State::ConnectingControl,
+             firstSession ? "Connecting control" : "Reconnecting to control");
+    LOG_CORE_INFO(firstSession ? "Attempting control connection..."
+                               : "Reconnecting to control...");
+    std::string error;
+    const bool hadAuthKey = !authKey.view().empty();
+    if (!control_->connect(identity, authKey.view(), &error)) {
+        LOG_CORE_ERROR("control connect failed: " + error);
+        if (firstSession) {
+            authKey.clear();
+            setState(hadAuthKey ? Snapshot::State::Error
+                                : Snapshot::State::NeedsAuthentication,
+                     "Authentication failed", error);
+        } else {
+            setState(Snapshot::State::ConnectingControl,
+                     "Reconnecting to control", error);
+        }
+        return stopRequested_ ? SessionResult::Stopped
+                              : SessionResult::ConnectFailed;
+    }
+    // Registration is done; reconnects reuse the registered node key.
+    authKey.clear();
+    setState(Snapshot::State::ConnectedControl, "Control connected");
+    LOG_CORE_INFO(std::string(firstSession ? "control connect succeeded"
+                                           : "control reconnected") +
+                  ". Polling netmap stream...");
+    {
+        // A region sent in the initial MapRequest is already advertised.
+        std::lock_guard lock(advertiseMutex_);
+        advertisedDerp_ = hint;
+        controlConnected_ = true;
     }
 
     // Until a route picks a region, advertise a sensible default so this node
@@ -296,12 +368,15 @@ void TailscaleCore::workerMain(SecureBytes authKey, SecureBytes passphrase) {
     const auto sessionStart = std::chrono::steady_clock::now();
     auto lastMessage = sessionStart;
     std::uint64_t messageCount = 0;
+    SessionResult result = SessionResult::Stopped;
     while (!stopRequested_) {
         PeerDelta delta;
         std::optional<std::vector<Peer>> fullPeers;
         std::string localAddress;
         std::optional<std::vector<DerpRegion>> derpMap;
         if (!control_->poll(&delta, &fullPeers, &localAddress, &derpMap, &error)) {
+            if (stopRequested_)
+                break;
             const auto now = std::chrono::steady_clock::now();
             const auto sinceLast =
                 std::chrono::duration_cast<std::chrono::seconds>(now - lastMessage)
@@ -318,10 +393,16 @@ void TailscaleCore::workerMain(SecureBytes authKey, SecureBytes passphrase) {
                 LOG_CORE_WARN(
                     "control was silent for more than 90 s before the drop: "
                     "control normally sends a keepalive about every minute, "
-                    "so the stream had stalled (HTTP/2 flow control or a "
-                    "dead network path) before it failed");
-            if (!stopRequested_)
+                    "so the stream had stalled (dead network path or a NAT "
+                    "timeout) before it failed");
+            if (messageCount > 0) {
+                setState(Snapshot::State::ConnectingControl,
+                         "Reconnecting to control", error);
+                result = SessionResult::DroppedAfterData;
+            } else {
                 setState(Snapshot::State::Error, "Control disconnected", error);
+                result = SessionResult::DroppedEarly;
+            }
             break;
         }
         lastMessage = std::chrono::steady_clock::now();
@@ -347,8 +428,10 @@ void TailscaleCore::workerMain(SecureBytes authKey, SecureBytes passphrase) {
         if (fullPeers) {
             LOG_CORE_INFO("Received full netmap with " + std::to_string(fullPeers->size()) + " peers");
             if (!replacePeers(std::move(*fullPeers), localAddress, &error)) {
-                if (!stopRequested_)
+                if (!stopRequested_) {
                     setState(Snapshot::State::Error, "Netmap rejected", error);
+                    result = SessionResult::Fatal;
+                }
                 break;
             }
             if (derpMap) {
@@ -377,14 +460,50 @@ void TailscaleCore::workerMain(SecureBytes authKey, SecureBytes passphrase) {
         paths_.poll(PathManager::Clock::now());
         advertiseDefault();
     }
-    controlConnected_ = false;
+    {
+        // Waits out an in-flight Hostinfo update before the session closes.
+        std::lock_guard lock(advertiseMutex_);
+        controlConnected_ = false;
+    }
     control_->close();
+    return result;
+}
+
+bool TailscaleCore::waitBeforeReconnect(std::chrono::seconds delay) {
+    std::unique_lock lock(stopMutex_);
+    return !stopSignal_.wait_for(lock, delay,
+                                 [this] { return stopRequested_.load(); });
+}
+
+int TailscaleCore::loadHomeDerpHint() const {
+    std::ifstream in(homeDerpPath_);
+    int region = 0;
+    if (!(in >> region) || region <= 0 || region > 65535)
+        return 0;
+    return region;
+}
+
+void TailscaleCore::saveHomeDerpHint(int region) const {
+    // Best effort: losing it only delays PreferredDERP by one update.
+    std::ofstream out(homeDerpPath_, std::ios::trunc);
+    if (out)
+        out << region << '\n';
 }
 
 void TailscaleCore::advertiseHomeDerp(int region, const char* reason) {
-    if (region <= 0 || !control_ || !controlConnected_)
+    if (region <= 0 || !control_)
         return;
     std::lock_guard lock(advertiseMutex_);
+    if (region != homeDerpHint_) {
+        homeDerpHint_ = region;
+        saveHomeDerpHint(region);
+    }
+    if (!controlConnected_) {
+        LOG_CORE_INFO("control is reconnecting; home DERP region " +
+                      std::to_string(region) + " (" + reason +
+                      ") will be advertised in the next MapRequest");
+        return;
+    }
     if (region == advertisedDerp_)
         return;
     std::string error;
