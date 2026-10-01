@@ -227,13 +227,38 @@ std::optional<Opened> open(std::span<const std::uint8_t> packet,
 
 namespace stun {
 
+std::uint32_t fingerprint(std::span<const std::uint8_t> bytes) {
+    std::uint32_t crc = 0xffffffffU;
+    for (const auto byte : bytes) {
+        crc ^= byte;
+        for (int bit = 0; bit < 8; ++bit)
+            crc = (crc >> 1U) ^ (0xedb88320U & (0U - (crc & 1U)));
+    }
+    return ~crc ^ 0x5354554eU;
+}
+
 std::vector<std::uint8_t> bindingRequest(const TxId& txid) {
+    // Same bytes as tailscale.com/net/stun.Request.
+    static constexpr std::string_view kSoftware = "tailnode";
+    constexpr std::uint16_t kAttrSoftware = 0x8022;
+    constexpr std::uint16_t kAttrFingerprint = 0x8028;
+    constexpr std::uint16_t kSoftwareAttrLen = 4 + kSoftware.size();
+    constexpr std::uint16_t kFingerprintAttrLen = 4 + 4;
     std::vector<std::uint8_t> out;
-    out.reserve(kStunHeaderLen);
+    out.reserve(kStunHeaderLen + kSoftwareAttrLen + kFingerprintAttrLen);
     putU16(out, kStunBindingRequest);
-    putU16(out, 0); // no attributes
+    putU16(out, kSoftwareAttrLen + kFingerprintAttrLen);
     putU32(out, kMagicCookie);
     out.insert(out.end(), txid.begin(), txid.end());
+    putU16(out, kAttrSoftware);
+    putU16(out, static_cast<std::uint16_t>(kSoftware.size()));
+    out.insert(out.end(), kSoftware.begin(), kSoftware.end());
+    // The fingerprint covers everything before it, with the length field
+    // already counting the fingerprint attribute.
+    const auto fp = fingerprint(out);
+    putU16(out, kAttrFingerprint);
+    putU16(out, 4);
+    putU32(out, fp);
     return out;
 }
 

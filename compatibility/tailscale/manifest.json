@@ -26,7 +26,6 @@
     "direct IPv4 UDP WireGuard path with automatic DERP fallback (opt-in, experimental)"
   ],
   "not_implemented": [
-    "IPv6 direct paths",
     "port mapping (UPnP / NAT-PMP / PCP) and hard-NAT birthday probing",
     "dedicated-tailnet capability probe"
   ],
@@ -34,7 +33,8 @@
     "system DNS configuration",
     "system TUN routes",
     "Tailscale SSH",
-    "exit nodes (0.0.0.0/0 routes are ignored)"
+    "exit nodes (0.0.0.0/0 routes are ignored)",
+    "IPv6 addresses and direct paths (the Switch network stack is IPv4-only)"
   ],
   "release_gate": "Capability 68 accepted. Live control, DERP authenticated transport, WireGuard localhost proxy, and subnet-router LAN hosts are enabled. Direct UDP paths are off by default (Settings: Direct connections)."
 }

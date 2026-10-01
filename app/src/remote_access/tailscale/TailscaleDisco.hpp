@@ -94,7 +94,11 @@ namespace stun {
 inline constexpr std::uint32_t kMagicCookie = 0x2112A442;
 inline constexpr std::uint16_t kDefaultPort = 3478;
 
+// Binding request in the exact form Tailscale's STUN servers accept: they
+// drop requests without SOFTWARE "tailnode" and a valid FINGERPRINT.
 std::vector<std::uint8_t> bindingRequest(const TxId& txid);
+// RFC 5389 FINGERPRINT value: CRC-32 (IEEE) of `bytes` XOR 0x5354554e.
+std::uint32_t fingerprint(std::span<const std::uint8_t> bytes);
 [[nodiscard]] bool looksLikeStun(std::span<const std::uint8_t> packet) noexcept;
 // Mapped address from a Binding success response with this transaction ID.
 std::optional<IPv4Endpoint> parseBindingResponse(

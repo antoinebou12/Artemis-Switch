@@ -132,11 +132,32 @@ int main() {
     // --- STUN ----------------------------------------------------------------
     {
         const auto txid = tx(0x40);
+        // CRC-32 check value for "123456789" is 0xCBF43926.
+        const std::string check = "123456789";
+        assert(stun::fingerprint(std::span<const std::uint8_t>(
+                   reinterpret_cast<const std::uint8_t*>(check.data()),
+                   check.size())) == (0xCBF43926U ^ 0x5354554eU));
+
+        // Tailscale's STUN server only answers requests carrying SOFTWARE
+        // "tailnode" followed by a valid FINGERPRINT (net/stun.Request).
         const auto request = stun::bindingRequest(txid);
-        assert(request.size() == 20);
+        assert(request.size() == 20 + 12 + 8);
         assert(request[0] == 0x00 && request[1] == 0x01);
+        assert(request[2] == 0x00 && request[3] == 20); // attribute bytes
         assert(request[4] == 0x21 && request[5] == 0x12 && request[6] == 0xa4 &&
                request[7] == 0x42);
+        assert(std::equal(txid.begin(), txid.end(), request.begin() + 8));
+        assert(request[20] == 0x80 && request[21] == 0x22 && request[22] == 0 &&
+               request[23] == 8);
+        assert(std::string(request.begin() + 24, request.begin() + 32) ==
+               "tailnode");
+        assert(request[32] == 0x80 && request[33] == 0x28 && request[34] == 0 &&
+               request[35] == 4);
+        const std::uint32_t fp = (std::uint32_t{request[36]} << 24U) |
+                                 (std::uint32_t{request[37]} << 16U) |
+                                 (std::uint32_t{request[38]} << 8U) | request[39];
+        assert(fp == stun::fingerprint(std::span<const std::uint8_t>(
+                         request.data(), 32)));
         assert(stun::looksLikeStun(request));
 
         // Binding success with XOR-MAPPED-ADDRESS 203.0.113.7:41641.

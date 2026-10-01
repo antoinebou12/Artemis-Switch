@@ -134,11 +134,16 @@ Default location: `sdmc:/switch/Artemis-Switch/wg0.conf`.
 
 ### Tailscale
 
+User guide (setup, settings, troubleshooting): [`TAILSCALE.md`](TAILSCALE.md).
+
 Configured with a control host, port, control public key (`mkey:`), hostname,
-and a one-off auth key file. The control plane (TS2021 Noise + netmap stream)
-is implemented in-app; the encrypted packet path is **DERP-relayed only**.
-There is no direct-UDP/STUN path yet, so both of these must hold or the route
-is refused with an explanatory error instead of hanging the handshake:
+and a one-off auth key file. The control plane (TS2021 Noise + HTTP/2 netmap
+stream, with flow control and automatic reconnect) is implemented in-app.
+The encrypted packet path is **DERP-relayed** by default; an opt-in
+experimental direct UDP path (STUN + disco) can take over once proven by
+pongs. Hosts behind a subnet router are reached by their LAN IP. Because DERP
+is always the fallback, both of these must hold or the route is refused with
+an explanatory error instead of hanging the handshake:
 
 - the control netmap carries a `DERPMap` with at least the peer's home region,
 - the peer advertises a non-zero home DERP region (`HomeDERP`).
