@@ -9,7 +9,7 @@ The Switch has no system VPN, so Artemis does not route the whole console. It on
 - A Tailscale account (or a compatible control server, see *Custom control server* below).
 - The host PC running Sunshine, Apollo or Vibepollo, and either:
   - Tailscale installed on the host PC, **or**
-  - a **subnet router** on the host's network (for example Tailscale on an OpenWrt router advertising `192.168.1.0/24`), with the route approved in the admin console.
+  - a **subnet router** on the host's network (for example Tailscale on an OpenWrt router advertising `192.168.1.0/24`), with the route approved in the admin console. See *Hosts behind a subnet router*.
 - An **auth key** for the Switch, created in the [admin console](https://login.tailscale.com/admin/settings/keys).
 
 ## Setup
@@ -53,16 +53,53 @@ The status row shows the progress: *Connecting to control*, *Control connected*,
 
 ### 4. Add the host
 
-Add the host by address, as you would on a LAN:
+The **Add host** search lists your tailnet's game hosts next to the LAN results. For example, at home with Tailscale on:
+
+| Row | What it is | When to pick it |
+|---|---|---|
+| `DESKTOP-C9UERV5` · `192.168.1.198` | Found by LAN discovery | At home: direct, no tunnel |
+| `desktop-c9uerv5.tail99a739.ts.net · Tailscale` · `100.98.191.24` | Your PC through Tailscale | Away from home |
+| **Add host on 192.168.1.0/24** · via `openwrt-main` | A router sharing its LAN | A PC behind the router that has no Tailscale (see *Hosts behind a subnet router*) |
+
+Away from home only the Tailscale rows appear, because LAN discovery cannot see through the tunnel.
+
+Artemis checks each online tailnet device and lists only the ones that run Sunshine, Apollo or Vibepollo:
+
+- Phones and tablets are skipped.
+- Every other device is asked for its GameStream server info over the tunnel. That takes about a second when Sunshine answers and up to 5 seconds when nothing does, so the list fills in over a few seconds.
+- Answers are remembered. Found hosts stay known until you close Artemis; a device that did not answer is rechecked after 10 minutes, or right away when you press **Refresh (X)**.
+- No device is checked while a host is in use (pairing, app list or a stream), and at most 16 per search. Devices that could not be checked are listed rather than hidden.
+
+You can also add any host by address, as you would on a LAN:
 
 | Host setup | Address to enter |
 |---|---|
 | Tailscale on the host PC | The host's tailnet IP, e.g. `100.98.191.24` |
-| Host behind a subnet router | The host's **LAN** IP, e.g. `192.168.1.50` |
+| Host behind a subnet router | The host's **LAN** IP, e.g. `192.168.1.50` (see *Hosts behind a subnet router*) |
 
 Then pair with the PIN as usual. Sunshine shows no popup when pairing succeeds; the host simply appears in the list.
 
 Any address that is not on your tailnet (or behind a subnet router on it) is dialed normally, so LAN hosts keep working while Tailscale is on.
+
+## Hosts behind a subnet router
+
+A **subnet router** is a Tailscale device that shares its whole LAN with your tailnet, for example Tailscale on an OpenWrt router sharing `192.168.1.0/24`. A PC on that LAN can then be streamed from without installing Tailscale on it.
+
+**Setup** (router side only; nothing to do on the Switch or the PC):
+
+1. On the router, advertise the LAN: `tailscale up --advertise-routes=192.168.1.0/24`.
+2. In the admin console, open the router under **Machines → Edit route settings** and approve the route.
+
+**Adding the host.** Use the **Add host on 192.168.1.0/24** row in Add host, which opens the IP keyboard with `192.168.1.` typed so you only add the last number. Or type the PC's LAN IP in the manual box. The automatic check cannot find these PCs, because they are not tailnet devices; only the router is.
+
+**How traffic flows.** Switch → Tailscale tunnel → router → PC. In `vpn.log` the route shows as `… -> 192.168.1.50 via subnet router 100.x.y.z`. With **Direct connections** on, the direct path is to the router.
+
+Good to know:
+
+- Only routes approved in the admin console are used. Exit-node routes (`0.0.0.0/0`) are ignored.
+- If two routers share overlapping subnets, the more specific one wins (a `/24` beats a `/16`).
+- Each PC behind the router is its own host; two PCs on the same subnet do not affect each other.
+- While Tailscale is on, LAN addresses inside a shared subnet always go through the tunnel, even when the Switch is on that same LAN at home. That still works, only less directly. At home, the row found by LAN discovery (e.g. `DESKTOP-C9UERV5`) is the direct path.
 
 ## Settings
 
@@ -127,7 +164,10 @@ Artemis writes a detailed log to `sdmc:/switch/Artemis-Switch/vpn.log`. Tailscal
 |---|---|
 | *Authentication failed* | The auth key is used up, expired, or not reusable. Generate a new one. The log line `control wants an interactive browser login` means the key was not accepted. |
 | Status stays at *Control connected* | Device approval is on: approve the Switch in the admin console. |
-| Host does not respond | Check the host is online in the admin console. For a subnet router, check the route is approved and the address is inside it. Look for `route activation failed` in the log. |
+| Host does not respond | Check the host is online in the admin console. Look for `route activation failed` in the log. |
+| Host behind a subnet router does not respond | Check the route is approved in the admin console and the IP is inside it. A working route logs `TCP proxy ready … via subnet router …`. |
+| My PC is not listed in Add host | Make sure the PC is awake and Sunshine is running, then press **Refresh (X)**. `add host filter: … hidden (no GameStream server …)` in the log means it did not answer. You can always add it by its `100.x` IP. |
+| A device that cannot stream is listed | It was listed unchecked: a host was in use or 16 devices were already checked (`… shown unchecked (…)` in the log). Leave the host, then press **Refresh (X)**. |
 | Pairing works but the host is not saved | Look for `host save:` in the log; it shows why. |
 | Stream stutters | DERP is far away or busy. Try **Direct connections**, and look for `WireGuard now goes directly to …` in the log. |
 | Direct connections never go direct | Check the `direct path self-test` lines first: `loopback packet received` and `DNS reply from 8.8.8.8` mean the Switch's UDP works. Then a `public endpoint … (STUN)` with no `pong from …` means the network (often a mobile carrier) cannot be traversed; DERP keeps working. |
@@ -138,6 +178,8 @@ Useful log lines when things work:
 control connect succeeded. Polling netmap stream...
 DERP relay connected via derp…  region N
 WireGuard handshake with peer completed
+add host filter: desktop-c9uerv5.tail99a739.ts.net shown (GameStream answered in 950 ms)
+add host filter: xiaomi-14t-pro.tail99a739.ts.net hidden (android)
 TCP proxy ready: 127.0.0.1:{47989,47984,48010} -> 192.168.1.50 via subnet router 100.x.y.z
 direct path: public endpoint 203.0.113.7:41641 (STUN)
 WireGuard now goes directly to 203.0.113.9:41641 (rtt 12 ms) instead of DERP

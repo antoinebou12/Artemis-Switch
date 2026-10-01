@@ -22,6 +22,8 @@
     "HTTP/2 receive-window flow control (WINDOW_UPDATE)",
     "control session reconnect with backoff, keeping the active route",
     "PreferredDERP in the initial MapRequest from the saved home region",
+    "Hostinfo OS and service-port parsing",
+    "Add Host game-host filtering (OS, reported ports, GameStream probe) and subnet shortcuts",
     "STUN endpoint discovery and encrypted disco ping/pong/call-me-maybe (opt-in, experimental)",
     "direct IPv4 UDP WireGuard path with automatic DERP fallback (opt-in, experimental)"
   ],
