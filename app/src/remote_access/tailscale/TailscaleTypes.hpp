@@ -49,6 +49,13 @@ struct Peer {
     std::vector<Endpoint> endpoints;
     int homeDerp = 0;
     bool online = false;
+    // From the peer's Hostinfo. os is lowercase ("windows", "android", ...),
+    // empty when control did not send it. tcpServicePorts are the listening
+    // TCP ports the peer reports; servicesKnown is false when control sent
+    // no Services list at all (not reported, or trimmed by control).
+    std::string os;
+    std::vector<std::uint16_t> tcpServicePorts;
+    bool servicesKnown = false;
 };
 
 struct PeerOnlineChange {

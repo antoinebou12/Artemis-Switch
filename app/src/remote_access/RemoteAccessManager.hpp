@@ -34,6 +34,9 @@ public:
     std::vector<RemoteAccessProviderInfo> availableProviders() const;
 
     std::string activeProviderId() const;
+    // True while any route is active or being activated, i.e. a host is in
+    // use (pairing, app list, stream). Probing must not replace it.
+    bool hasActiveRoute() const;
     void setActiveProviderId(const std::string& id);
 
     bool startProvider(const std::string& id);

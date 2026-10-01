@@ -5,6 +5,8 @@
 
 #include <borealis/extern/nlohmann/json.hpp>
 
+#include <algorithm>
+#include <cctype>
 #include <charconv>
 #include <limits>
 
@@ -18,6 +20,49 @@ std::string stripPrefix(std::string address) {
     if (slash != std::string::npos)
         address.resize(slash);
     return address;
+}
+
+// Hostinfo.OS and the TCP ports in Hostinfo.Services, used to tell game
+// hosts from phones and servers. Every field is optional and type-checked:
+// control may omit, null or trim any of it.
+void parseHostinfo(const Json& node, Peer& peer) {
+    const auto hostinfo = node.find("Hostinfo");
+    if (hostinfo == node.end() || !hostinfo->is_object())
+        return;
+    if (const auto os = hostinfo->find("OS");
+        os != hostinfo->end() && os->is_string()) {
+        peer.os = os->get<std::string>();
+        if (peer.os.size() > 32)
+            peer.os.resize(32);
+        std::transform(peer.os.begin(), peer.os.end(), peer.os.begin(),
+                       [](unsigned char c) {
+                           return static_cast<char>(std::tolower(c));
+                       });
+    }
+    const auto services = hostinfo->find("Services");
+    if (services == hostinfo->end() || !services->is_array())
+        return;
+    peer.servicesKnown = true;
+    constexpr std::size_t kMaxServices = 256;
+    for (const auto& service : *services) {
+        if (peer.tcpServicePorts.size() >= kMaxServices)
+            break;
+        if (!service.is_object())
+            continue;
+        const auto proto = service.find("Proto");
+        const auto port = service.find("Port");
+        if (proto == service.end() || !proto->is_string() ||
+            proto->get<std::string>() != "tcp" || port == service.end() ||
+            !port->is_number_unsigned())
+            continue;
+        const auto value = port->get<std::uint64_t>();
+        if (value == 0 || value > 65535)
+            continue;
+        const auto tcpPort = static_cast<std::uint16_t>(value);
+        if (std::find(peer.tcpServicePorts.begin(), peer.tcpServicePorts.end(),
+                      tcpPort) == peer.tcpServicePorts.end())
+            peer.tcpServicePorts.push_back(tcpPort);
+    }
 }
 
 std::optional<Peer> parsePeer(
@@ -127,6 +172,7 @@ std::optional<Peer> parsePeer(
         }
     }
     peer.online = node.value("Online", false);
+    parseHostinfo(node, peer);
     if (nodeId != 0)
         idMap[nodeId] = peer.stableId;
     return peer;

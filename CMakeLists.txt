@@ -382,6 +382,7 @@ elseif (PLATFORM_SWITCH)
         list(APPEND MAIN_SRC
             app/src/vpn/WireGuardConfig.cpp
             app/src/vpn/WireGuardManager.cpp
+            app/src/remote_access/AddHostPeerFilter.cpp
             app/src/remote_access/RemoteAccessManager.cpp
             app/src/remote_access/RemoteAccessSelection.cpp
             app/src/remote_access/RemoteRouting.cpp

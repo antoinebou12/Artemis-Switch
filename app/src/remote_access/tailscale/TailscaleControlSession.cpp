@@ -281,6 +281,49 @@ std::size_t jsonArraySize(const nlohmann::json& object, const char* key) {
     return it != object.end() && it->is_array() ? it->size() : 0;
 }
 
+// " os=windows services=12 tcp=[47984,47989,...] gamestream=yes" for the
+// Add Host filter: shows what control tells us about each peer's software.
+std::string hostinfoSummary(const nlohmann::json& peer) {
+    const auto hostinfo = peer.find("Hostinfo");
+    if (hostinfo == peer.end() || !hostinfo->is_object())
+        return " hostinfo=absent";
+    std::string out = " os=";
+    const auto os = hostinfo->find("OS");
+    out += os != hostinfo->end() && os->is_string() ? os->get<std::string>()
+                                                     : std::string("unknown");
+    const auto services = hostinfo->find("Services");
+    if (services == hostinfo->end() || !services->is_array())
+        return out + " services=absent";
+    std::vector<unsigned> ports;
+    for (const auto& service : *services) {
+        if (!service.is_object())
+            continue;
+        const auto proto = service.find("Proto");
+        const auto port = service.find("Port");
+        if (proto != service.end() && proto->is_string() &&
+            proto->get<std::string>() == "tcp" && port != service.end() &&
+            port->is_number_unsigned())
+            ports.push_back(port->get<unsigned>());
+    }
+    std::sort(ports.begin(), ports.end());
+    ports.erase(std::unique(ports.begin(), ports.end()), ports.end());
+    const bool gamestream =
+        std::find(ports.begin(), ports.end(), 47989U) != ports.end() ||
+        std::find(ports.begin(), ports.end(), 47984U) != ports.end();
+    out += " services=" + std::to_string(services->size()) + " tcp=[";
+    constexpr std::size_t kMaxPortsShown = 16;
+    for (std::size_t i = 0; i < ports.size() && i < kMaxPortsShown; ++i) {
+        if (i)
+            out += ",";
+        out += std::to_string(ports[i]);
+    }
+    if (ports.size() > kMaxPortsShown)
+        out += ",...";
+    out += "] gamestream=";
+    out += gamestream ? "yes" : "no";
+    return out;
+}
+
 bool jsonHasArray(const nlohmann::json& object, const char* key) {
     const auto it = object.find(key);
     return it != object.end() && it->is_array();
@@ -400,7 +443,8 @@ void logNetmapDiagnostics(const nlohmann::json& root, const Key32& nodePublic) {
                 " homeDERP=" + std::to_string(nodeHomeDerp(peer)) +
                 " endpoints=" + std::to_string(jsonArraySize(peer, "Endpoints")) +
                 " disco=" + (jsonString(peer, "DiscoKey").empty() ? "no" : "yes") +
-                " nodekey=" + shortTypedKey(jsonString(peer, "Key")));
+                " nodekey=" + shortTypedKey(jsonString(peer, "Key")) +
+                hostinfoSummary(peer));
             ++index;
         }
     }

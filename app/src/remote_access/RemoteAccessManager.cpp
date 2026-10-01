@@ -65,6 +65,15 @@ std::vector<RemoteAccessProviderInfo> RemoteAccessManager::availableProviders() 
     return out;
 }
 
+bool RemoteAccessManager::hasActiveRoute() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return std::any_of(activeRoutes_.begin(), activeRoutes_.end(),
+                       [](const auto& route) {
+                           return route.second->state == RouteState::Active ||
+                                  route.second->state == RouteState::Activating;
+                       });
+}
+
 std::string RemoteAccessManager::activeProviderId() const {
     std::lock_guard<std::mutex> lock(mutex_);
     return activeProviderId_;

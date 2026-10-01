@@ -295,6 +295,12 @@ std::vector<RemoteAccessPeer> TailscaleProvider::peers() const {
         entry.name = peer.hostname.empty() ? peer.stableId : peer.hostname;
         entry.address = peer.addresses.empty() ? std::string{} : peer.addresses[0];
         entry.online = peer.online;
+        entry.os = peer.os;
+        // Control often sends only internal entries (peerapi) and no real
+        // TCP ports; an empty list therefore proves nothing.
+        entry.tcpPortsKnown = !peer.tcpServicePorts.empty();
+        entry.tcpPorts = peer.tcpServicePorts;
+        entry.subnets = peer.allowedIPs;
         entry.metadata = peer.homeDerp > 0
                              ? "derp-" + std::to_string(peer.homeDerp)
                              : std::string{};

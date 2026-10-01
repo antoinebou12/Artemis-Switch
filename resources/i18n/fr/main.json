@@ -36,6 +36,9 @@
         "search": "Rechercher",
         "search_error": "La recherche n'est pas disponible",
         "search_refresh": "Rafraîchir",
+        "subnet_shortcut": "Ajouter un hôte sur {}",
+        "subnet_via": "via {}",
+        "subnet_title": "IP de l'hôte sur {}",
         "try_connect": "Connexion à l'hôte en cours..."
     },
     "app_list": {

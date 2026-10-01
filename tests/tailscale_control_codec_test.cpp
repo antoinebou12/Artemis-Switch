@@ -50,6 +50,46 @@ int main() {
     assert(update->fullPeers && update->fullPeers->size() == 1);
     assert(update->fullPeers->front().stableId == "stable-42");
     assert(update->fullPeers->front().endpoints.front().port == 41641);
+    // No Hostinfo: nothing is known about the peer's software.
+    assert(update->fullPeers->front().os.empty());
+    assert(!update->fullPeers->front().servicesKnown);
+    assert(update->fullPeers->front().tcpServicePorts.empty());
+
+    // Hostinfo.OS and the TCP ports in Hostinfo.Services feed the Add Host
+    // filter. UDP, malformed and duplicate entries are skipped; an empty
+    // Services list still counts as known.
+    {
+        MapCodec hostinfoCodec;
+        const std::string withHostinfo =
+            "{\"Node\":{\"Addresses\":[\"100.64.0.2/32\"]},\"Peers\":["
+            "{\"ID\":1,\"StableID\":\"pc\",\"Key\":\"nodekey:" + zeroKey +
+            "\",\"Addresses\":[\"100.64.0.10/32\"],\"Hostinfo\":{"
+            "\"OS\":\"Windows\",\"Services\":["
+            "{\"Proto\":\"tcp\",\"Port\":47989,\"Description\":\"sunshine\"},"
+            "{\"Proto\":\"tcp\",\"Port\":47984},"
+            "{\"Proto\":\"tcp\",\"Port\":47989},"
+            "{\"Proto\":\"udp\",\"Port\":47998},"
+            "{\"Proto\":\"tcp\",\"Port\":0},"
+            "{\"Proto\":\"tcp\",\"Port\":\"80\"},"
+            "\"garbage\",null]}},"
+            "{\"ID\":2,\"StableID\":\"phone\",\"Key\":\"nodekey:" + zeroKey +
+            "\",\"Addresses\":[\"100.64.0.11/32\"],\"Hostinfo\":{"
+            "\"OS\":\"android\",\"Services\":[]}},"
+            "{\"ID\":3,\"StableID\":\"odd\",\"Key\":\"nodekey:" + zeroKey +
+            "\",\"Addresses\":[\"100.64.0.12/32\"],\"Hostinfo\":{"
+            "\"OS\":null,\"Services\":{}}}]}";
+        const auto decoded = hostinfoCodec.decode(withHostinfo, &error);
+        assert(decoded && decoded->fullPeers && decoded->fullPeers->size() == 3);
+        const auto& pc = (*decoded->fullPeers)[0];
+        assert(pc.os == "windows");
+        assert(pc.servicesKnown);
+        assert((pc.tcpServicePorts == std::vector<std::uint16_t>{47989, 47984}));
+        const auto& phone = (*decoded->fullPeers)[1];
+        assert(phone.os == "android" && phone.servicesKnown &&
+               phone.tcpServicePorts.empty());
+        const auto& odd = (*decoded->fullPeers)[2];
+        assert(odd.os.empty() && !odd.servicesKnown);
+    }
 
     const auto removed = codec.decode("{\"PeersRemoved\":[42]}", &error);
     assert(removed && removed->delta.removedStableIds.size() == 1);

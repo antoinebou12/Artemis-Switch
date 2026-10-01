@@ -36,6 +36,9 @@
         "search": "Search",
         "search_error": "Search is unavailable",
         "search_refresh": "Refresh",
+        "subnet_shortcut": "Add host on {}",
+        "subnet_via": "via {}",
+        "subnet_title": "Host IP on {}",
         "try_connect": "Trying to connect to the host"
     },
     "app_list": {

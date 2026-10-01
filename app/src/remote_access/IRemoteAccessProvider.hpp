@@ -1,4 +1,5 @@
 #pragma once
+#include <cstdint>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -11,6 +12,12 @@ struct RemoteAccessPeer {
     std::string address;
     bool online = false;
     std::string metadata;
+    // Optional hints for the Add Host filter (see AddHostPeerFilter.hpp).
+    // Providers that do not know them leave the defaults.
+    std::string os;                    // lowercase, e.g. "windows", "android"
+    bool tcpPortsKnown = false;        // tcpPorts is a real listening-port list
+    std::vector<std::uint16_t> tcpPorts;
+    std::vector<std::string> subnets;  // shared LAN subnets, "a.b.c.d/n"
 };
 
 struct RemoteAccessRoute {

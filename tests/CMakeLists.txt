@@ -346,6 +346,14 @@ add_executable(host_endpoints_test
 target_compile_features(host_endpoints_test PRIVATE cxx_std_20)
 add_test(NAME host_endpoints_test COMMAND host_endpoints_test)
 
+add_executable(add_host_peer_filter_test
+    "${REPO_ROOT}/tests/add_host_peer_filter_test.cpp"
+    "${REPO_ROOT}/app/src/remote_access/AddHostPeerFilter.cpp")
+target_include_directories(add_host_peer_filter_test PRIVATE
+    "${REPO_ROOT}/app/src/remote_access")
+target_compile_features(add_host_peer_filter_test PRIVATE cxx_std_20)
+add_test(NAME add_host_peer_filter_test COMMAND add_host_peer_filter_test)
+
 add_executable(remote_access_route_lifecycle_test
     "${REPO_ROOT}/tests/remote_access_route_lifecycle_test.cpp"
     "${REPO_ROOT}/app/src/remote_access/RemoteAccessManager.cpp"
