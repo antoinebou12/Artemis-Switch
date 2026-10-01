@@ -108,7 +108,9 @@ int main() {
         "{\"Name\":\"1b\",\"RegionID\":1,\"IPv4\":\"203.0.2.2\"}]},"
         "\"2\":{\"RegionID\":2,\"RegionCode\":\"fra\",\"Nodes\":["
         "{\"Name\":\"2a\",\"RegionID\":2,\"HostName\":\"derp2.example\","
-        "\"DERPPort\":8443}]},"
+        "\"DERPPort\":8443,\"STUNPort\":-1},"
+        "{\"Name\":\"2s\",\"RegionID\":2,\"HostName\":\"stun2.example\","
+        "\"STUNOnly\":true}]},"
         "\"3\":{\"RegionID\":3,\"RegionCode\":\"empty\",\"Nodes\":["
         "{\"Name\":\"3a\",\"RegionID\":3}]}}}}";
     const auto derpUpdate = codec.decode(withDerp, &error);
@@ -125,6 +127,10 @@ int main() {
     assert(nyc->nodes[1].host == "203.0.2.2" && nyc->nodes[1].port == 443);
     assert(fra && fra->nodes.size() == 1);
     assert(fra->nodes[0].host == "derp2.example" && fra->nodes[0].port == 8443);
+    // STUN: default 3478, -1 disables it, STUN-only nodes are not relays.
+    assert(nyc->nodes[0].stunPort == 3478);
+    assert(fra->nodes[0].stunPort == 0);
+    assert(fra->nodes.size() == 1);
 
     // A malformed DERPMap section fails the update rather than installing a
     // half-parsed relay map the data path would then trust.

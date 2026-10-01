@@ -19,6 +19,24 @@ namespace artemis::tailscale {
 constexpr std::array<std::uint16_t, 3> kTailscaleTcpPorts{47989, 47984, 48010};
 constexpr std::array<std::uint16_t, 5> kTailscaleUdpPorts{47998, 48000, 47999, 48002, 48010};
 
+// Everything a backend needs to look for a direct UDP path to the route's
+// peer. WireGuard keeps working over DERP until a path is proven by pongs.
+struct DirectPathConfig {
+    std::string peerStableId;
+    Key32 peerNodeKey{};
+    Key32 peerDiscoKey{};
+    std::vector<std::string> peerEndpoints; // "ip:port" from the netmap
+    Key32 localNodePrivate{};
+    Key32 localDiscoPrivate{};
+    std::vector<DerpRegion> derpMap;
+    int derpRegion = 0;
+    // Our discovered UDP endpoints, to be advertised to control.
+    std::function<void(std::vector<std::string>)> publishEndpoints;
+    // Path change for peerStableId: endpoint + RTT when direct, empty when
+    // traffic is back on DERP.
+    std::function<void(const std::string& endpoint, int rttMs)> pathChanged;
+};
+
 // ponytail: abstraction ceiling is in-process loopback proxy; upgrade to direct socket forwarding if OS TUN exists.
 class IWgxBackend {
 public:
@@ -55,6 +73,10 @@ public:
     virtual void stopUdpRelay() noexcept = 0;
     virtual void stop() noexcept = 0;
     [[nodiscard]] virtual bool isRunning() const noexcept = 0;
+    // Optional direct-path discovery (STUN + disco). Called after the
+    // WireGuard handshake succeeded over DERP; backends without UDP support
+    // keep relaying. Never fails the route.
+    virtual void startDirectPath(DirectPathConfig config) { (void)config; }
 };
 
 class SimulatedWgxBackend : public IWgxBackend {
@@ -68,6 +90,13 @@ public:
                        std::string* error) override;
     [[nodiscard]] const std::string& activeHostIp() const noexcept {
         return activeHostIp_;
+    }
+    void startDirectPath(DirectPathConfig config) override {
+        directConfig_ = std::move(config);
+    }
+    [[nodiscard]] const std::optional<DirectPathConfig>& directConfig()
+        const noexcept {
+        return directConfig_;
     }
     bool startUdpRelay(const std::string& peerIp,
                        std::span<const std::uint16_t> ports,
@@ -92,6 +121,7 @@ private:
     std::string localIp_;
     std::string activePeerIp_;
     std::string activeHostIp_;
+    std::optional<DirectPathConfig> directConfig_;
     std::vector<uint16_t> tcpPorts_;
     std::vector<uint16_t> udpPorts_;
 };
@@ -103,6 +133,11 @@ public:
     using LocalInfoProvider =
         std::function<std::optional<std::pair<std::string, Key32>>()>;
     using DerpMapProvider = std::function<std::vector<DerpRegion>()>;
+    using DiscoKeyProvider = std::function<std::optional<Key32>()>;
+    using EndpointPublisher = std::function<void(std::vector<std::string>)>;
+    using PathObserver = std::function<void(const std::string& peerId,
+                                            const std::string& endpoint,
+                                            int rttMs)>;
 
     explicit TailscaleWgxRoute(std::shared_ptr<IWgxBackend> backend = nullptr,
                                PeerResolver peerResolver = nullptr,
@@ -112,6 +147,8 @@ public:
     void setLocalInfoProvider(LocalInfoProvider provider);
     void setDerpMapProvider(DerpMapProvider provider);
     void setBackend(std::shared_ptr<IWgxBackend> backend);
+    void setDirectPathHooks(DiscoKeyProvider discoKey,
+                            EndpointPublisher publisher, PathObserver observer);
 
     bool start(const RemoteRouteTarget& target,
                std::string* error) override;
@@ -129,6 +166,9 @@ private:
     PeerResolver peerResolver_;
     LocalInfoProvider localInfoProvider_;
     DerpMapProvider derpMapProvider_;
+    DiscoKeyProvider discoKeyProvider_;
+    EndpointPublisher endpointPublisher_;
+    PathObserver pathObserver_;
     std::optional<RemoteRouteTarget> activeTarget_;
     bool streamingPrepared_ = false;
 };

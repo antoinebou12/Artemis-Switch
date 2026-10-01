@@ -36,6 +36,16 @@ void PathManager::noteDirectPacket(std::string_view peerId,
         found->second.lastDirectPacket = now;
 }
 
+void PathManager::directLost(std::string_view peerId) {
+    std::lock_guard lock(mutex_);
+    const auto found = paths_.find(std::string(peerId));
+    if (found == paths_.end())
+        return;
+    found->second.direct = false;
+    found->second.probing = false;
+    found->second.directRttMs = -1;
+}
+
 void PathManager::networkChanged() {
     std::lock_guard lock(mutex_);
     for (auto& [_, state] : paths_) {

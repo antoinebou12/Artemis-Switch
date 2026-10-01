@@ -565,6 +565,17 @@ void TailscaleControlSession::setInitialPreferredDerp(int region) noexcept {
     initialPreferredDerp_ = region > 0 ? region : 0;
 }
 
+void TailscaleControlSession::setLocalEndpoints(
+    std::vector<std::string> endpoints) {
+    std::lock_guard lock(endpointsMutex_);
+    localEndpoints_ = std::move(endpoints);
+}
+
+std::vector<std::string> TailscaleControlSession::localEndpoints() {
+    std::lock_guard lock(endpointsMutex_);
+    return localEndpoints_;
+}
+
 void TailscaleControlSession::logRegisterResponse(
     std::span<const std::uint8_t> payload) {
 #if defined(__SWITCH__)
@@ -849,6 +860,7 @@ bool TailscaleControlSession::connect(const Identity& identity,
     // peers can reach this node from the first netmap instead of waiting
     // for a follow-up Hostinfo update.
     mapData.preferredDerp = initialPreferredDerp_;
+    mapData.endpoints = localEndpoints();
 
     const std::string mapJson = encodeMapRequest(mapData);
     if (!mapJson.empty()) {
@@ -929,6 +941,7 @@ bool TailscaleControlSession::sendHostinfoUpdate(int preferredDerp,
     update.hostname = hostname_.empty() ? "artemis-switch" : hostname_;
     update.preferredDerp = preferredDerp;
     update.capabilityVersion = capabilityVersion_;
+    update.endpoints = localEndpoints();
     const std::string json = encodeMapRequest(update);
     if (json.empty()) {
         if (error) *error = "cannot encode Hostinfo update";
@@ -952,7 +965,8 @@ bool TailscaleControlSession::sendHostinfoUpdate(int preferredDerp,
         return false;
     LOG_SESSION_INFO("sent Hostinfo update on stream " +
                      std::to_string(streamId) +
-                     ": NetInfo.PreferredDERP=" + std::to_string(preferredDerp));
+                     ": NetInfo.PreferredDERP=" + std::to_string(preferredDerp) +
+                     " endpoints=" + std::to_string(update.endpoints.size()));
     return true;
 }
 

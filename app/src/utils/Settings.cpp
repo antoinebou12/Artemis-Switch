@@ -541,6 +541,11 @@ void Settings::load() {
                 }
             }
 
+            if (json_t* direct = json_object_get(
+                    settings, "tailscale_direct_connections")) {
+                m_tailscale_direct_connections = json_typeof(direct) == JSON_TRUE;
+            }
+
             if (json_t* remote_access_prefer_lan =
                     json_object_get(settings, "remote_access_prefer_lan")) {
                 m_remote_access_prefer_lan =
@@ -915,6 +920,9 @@ void Settings::save() {
             json_object_set_new(
                 settings, "tailscale_auth_key_path",
                 json_string(m_tailscale_auth_key_path.c_str()));
+            json_object_set_new(settings, "tailscale_direct_connections",
+                                m_tailscale_direct_connections ? json_true()
+                                                               : json_false());
             json_object_set_new(settings, "remote_access_prefer_lan",
                                 m_remote_access_prefer_lan ? json_true() : json_false());
             json_object_set_new(settings, "remote_access_auto_connect",

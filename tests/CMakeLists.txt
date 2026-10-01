@@ -515,6 +515,18 @@ target_include_directories(tailscale_box_test PRIVATE
 target_compile_features(tailscale_box_test PRIVATE cxx_std_20)
 add_test(NAME tailscale_box_test COMMAND tailscale_box_test)
 
+add_executable(tailscale_disco_test
+    "${REPO_ROOT}/tests/tailscale_disco_test.cpp"
+    "${REPO_ROOT}/app/src/remote_access/tailscale/TailscaleDisco.cpp"
+    "${REPO_ROOT}/app/src/remote_access/tailscale/TailscaleBox.cpp"
+    "${REPO_ROOT}/extern/wg-nx/library/crypto/monocypher.c")
+target_include_directories(tailscale_disco_test PRIVATE
+    "${REPO_ROOT}/app/src/remote_access"
+    "${REPO_ROOT}/app/src/remote_access/tailscale"
+    "${REPO_ROOT}/extern/wg-nx/library/crypto")
+target_compile_features(tailscale_disco_test PRIVATE cxx_std_20)
+add_test(NAME tailscale_disco_test COMMAND tailscale_disco_test)
+
 add_executable(tailscale_wgx_route_test
     "${REPO_ROOT}/tests/tailscale_wgx_route_test.cpp"
     "${REPO_ROOT}/app/src/remote_access/tailscale/TailscaleWgxRoute.cpp"

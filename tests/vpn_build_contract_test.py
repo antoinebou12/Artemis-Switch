@@ -63,11 +63,20 @@ def main():
     assert '"${_make_exe}" all' in wireguard
     assert "netbird-switch-peer-identity.patch" in netbird_backend
 
-    # Enabling the experimental sources must never open the provider. Only a
-    # reviewed live-gate update may replace null with an accepted capability.
-    assert compatibility["accepted_capability_version"] is None
-    assert "HTTP/2-over-Noise control session" in compatibility["not_implemented"]
-    assert "fail-closed" in compatibility["release_gate"]
+    # The accepted capability is a reviewed live-gate value: it must be set,
+    # never exceed the audited candidate, and the gate must say what is live.
+    accepted = compatibility["accepted_capability_version"]
+    candidate = compatibility["candidate_capability_version"]
+    assert isinstance(accepted, int) and 0 < accepted <= candidate, accepted
+    assert "HTTP/2-over-Noise control session" in compatibility["implemented_primitives"]
+    assert "HTTP/2-over-Noise control session" not in compatibility["not_implemented"]
+    assert f"Capability {accepted} accepted" in compatibility["release_gate"]
+    # Direct UDP paths stay opt-in until proven on more networks.
+    assert "off by default" in compatibility["release_gate"]
+    overlap = set(compatibility["implemented_primitives"]) & set(
+        compatibility["not_implemented"]
+    )
+    assert not overlap, f"listed as both implemented and not: {overlap}"
 
     for required in [
         "wireguard.o",

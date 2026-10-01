@@ -45,6 +45,7 @@ public:
               std::string* error) override;
     bool sendHostinfoUpdate(int preferredDerp, std::string* error) override;
     void setInitialPreferredDerp(int region) noexcept override;
+    void setLocalEndpoints(std::vector<std::string> endpoints) override;
     void close() noexcept override;
     void interrupt() noexcept override;
 
@@ -97,6 +98,9 @@ private:
     Http2ReceiveWindow connectionWindow_{kHttp2ClientConnectionWindow};
     Http2ReceiveWindow mapStreamWindow_{kHttp2ClientStreamWindow};
     int initialPreferredDerp_ = 0;
+    std::mutex endpointsMutex_;
+    std::vector<std::string> localEndpoints_; // guarded by endpointsMutex_
+    std::vector<std::string> localEndpoints();
 };
 
 } // namespace artemis::tailscale

@@ -222,6 +222,15 @@ std::optional<std::vector<DerpRegion>> parseDerpMap(const Json& root,
                 if (port <= 0 || port > 65535)
                     continue;
                 derpNode.port = static_cast<std::uint16_t>(port);
+                // STUNPort: 0 means the default 3478, negative disables it.
+                const int stunPort = node.value("STUNPort", 0);
+                derpNode.stunPort =
+                    stunPort < 0 || stunPort > 65535
+                        ? std::uint16_t{0}
+                        : static_cast<std::uint16_t>(stunPort == 0 ? 3478
+                                                                   : stunPort);
+                if (node.value("STUNOnly", false))
+                    continue; // no DERP service on this node
                 entry.nodes.push_back(std::move(derpNode));
             }
         }

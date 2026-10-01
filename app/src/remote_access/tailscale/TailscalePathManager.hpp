@@ -24,6 +24,8 @@ public:
                     Clock::time_point now);
     void noteDirectPacket(std::string_view peerId, Clock::time_point now);
     void networkChanged();
+    // The direct path to one peer stopped answering; it is back on DERP.
+    void directLost(std::string_view peerId);
     void poll(Clock::time_point now);
     [[nodiscard]] RemotePathInfo pathInfo(std::string_view peerId) const;
 

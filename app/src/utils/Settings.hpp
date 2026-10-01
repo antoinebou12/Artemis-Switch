@@ -377,6 +377,15 @@ class Settings : public Singleton<Settings> {
         return m_netbird_config_path;
     }
 
+    // Experimental: let Tailscale look for a direct UDP path (STUN + disco)
+    // instead of relaying every packet through DERP. Off by default.
+    void set_tailscale_direct_connections(bool enabled) {
+        m_tailscale_direct_connections = enabled;
+    }
+    [[nodiscard]] bool tailscale_direct_connections() const {
+        return m_tailscale_direct_connections;
+    }
+
     void set_remote_access_prefer_lan(bool prefer) {
         m_remote_access_prefer_lan = prefer;
     }
@@ -621,6 +630,7 @@ class Settings : public Singleton<Settings> {
     std::string m_tailscale_hostname = "artemis-switch";
     std::string m_tailscale_auth_key_path;
     bool m_remote_access_prefer_lan = true;
+    bool m_tailscale_direct_connections = false;
     bool m_remote_access_auto_connect = false;
     bool m_show_host_web_config = true;
     bool m_show_performance_tab = true;

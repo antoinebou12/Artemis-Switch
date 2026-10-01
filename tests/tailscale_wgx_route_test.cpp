@@ -81,6 +81,8 @@ int main() {
         assert(backend->isTcpActive());
         assert(!backend->isUdpActive());
         assert(backend->activeHostIp() == "100.64.0.10");
+        // No disco key anywhere: no direct-path probing is requested.
+        assert(!backend->directConfig());
 
         // Prepare streaming activates UDP media relays
         assert(route.prepareForStreaming(target, &error));
@@ -112,6 +114,77 @@ int main() {
         lanTarget.targetAddress = "pc.lan";
         assert(!route.start(lanTarget, &error));
         assert(!route.isActive());
+    }
+
+    // 2b. With a disco key on both sides the route asks the backend to probe
+    //     a direct path, after (never instead of) the DERP route.
+    {
+        auto backend = std::make_shared<SimulatedWgxBackend>();
+        const auto localKey = makeKey(10);
+        const auto peerKey = makeKey(40);
+        const auto peerDisco = makeKey(70);
+        const auto localDisco = makeKey(90);
+        artemis::tailscale::DerpRegion region;
+        region.regionId = 3;
+        region.regionCode = "test";
+        region.nodes.push_back({"derp3.example", 443});
+
+        TailscaleWgxRoute route(
+            backend,
+            [&](std::string_view peerId) -> std::optional<Peer> {
+                if (peerId != "ts-peer-direct")
+                    return std::nullopt;
+                Peer peer;
+                peer.stableId = "ts-peer-direct";
+                peer.nodeKey = peerKey;
+                peer.discoKey = peerDisco;
+                peer.addresses = {"100.64.0.11"};
+                peer.endpoints.push_back({"203.0.113.7", 41641});
+                peer.homeDerp = 3;
+                return peer;
+            },
+            [&localKey]() -> std::optional<std::pair<std::string, Key32>> {
+                return std::make_pair("100.64.0.2", localKey);
+            });
+        route.setDerpMapProvider([region]() {
+            return std::vector<artemis::tailscale::DerpRegion>{region};
+        });
+        std::vector<std::string> published;
+        std::string observedPeer;
+        std::string observedEndpoint;
+        route.setDirectPathHooks(
+            [&]() -> std::optional<Key32> { return localDisco; },
+            [&](std::vector<std::string> endpoints) { published = endpoints; },
+            [&](const std::string& peerId, const std::string& endpoint, int) {
+                observedPeer = peerId;
+                observedEndpoint = endpoint;
+            });
+
+        RemoteRouteTarget target;
+        target.peerId = "ts-peer-direct";
+        target.peerAddress = "100.64.0.11";
+        target.targetAddress = "100.64.0.11";
+        std::string error;
+        assert(route.start(target, &error));
+        assert(backend->isDerpReady() && backend->isTcpActive());
+        const auto& config = backend->directConfig();
+        assert(config.has_value());
+        assert(config->peerStableId == "ts-peer-direct");
+        assert(config->peerNodeKey == peerKey);
+        assert(config->peerDiscoKey == peerDisco);
+        assert(config->localDiscoPrivate == localDisco);
+        assert(config->localNodePrivate == localKey);
+        assert(config->peerEndpoints ==
+               std::vector<std::string>{"203.0.113.7:41641"});
+        assert(config->derpRegion == 3 && config->derpMap.size() == 1);
+        // Hooks reach the core with the route's peer id attached.
+        config->publishEndpoints({"198.51.100.4:41641"});
+        assert(published == std::vector<std::string>{"198.51.100.4:41641"});
+        config->pathChanged("203.0.113.7:41641", 12);
+        assert(observedPeer == "ts-peer-direct" &&
+               observedEndpoint == "203.0.113.7:41641");
+        route.stop();
+        assert(!backend->directConfig());
     }
 
     // 3. Validation guards against malformed/missing data:

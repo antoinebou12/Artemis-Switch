@@ -68,6 +68,8 @@ struct PeerDelta {
 struct DerpNode {
     std::string host;
     std::uint16_t port = 443;
+    // UDP STUN port on the same host; 0 when the node disables STUN.
+    std::uint16_t stunPort = 3478;
 };
 
 struct DerpRegion {

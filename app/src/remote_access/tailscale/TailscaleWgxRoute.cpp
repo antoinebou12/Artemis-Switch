@@ -8,16 +8,26 @@ extern "C" {
 #include <netinet/in.h>
 #include <sys/socket.h>
 }
+#include <netdb.h>
+#include <poll.h>
+#include <unistd.h>
 #include "TailscaleDerp.hpp"
+#include "TailscaleDisco.hpp"
+#include "TailscaleRandom.hpp"
 #include "TailscaleTransport.hpp"
 #include "../../vpn/SocketFdLock.hpp"
 #include "../../utils/Settings.hpp"
 #include "../../vpn/VpnFileLogger.hpp"
 
 #include <atomic>
+#include <cerrno>
 #include <chrono>
 #include <cstring>
+#include <functional>
+#include <optional>
+#include <span>
 #include <thread>
+#include <vector>
 
 // Same shim pattern as TailscaleControlSession: the Switch build links
 // X25519 through wg-nx rather than monocypher directly.
@@ -168,6 +178,7 @@ void SimulatedWgxBackend::stop() noexcept {
     derpReady_ = false;
     activePeerIp_.clear();
     activeHostIp_.clear();
+    directConfig_.reset();
 }
 
 bool SimulatedWgxBackend::isRunning() const noexcept { return running_; }
@@ -282,6 +293,11 @@ public:
                            "WireGuard initiation bytes: " + dump);
             }
         }
+        // A pong-proven direct UDP path wins; anything else (no path yet,
+        // trust expired, send error) falls through to DERP.
+        if (directActive_.load(std::memory_order_acquire) &&
+            sendDirect(packet, length))
+            return;
         std::lock_guard lock(derpWriteMutex_);
         if (!derpAlive_ || !derp_ || !havePeer_) {
             if (egressDropped_.fetch_add(1, std::memory_order_relaxed) == 0)
@@ -306,6 +322,489 @@ public:
                        "DERP SendPacket write failed: " +
                            (sendError.empty() ? std::string("unknown error")
                                               : sendError));
+        }
+    }
+
+    // ---- Direct UDP path (Settings: tailscale_direct_connections) ----
+    //
+    // One UDP socket carries STUN, disco and direct WireGuard. WireGuard
+    // stays on DERP until a disco ping to one of the peer's endpoints is
+    // answered; the path is then trusted for DirectPath::kTrustDuration and
+    // re-proven on every heartbeat, so a dead path drops back to DERP within
+    // a few seconds on its own.
+
+    using DirectClock = DirectPath::Clock;
+
+    static sockaddr_in toSockaddr(const IPv4Endpoint& endpoint) {
+        sockaddr_in addr{};
+        addr.sin_family = AF_INET;
+        addr.sin_addr.s_addr = htonl(endpoint.address);
+        addr.sin_port = htons(endpoint.port);
+        return addr;
+    }
+
+    static IPv4Endpoint fromSockaddr(const sockaddr_in& addr) {
+        return {ntohl(addr.sin_addr.s_addr), ntohs(addr.sin_port)};
+    }
+
+    // The interface address the OS routes to the internet with. A connected
+    // UDP socket sends nothing; getsockname just reports the chosen source.
+    static std::optional<IPv4Endpoint> discoverLanAddress() {
+        int fd = -1;
+        {
+            auto guard = SocketFdLock::instance().guard();
+            fd = ::socket(AF_INET, SOCK_DGRAM, 0);
+        }
+        if (fd < 0)
+            return std::nullopt;
+        sockaddr_in probe{};
+        probe.sin_family = AF_INET;
+        probe.sin_port = htons(53);
+        probe.sin_addr.s_addr = htonl(0x08080808U);
+        std::optional<IPv4Endpoint> result;
+        if (::connect(fd, reinterpret_cast<sockaddr*>(&probe), sizeof(probe)) == 0) {
+            sockaddr_in local{};
+            socklen_t len = sizeof(local);
+            if (::getsockname(fd, reinterpret_cast<sockaddr*>(&local), &len) == 0 &&
+                local.sin_addr.s_addr != 0)
+                result = IPv4Endpoint{ntohl(local.sin_addr.s_addr), 1};
+        }
+        auto guard = SocketFdLock::instance().guard();
+        ::close(fd);
+        return result;
+    }
+
+    void startDirectPath(DirectPathConfig config) override {
+        stopDirectPath();
+        if (!Settings::instance().tailscale_direct_connections()) {
+            logTsRoute(VpnFileLogger::Severity::Info,
+                       "direct connections are off in Settings; all traffic "
+                       "stays on DERP");
+            return;
+        }
+        int fd = -1;
+        {
+            auto guard = SocketFdLock::instance().guard();
+            fd = ::socket(AF_INET, SOCK_DGRAM, 0);
+        }
+        if (fd < 0) {
+            logTsRoute(VpnFileLogger::Severity::Warning,
+                       "direct path: no UDP socket available (errno " +
+                           std::to_string(errno) + "); staying on DERP");
+            return;
+        }
+        // Tailscale's default port first (friendlier to port-forwarding
+        // routers), any free port otherwise.
+        sockaddr_in bindAddr{};
+        bindAddr.sin_family = AF_INET;
+        bindAddr.sin_addr.s_addr = htonl(INADDR_ANY);
+        bindAddr.sin_port = htons(41641);
+        if (::bind(fd, reinterpret_cast<sockaddr*>(&bindAddr), sizeof(bindAddr)) != 0) {
+            bindAddr.sin_port = 0;
+            if (::bind(fd, reinterpret_cast<sockaddr*>(&bindAddr),
+                       sizeof(bindAddr)) != 0) {
+                logTsRoute(VpnFileLogger::Severity::Warning,
+                           "direct path: UDP bind failed (errno " +
+                               std::to_string(errno) + "); staying on DERP");
+                auto guard = SocketFdLock::instance().guard();
+                ::close(fd);
+                return;
+            }
+        }
+        sockaddr_in bound{};
+        socklen_t boundLen = sizeof(bound);
+        ::getsockname(fd, reinterpret_cast<sockaddr*>(&bound), &boundLen);
+        const std::uint16_t localPort = ntohs(bound.sin_port);
+
+        Key32 discoPublic{};
+        tailscale_internal_crypto_x25519_public_key(
+            discoPublic.data(), config.localDiscoPrivate.data());
+        Key32 nodePublic{};
+        tailscale_internal_crypto_x25519_public_key(
+            nodePublic.data(), config.localNodePrivate.data());
+        const auto lan = discoverLanAddress();
+
+        std::lock_guard lock(directMutex_);
+        directPath_.reset();
+        for (const auto& text : config.peerEndpoints)
+            if (const auto endpoint = IPv4Endpoint::parse(text))
+                directPath_.addCandidate(*endpoint);
+        const std::size_t candidates = directPath_.candidateCount();
+        directConfig_ = std::move(config);
+        localDiscoPublic_ = discoPublic;
+        localNodePublic_ = nodePublic;
+        udpFd_ = fd;
+        udpPort_ = localPort;
+        reportedBest_ = {};
+        stunMapped_ = {};
+        localEndpoints_.clear();
+        if (lan)
+            localEndpoints_.push_back({lan->address, localPort});
+        endpointsChanged_ = true;
+        directWgLogged_ = false;
+        firstPongLogged_ = false;
+        directSent_ = 0;
+        directReceived_ = 0;
+        discoRejected_ = 0;
+        directActive_ = false;
+        udpRunning_ = true;
+        udpThread_ = std::thread(&RealWgxBackend::udpLoop, this);
+        logTsRoute(VpnFileLogger::Severity::Info,
+                   "direct path: probing on UDP port " +
+                       std::to_string(localPort) + " (LAN " +
+                       (lan ? IPv4Endpoint{lan->address, localPort}.toString()
+                            : std::string("unknown")) +
+                       ", " + std::to_string(candidates) +
+                       " peer endpoints from the netmap); WireGuard stays on "
+                       "DERP until a path answers");
+    }
+
+    void stopDirectPath() noexcept {
+        udpRunning_ = false;
+        directActive_ = false;
+        if (udpThread_.joinable())
+            udpThread_.join();
+        std::function<void(const std::string&, int)> notify;
+        {
+            std::lock_guard lock(directMutex_);
+            if (udpFd_ >= 0) {
+                auto guard = SocketFdLock::instance().guard();
+                ::close(udpFd_);
+                udpFd_ = -1;
+            }
+            if (directConfig_) {
+                logTsRoute(VpnFileLogger::Severity::Info,
+                           "direct path stopped: sent " +
+                               std::to_string(directSent_.load()) +
+                               " / received " +
+                               std::to_string(directReceived_.load()) +
+                               " WireGuard packets directly, " +
+                               std::to_string(discoRejected_.load()) +
+                               " disco packets rejected");
+                if (reportedBest_.valid())
+                    notify = directConfig_->pathChanged;
+            }
+            directConfig_.reset();
+            directPath_.reset();
+            reportedBest_ = {};
+        }
+        if (notify)
+            notify({}, -1);
+    }
+
+    bool sendDirect(const void* packet, std::size_t length) {
+        std::lock_guard lock(directMutex_);
+        if (udpFd_ < 0)
+            return false;
+        const auto best = directPath_.best(DirectClock::now());
+        if (!best)
+            return false;
+        const auto to = toSockaddr(*best);
+        const auto sent = ::sendto(udpFd_, packet, length, 0,
+                                   reinterpret_cast<const sockaddr*>(&to),
+                                   sizeof(to));
+        if (sent != static_cast<decltype(sent)>(length))
+            return false;
+        directSent_.fetch_add(1, std::memory_order_relaxed);
+        return true;
+    }
+
+    // Caller holds directMutex_.
+    bool sendUdpLocked(std::span<const std::uint8_t> bytes,
+                       const IPv4Endpoint& to) {
+        if (udpFd_ < 0 || bytes.empty())
+            return false;
+        const auto addr = toSockaddr(to);
+        return ::sendto(udpFd_, bytes.data(), bytes.size(), 0,
+                        reinterpret_cast<const sockaddr*>(&addr),
+                        sizeof(addr)) == static_cast<ssize_t>(bytes.size());
+    }
+
+    // Caller holds directMutex_ with directConfig_ set.
+    std::vector<std::uint8_t> sealDiscoLocked(const disco::Message& message) {
+        std::array<std::uint8_t, disco::kNonceLen> nonce{};
+        secureRandomBytes(nonce);
+        return disco::seal(message, directConfig_->localDiscoPrivate,
+                           localDiscoPublic_, directConfig_->peerDiscoKey, nonce);
+    }
+
+    void sendDiscoViaDerp(const std::vector<std::uint8_t>& packet) {
+        if (packet.empty())
+            return;
+        std::lock_guard lock(derpWriteMutex_);
+        if (derpAlive_ && derp_ && havePeer_)
+            derp_->sendPacket(
+                std::span<const std::uint8_t>(peerNodeKey_.data(),
+                                              peerNodeKey_.size()),
+                packet, nullptr);
+    }
+
+    // Disco from the active peer, either over UDP (`from` set) or DERP.
+    void handleDisco(std::span<const std::uint8_t> packet,
+                     std::optional<IPv4Endpoint> from) {
+        std::vector<std::uint8_t> derpReply;
+        {
+            std::lock_guard lock(directMutex_);
+            if (!directConfig_)
+                return; // direct connections off: disco is simply dropped
+            const auto opened =
+                disco::open(packet, directConfig_->localDiscoPrivate);
+            if (!opened || opened->sender != directConfig_->peerDiscoKey) {
+                discoRejected_.fetch_add(1, std::memory_order_relaxed);
+                return;
+            }
+            const auto& message = opened->message;
+            switch (message.type) {
+            case disco::MessageType::Ping: {
+                disco::Message pong;
+                pong.type = disco::MessageType::Pong;
+                pong.txid = message.txid;
+                pong.source =
+                    from ? *from
+                         : IPv4Endpoint{disco::kDerpMagicAddress,
+                                        static_cast<std::uint16_t>(
+                                            activeDerpRegion_.load())};
+                const auto reply = sealDiscoLocked(pong);
+                if (from) {
+                    // A peer reaching us directly is itself a candidate.
+                    directPath_.addCandidate(*from);
+                    sendUdpLocked(reply, *from);
+                } else {
+                    derpReply = reply;
+                }
+                break;
+            }
+            case disco::MessageType::Pong: {
+                if (!from)
+                    break; // we only ping directly
+                const auto rtt =
+                    directPath_.notePong(message.txid, *from, DirectClock::now());
+                if (rtt && !firstPongLogged_) {
+                    firstPongLogged_ = true;
+                    logTsRoute(VpnFileLogger::Severity::Info,
+                               "direct path: pong from " + from->toString() +
+                                   " in " + std::to_string(*rtt) + " ms");
+                }
+                if (message.source.valid() && !(message.source == stunMapped_) &&
+                    message.source.address != disco::kDerpMagicAddress) {
+                    // How the peer saw us: another endpoint worth advertising.
+                    const bool known = std::any_of(
+                        localEndpoints_.begin(), localEndpoints_.end(),
+                        [&](const IPv4Endpoint& e) { return e == message.source; });
+                    if (!known && localEndpoints_.size() < 8) {
+                        localEndpoints_.push_back(message.source);
+                        endpointsChanged_ = true;
+                    }
+                }
+                break;
+            }
+            case disco::MessageType::CallMeMaybe:
+                for (const auto& endpoint : message.endpoints)
+                    directPath_.addCandidate(endpoint);
+                break;
+            }
+        }
+        if (!derpReply.empty())
+            sendDiscoViaDerp(derpReply);
+    }
+
+    std::optional<sockaddr_in> resolveStunServer() {
+        std::vector<DerpRegion> derpMap;
+        int region = activeDerpRegion_.load();
+        {
+            std::lock_guard lock(directMutex_);
+            if (!directConfig_)
+                return std::nullopt;
+            derpMap = directConfig_->derpMap;
+            if (region <= 0)
+                region = directConfig_->derpRegion;
+        }
+        for (const auto& candidate : derpMap) {
+            if (candidate.regionId != region)
+                continue;
+            for (const auto& node : candidate.nodes) {
+                if (node.stunPort == 0)
+                    continue;
+                addrinfo hints{};
+                hints.ai_family = AF_INET;
+                hints.ai_socktype = SOCK_DGRAM;
+                addrinfo* result = nullptr;
+                if (::getaddrinfo(node.host.c_str(), nullptr, &hints, &result) != 0 ||
+                    !result)
+                    continue;
+                sockaddr_in addr =
+                    *reinterpret_cast<const sockaddr_in*>(result->ai_addr);
+                ::freeaddrinfo(result);
+                addr.sin_port = htons(node.stunPort);
+                logTsRoute(VpnFileLogger::Severity::Info,
+                           "direct path: STUN server " + node.host + ":" +
+                               std::to_string(node.stunPort));
+                return addr;
+            }
+        }
+        logTsRoute(VpnFileLogger::Severity::Warning,
+                   "direct path: no STUN server in DERP region " +
+                       std::to_string(region) +
+                       "; only LAN and peer-observed endpoints are used");
+        return std::nullopt;
+    }
+
+    // Timers: STUN refresh, heartbeat pings, call-me-maybe, endpoint
+    // publishing and best-path change reporting.
+    void directHousekeeping(DirectClock::time_point now,
+                            const std::optional<sockaddr_in>& stunServer,
+                            DirectClock::time_point& nextStun,
+                            DirectClock::time_point& nextCallMeMaybe) {
+        std::vector<std::uint8_t> callMeMaybe;
+        std::function<void(std::vector<std::string>)> publish;
+        std::vector<std::string> published;
+        std::function<void(const std::string&, int)> pathChanged;
+        std::string changedEndpoint;
+        int changedRtt = -1;
+        bool pathDidChange = false;
+        {
+            std::lock_guard lock(directMutex_);
+            if (!directConfig_)
+                return;
+            if (stunServer && now >= nextStun) {
+                secureRandomBytes(stunTx_);
+                const auto request = stun::bindingRequest(stunTx_);
+                ::sendto(udpFd_, request.data(), request.size(), 0,
+                         reinterpret_cast<const sockaddr*>(&*stunServer),
+                         sizeof(*stunServer));
+                nextStun = now + std::chrono::seconds(20);
+            }
+            for (const auto& endpoint : directPath_.due(now)) {
+                disco::Message ping;
+                ping.type = disco::MessageType::Ping;
+                secureRandomBytes(ping.txid);
+                ping.nodeKey = localNodePublic_;
+                ping.hasNodeKey = true;
+                if (sendUdpLocked(sealDiscoLocked(ping), endpoint))
+                    directPath_.notePingSent(ping.txid, endpoint, now);
+            }
+            const auto best = directPath_.best(now);
+            // Ask the peer to ping us while there is no direct path, and
+            // whenever our endpoints changed.
+            if (!localEndpoints_.empty() &&
+                (endpointsChanged_ || (!best && now >= nextCallMeMaybe))) {
+                disco::Message message;
+                message.type = disco::MessageType::CallMeMaybe;
+                message.endpoints = localEndpoints_;
+                callMeMaybe = sealDiscoLocked(message);
+                nextCallMeMaybe = now + std::chrono::seconds(10);
+            }
+            if (endpointsChanged_) {
+                endpointsChanged_ = false;
+                publish = directConfig_->publishEndpoints;
+                for (const auto& endpoint : localEndpoints_)
+                    published.push_back(endpoint.toString());
+            }
+            const IPv4Endpoint current = best.value_or(IPv4Endpoint{});
+            if (!(current == reportedBest_)) {
+                reportedBest_ = current;
+                pathDidChange = true;
+                pathChanged = directConfig_->pathChanged;
+                if (best) {
+                    changedEndpoint = best->toString();
+                    changedRtt = directPath_.bestRttMs();
+                }
+            }
+            directActive_.store(best.has_value(), std::memory_order_release);
+        }
+        if (!callMeMaybe.empty())
+            sendDiscoViaDerp(callMeMaybe);
+        if (publish && !published.empty())
+            publish(std::move(published));
+        if (pathDidChange) {
+            logTsRoute(VpnFileLogger::Severity::Info,
+                       changedEndpoint.empty()
+                           ? std::string("direct path lost; WireGuard is back "
+                                         "on DERP")
+                           : "WireGuard now goes directly to " +
+                                 changedEndpoint + " (rtt " +
+                                 std::to_string(changedRtt) +
+                                 " ms) instead of DERP");
+            if (pathChanged)
+                pathChanged(changedEndpoint, changedRtt);
+        }
+    }
+
+    void handleUdpPacket(const std::uint8_t* data, std::size_t length,
+                         const IPv4Endpoint& from) {
+        const std::span<const std::uint8_t> packet(data, length);
+        if (stun::looksLikeStun(packet)) {
+            std::lock_guard lock(directMutex_);
+            const auto mapped = stun::parseBindingResponse(packet, stunTx_);
+            if (mapped && !(*mapped == stunMapped_)) {
+                // A new public mapping replaces the old one.
+                localEndpoints_.erase(
+                    std::remove(localEndpoints_.begin(), localEndpoints_.end(),
+                                stunMapped_),
+                    localEndpoints_.end());
+                stunMapped_ = *mapped;
+                localEndpoints_.push_back(*mapped);
+                endpointsChanged_ = true;
+                logTsRoute(VpnFileLogger::Severity::Info,
+                           "direct path: public endpoint " + mapped->toString() +
+                               " (STUN)");
+            }
+            return;
+        }
+        if (disco::looksLikeDisco(packet)) {
+            handleDisco(packet, from);
+            return;
+        }
+        const bool wgHeader = length >= 4 && data[0] >= 1 && data[0] <= 4 &&
+                              data[1] == 0 && data[2] == 0 && data[3] == 0;
+        if (!wgHeader || !context_)
+            return;
+        {
+            // WireGuard authenticates every packet, but only accept it from
+            // addresses this peer is known to use.
+            std::lock_guard lock(directMutex_);
+            if (!directPath_.isCandidate(from))
+                return;
+            if (!directWgLogged_) {
+                directWgLogged_ = true;
+                logTsRoute(VpnFileLogger::Severity::Info,
+                           "direct path: receiving WireGuard from " +
+                               from.toString());
+            }
+        }
+        directReceived_.fetch_add(1, std::memory_order_relaxed);
+        wgx_inject_encrypted(context_,
+                             activePeerId_.load(std::memory_order_acquire),
+                             data, length);
+    }
+
+    void udpLoop() {
+        const auto stunServer = resolveStunServer();
+        auto nextStun = DirectClock::now();
+        auto nextCallMeMaybe = DirectClock::now();
+        auto nextHousekeeping = DirectClock::now();
+        std::vector<std::uint8_t> buffer(4096);
+        while (udpRunning_) {
+            const auto now = DirectClock::now();
+            if (now >= nextHousekeeping) {
+                directHousekeeping(now, stunServer, nextStun, nextCallMeMaybe);
+                nextHousekeeping = now + std::chrono::milliseconds(100);
+            }
+            pollfd pfd{};
+            pfd.fd = udpFd_;
+            pfd.events = POLLIN;
+            const int ready = ::poll(&pfd, 1, 100);
+            if (ready <= 0 || !(pfd.revents & POLLIN))
+                continue;
+            sockaddr_in source{};
+            socklen_t sourceLen = sizeof(source);
+            const auto received = ::recvfrom(
+                udpFd_, buffer.data(), buffer.size(), 0,
+                reinterpret_cast<sockaddr*>(&source), &sourceLen);
+            if (received <= 0)
+                continue;
+            handleUdpPacket(buffer.data(), static_cast<std::size_t>(received),
+                            fromSockaddr(source));
         }
     }
 
@@ -963,6 +1462,13 @@ public:
                 const auto* inner = payload.data() + kDerpKeyLen;
                 const std::size_t innerLen = payload.size() - kDerpKeyLen;
                 classifyIngress(inner, innerLen);
+                // Disco is path discovery, not WireGuard: never inject it.
+                if (disco::looksLikeDisco(
+                        std::span<const std::uint8_t>(inner, innerLen))) {
+                    handleDisco(std::span<const std::uint8_t>(inner, innerLen),
+                                std::nullopt);
+                    break;
+                }
                 const std::uint32_t injectPeer =
                     activePeerId_.load(std::memory_order_acquire);
                 const long long injectStart = nowMs();
@@ -1117,6 +1623,7 @@ public:
     }
 
     void stop() noexcept override {
+        stopDirectPath();
         stopDerp();
         running_ = false;
         if (relay_) {
@@ -1189,6 +1696,30 @@ private:
     std::atomic_uint32_t slowInjectLogs_{0};
     std::atomic_int64_t handshakeStartMs_{0};
     std::atomic_bool summaryLogged_{false};
+
+    // Direct path state. directMutex_ guards everything below except the
+    // atomics; it is never held while taking derpWriteMutex_. udpFd_ is set
+    // before the UDP thread starts and closed only after it is joined.
+    std::mutex directMutex_;
+    std::optional<DirectPathConfig> directConfig_;
+    DirectPath directPath_;
+    Key32 localDiscoPublic_{};
+    Key32 localNodePublic_{};
+    int udpFd_ = -1;
+    std::uint16_t udpPort_ = 0;
+    std::thread udpThread_;
+    std::atomic_bool udpRunning_{false};
+    std::atomic_bool directActive_{false};
+    IPv4Endpoint reportedBest_{};
+    IPv4Endpoint stunMapped_{};
+    std::vector<IPv4Endpoint> localEndpoints_;
+    TxId stunTx_{};
+    bool endpointsChanged_ = false;
+    bool directWgLogged_ = false;
+    bool firstPongLogged_ = false;
+    std::atomic_uint64_t directSent_{0};
+    std::atomic_uint64_t directReceived_{0};
+    std::atomic_uint32_t discoRejected_{0};
 };
 #endif
 
@@ -1222,6 +1753,15 @@ void TailscaleWgxRoute::setDerpMapProvider(DerpMapProvider provider) {
 void TailscaleWgxRoute::setBackend(std::shared_ptr<IWgxBackend> backend) {
     std::lock_guard lock(mutex_);
     backend_ = std::move(backend);
+}
+
+void TailscaleWgxRoute::setDirectPathHooks(DiscoKeyProvider discoKey,
+                                           EndpointPublisher publisher,
+                                           PathObserver observer) {
+    std::lock_guard lock(mutex_);
+    discoKeyProvider_ = std::move(discoKey);
+    endpointPublisher_ = std::move(publisher);
+    pathObserver_ = std::move(observer);
 }
 
 bool TailscaleWgxRoute::start(const RemoteRouteTarget& target,
@@ -1280,8 +1820,10 @@ bool TailscaleWgxRoute::start(const RemoteRouteTarget& target,
 
     Key32 peerKey{};
     int homeDerpRegion = 0;
+    std::optional<Peer> resolvedPeer;
     if (peerResolver_) {
         auto peer = peerResolver_(target.peerId);
+        resolvedPeer = peer;
         if (!peer) {
             if (error)
                 *error = "Tailscale peer not found in netmap: " + target.peerId;
@@ -1379,6 +1921,37 @@ bool TailscaleWgxRoute::start(const RemoteRouteTarget& target,
     if (!backend_->startTcpProxy(target.peerAddress, hostIp, kTailscaleTcpPorts,
                                  error))
         return false;
+
+    // The route works over DERP now. Look for a direct UDP path alongside
+    // it; that never fails or delays the route.
+    const auto discoPrivate =
+        discoKeyProvider_ ? discoKeyProvider_() : std::optional<Key32>{};
+    const bool peerHasDisco =
+        resolvedPeer &&
+        std::any_of(resolvedPeer->discoKey.begin(), resolvedPeer->discoKey.end(),
+                    [](std::uint8_t b) { return b != 0; });
+    if (discoPrivate && peerHasDisco) {
+        DirectPathConfig direct;
+        direct.peerStableId = target.peerId;
+        direct.peerNodeKey = peerKey;
+        direct.peerDiscoKey = resolvedPeer->discoKey;
+        for (const auto& endpoint : resolvedPeer->endpoints)
+            direct.peerEndpoints.push_back(endpoint.address + ":" +
+                                           std::to_string(endpoint.port));
+        direct.localNodePrivate = localPrivateKey;
+        direct.localDiscoPrivate = *discoPrivate;
+        direct.derpMap = derpMap;
+        direct.derpRegion = homeDerpRegion;
+        direct.publishEndpoints = endpointPublisher_;
+        if (pathObserver_) {
+            direct.pathChanged = [observer = pathObserver_,
+                                  peerId = target.peerId](
+                                     const std::string& endpoint, int rttMs) {
+                observer(peerId, endpoint, rttMs);
+            };
+        }
+        backend_->startDirectPath(std::move(direct));
+    }
 
     activeTarget_ = target;
     streamingPrepared_ = false;

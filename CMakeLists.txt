@@ -413,6 +413,7 @@ elseif (PLATFORM_SWITCH)
             app/src/remote_access/tailscale/TailscaleBox.cpp
             app/src/remote_access/tailscale/TailscaleControlCodec.cpp
             app/src/remote_access/tailscale/TailscaleControlKey.cpp
+            app/src/remote_access/tailscale/TailscaleDisco.cpp
             app/src/remote_access/tailscale/TailscaleControlSession.cpp
             app/src/remote_access/tailscale/TailscaleDerp.cpp
             app/src/remote_access/tailscale/TailscaleHttpUpgrade.cpp

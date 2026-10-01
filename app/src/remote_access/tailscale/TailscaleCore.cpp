@@ -55,6 +55,24 @@ TailscaleCore::TailscaleCore(std::filesystem::path statePath,
             std::lock_guard lock(snapshotMutex_);
             return snapshot_.derpMap;
         });
+        wgxRoute->setDirectPathHooks(
+            [this]() -> std::optional<Key32> {
+                std::lock_guard lock(identityMutex_);
+                if (!identity_)
+                    return std::nullopt;
+                return identity_->discoPrivate;
+            },
+            [this](std::vector<std::string> endpoints) {
+                publishEndpoints(std::move(endpoints));
+            },
+            [this](const std::string& peerId, const std::string& endpoint,
+                   int rttMs) {
+                if (endpoint.empty())
+                    paths_.directLost(peerId);
+                else
+                    paths_.directPong(peerId, endpoint, rttMs,
+                                      PathManager::Clock::now());
+            });
     }
 }
 
@@ -517,6 +535,27 @@ void TailscaleCore::advertiseHomeDerp(int region, const char* reason) {
                   std::to_string(advertisedDerp_) +
                   "); peers learn it with their next netmap update");
     advertisedDerp_ = region;
+}
+
+void TailscaleCore::publishEndpoints(std::vector<std::string> endpoints) {
+    if (!control_)
+        return;
+    std::lock_guard lock(advertiseMutex_);
+    if (endpoints == publishedEndpoints_)
+        return;
+    publishedEndpoints_ = endpoints;
+    control_->setLocalEndpoints(std::move(endpoints));
+    // Kept for the next (re)connect; send now only with a live session and
+    // a home region, so the update never clears PreferredDERP.
+    if (!controlConnected_ || advertisedDerp_ <= 0)
+        return;
+    std::string error;
+    if (!control_->sendHostinfoUpdate(advertisedDerp_, &error))
+        LOG_CORE_ERROR("could not advertise UDP endpoints: " + error);
+    else
+        LOG_CORE_INFO("advertised " +
+                      std::to_string(publishedEndpoints_.size()) +
+                      " UDP endpoints for direct connections");
 }
 
 int TailscaleCore::chooseDefaultHomeDerp() const {

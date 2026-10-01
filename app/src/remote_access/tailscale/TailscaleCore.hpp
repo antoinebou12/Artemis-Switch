@@ -43,6 +43,11 @@ public:
     // Home DERP region to put in the next connect()'s initial MapRequest
     // (Hostinfo.NetInfo.PreferredDERP). 0 omits it.
     virtual void setInitialPreferredDerp(int region) noexcept { (void)region; }
+    // This node's UDP endpoints ("ip:port") sent as MapRequest.Endpoints in
+    // the next connect() and every later Hostinfo update. Thread-safe.
+    virtual void setLocalEndpoints(std::vector<std::string> endpoints) {
+        (void)endpoints;
+    }
     virtual void close() noexcept = 0;
     // Called from stop() on another thread: unblocks a poll() waiting on the
     // network so the worker can exit and close() the session itself.
@@ -114,6 +119,8 @@ private:
     // Sleeps up to `delay`, returning early (false) when stop() is requested.
     bool waitBeforeReconnect(std::chrono::seconds delay);
     int loadHomeDerpHint() const;
+    // Called by the route backend when STUN/local discovery finds endpoints.
+    void publishEndpoints(std::vector<std::string> endpoints);
     void saveHomeDerpHint(int region) const;
     // Default home region before any route exists: the most common home
     // region of online peers, else the lowest region in the DERP map.
@@ -141,6 +148,7 @@ private:
     // Region to advertise on the next (re)connect: the last one advertised
     // or requested by a route, even while control was down.
     int homeDerpHint_ = 0; // guarded by advertiseMutex_
+    std::vector<std::string> publishedEndpoints_; // guarded by advertiseMutex_
     // Small non-secret sidecar next to the identity state, so the very first
     // MapRequest after an app restart already carries PreferredDERP.
     std::filesystem::path homeDerpPath_;
