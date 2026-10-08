@@ -21,6 +21,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Fetch submodules used by the portable tests
+        # The unit suite compiles sources from extern/wg-nx and includes from
+        # extern/borealis; a plain checkout leaves both empty. Shallow and
+        # limited to what the tests need (a recursive checkout also pulls vcpkg).
+        # act already runs against the local working copy.
+        if: ${{ !env.ACT }}
+        run: git submodule update --init --depth 1 extern/wg-nx extern/borealis
+
       - name: Validate Artemis English/French translations
         run: python tests/i18n_consistency_test.py
 
@@ -46,6 +54,14 @@ jobs:
       UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
     steps:
       - uses: actions/checkout@v4
+
+      - name: Fetch submodules used by the portable tests
+        # The unit suite compiles sources from extern/wg-nx and includes from
+        # extern/borealis; a plain checkout leaves both empty. Shallow and
+        # limited to what the tests need (a recursive checkout also pulls vcpkg).
+        # act already runs against the local working copy.
+        if: ${{ !env.ACT }}
+        run: git submodule update --init --depth 1 extern/wg-nx extern/borealis
 
       - name: Configure sanitizer build
         run: cmake -S tests -B build/tests-sanitized -DCMAKE_BUILD_TYPE=Debug

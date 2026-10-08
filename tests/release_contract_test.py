@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -6,6 +7,45 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def require(text: str, needle: str, source: str):
     assert needle in text, f"{source} is missing required release contract: {needle}"
+
+
+def split_jobs(text: str):
+    """Maps job name -> its YAML text, without needing a YAML parser in CI."""
+    _, _, body = text.partition("\njobs:\n")
+    jobs, current = {}, None
+    for line in body.splitlines():
+        match = re.match(r"^  ([A-Za-z0-9_-]+):\s*$", line)
+        if match:
+            current = match.group(1)
+            jobs[current] = []
+        elif current:
+            jobs[current].append(line)
+    return {name: "\n".join(lines) for name, lines in jobs.items()}
+
+
+def check_test_jobs_fetch_submodules():
+    # The unit suite compiles sources from extern/wg-nx and includes
+    # extern/borealis. A plain actions/checkout leaves both empty, so every job
+    # that builds the suite has to fetch them.
+    for name in ("unit-tests.yml", "feature-integration-ci.yml"):
+        text = (ROOT / ".github/workflows" / name).read_text(encoding="utf-8")
+        for job, block in split_jobs(text).items():
+            if "cmake -S tests" in block:
+                assert "submodule" in block, (
+                    f"{name} job '{job}' builds the unit suite without fetching submodules"
+                )
+                assert "extern/wg-nx" in block or "recursive" in block, (
+                    f"{name} job '{job}' does not fetch extern/wg-nx"
+                )
+
+
+def check_unit_suite_keeps_asserts_live():
+    # Release adds -DNDEBUG, which compiles every assert() away and turns the
+    # suite into a no-op. The CMake file must strip it and keep the guard test.
+    cmake = (ROOT / "tests/CMakeLists.txt").read_text(encoding="utf-8")
+    assert "NDEBUG" in cmake, "tests/CMakeLists.txt no longer strips NDEBUG"
+    assert "assert_enabled_test" in cmake, "assert guard test is not registered"
+    assert (ROOT / "tests/assert_enabled_test.cpp").exists()
 
 
 def main():
@@ -81,6 +121,9 @@ def main():
         "--exclude='build'",
     ]:
         require(package, needle, "package-release-source.sh")
+
+    check_test_jobs_fetch_submodules()
+    check_unit_suite_keeps_asserts_live()
 
     print(
         "Release contract OK: quality gate, Switch binary, debug ELF, "

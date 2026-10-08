@@ -19,6 +19,60 @@ def gitlink(path: str) -> str:
     return parts[1]
 
 
+# Every tracked recipe that configures the Switch NRO. The VPN backends default
+# to ON for Switch, but the release is a contract: if a default ever flips, or a
+# recipe drifts, the NRO must not silently lose NetBird, Tailscale or WireGuard.
+# (scripts/build-switch-nro.sh and scripts/build-nro-msys.sh are deliberately
+# absent: .gitignore's `build*` keeps them local-only.)
+SWITCH_BUILD_FILES = [
+    ".github/workflows/docker-image.yml",
+    "scripts/docker-build-nro.sh",
+    "docker-compose.yml",
+]
+VPN_FEATURE_FLAGS = (
+    "-DENABLE_WIREGUARD=ON",
+    "-DENABLE_NETBIRD=ON",
+    "-DENABLE_TAILSCALE=ON",
+)
+
+
+def logical_lines(text: str):
+    """Joins backslash continuations so a wrapped cmake call is one command."""
+    return text.replace("\\\r\n", " ").replace("\\\n", " ").splitlines()
+
+
+def check_switch_builds_state_vpn_flags():
+    for relative in SWITCH_BUILD_FILES:
+        text = (ROOT / relative).read_text(encoding="utf-8")
+        commands = [line for line in logical_lines(text) if "-DPLATFORM_SWITCH=ON" in line]
+        assert commands, f"{relative} no longer configures a Switch build"
+        for command in commands:
+            for flag in VPN_FEATURE_FLAGS:
+                assert flag in command, f"{relative} must pass {flag} explicitly: {command.strip()}"
+
+
+def check_random_device_is_switch_guarded():
+    # devkitA64's std::random_device replays one fixed sequence, which made the
+    # machine, node and disco keys identical. Any code that still reaches for
+    # it must also have a Switch branch that uses the kernel CSPRNG.
+    for root in ("app/src/remote_access", "app/src/vpn"):
+        base = ROOT / root
+        if not base.is_dir():
+            continue
+        for path in sorted(base.rglob("*")):
+            if path.suffix not in {".cpp", ".hpp", ".h"}:
+                continue
+            code = "\n".join(
+                line.split("//", 1)[0]
+                for line in path.read_text(encoding="utf-8", errors="replace").splitlines()
+            )
+            if "random_device" in code:
+                relative = path.relative_to(ROOT)
+                assert "__SWITCH__" in code and "randomGet" in code, (
+                    f"{relative} uses std::random_device without a Switch randomGet branch"
+                )
+
+
 def main():
     modules = (ROOT / ".gitmodules").read_text(encoding="utf-8")
     cmake = (ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
@@ -86,6 +140,9 @@ def main():
         "Unexpected Tailscale wgx archive members",
     ]:
         assert required in tailscale, f"Tailscale isolation contract missing: {required}"
+
+    check_switch_builds_state_vpn_flags()
+    check_random_device_is_switch_guarded()
 
     print("VPN build contract OK: three independent stacks, pins, and symbol isolation")
 
