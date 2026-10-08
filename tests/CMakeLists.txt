@@ -41,7 +41,22 @@ endif()
 
 enable_testing()
 
+# The suite reports failures through assert(). Release-style configurations add
+# -DNDEBUG, which compiles every assert (and its side effects) away and makes a
+# green run meaningless, so remove it from every configuration's flags.
+# assert_enabled_test fails if NDEBUG still reaches a test some other way.
+foreach(_lang C CXX)
+    foreach(_config RELEASE RELWITHDEBINFO MINSIZEREL)
+        set(_flags_var CMAKE_${_lang}_FLAGS_${_config})
+        string(REGEX REPLACE "[-/]D[ ]*NDEBUG" "" ${_flags_var} "${${_flags_var}}")
+    endforeach()
+endforeach()
+
 find_package(Threads REQUIRED)
+
+add_executable(assert_enabled_test assert_enabled_test.cpp)
+target_compile_features(assert_enabled_test PRIVATE cxx_std_20)
+add_test(NAME assert_enabled_test COMMAND assert_enabled_test)
 
 add_executable(artemis_test_smoke smoke_test.cpp)
 target_compile_features(artemis_test_smoke PRIVATE cxx_std_20)
@@ -522,6 +537,36 @@ target_include_directories(tailscale_box_test PRIVATE
     "${REPO_ROOT}/extern/wg-nx/library/crypto")
 target_compile_features(tailscale_box_test PRIVATE cxx_std_20)
 add_test(NAME tailscale_box_test COMMAND tailscale_box_test)
+
+add_executable(tailscale_http2_test
+    "${REPO_ROOT}/tests/tailscale_http2_test.cpp"
+    "${REPO_ROOT}/app/src/remote_access/tailscale/TailscaleHttp2.cpp")
+target_include_directories(tailscale_http2_test PRIVATE
+    "${REPO_ROOT}/app/src/remote_access/tailscale")
+target_compile_features(tailscale_http2_test PRIVATE cxx_std_20)
+add_test(NAME tailscale_http2_test COMMAND tailscale_http2_test)
+
+add_executable(tailscale_random_test
+    "${REPO_ROOT}/tests/tailscale_random_test.cpp")
+target_include_directories(tailscale_random_test PRIVATE
+    "${REPO_ROOT}/app/src/remote_access/tailscale")
+target_compile_features(tailscale_random_test PRIVATE cxx_std_20)
+target_link_libraries(tailscale_random_test PRIVATE Threads::Threads)
+add_test(NAME tailscale_random_test COMMAND tailscale_random_test)
+
+add_executable(tailscale_transport_test
+    "${REPO_ROOT}/tests/tailscale_transport_test.cpp"
+    "${REPO_ROOT}/app/src/remote_access/tailscale/TailscaleTransport.cpp")
+target_include_directories(tailscale_transport_test PRIVATE
+    "${REPO_ROOT}/app/src/remote_access/tailscale")
+target_compile_features(tailscale_transport_test PRIVATE cxx_std_20)
+target_link_libraries(tailscale_transport_test PRIVATE Threads::Threads)
+if(WIN32)
+    target_link_libraries(tailscale_transport_test PRIVATE ws2_32)
+endif()
+add_test(NAME tailscale_transport_test COMMAND tailscale_transport_test)
+# Loopback sockets: fail fast instead of hanging a CI job if a read never wakes.
+set_tests_properties(tailscale_transport_test PROPERTIES TIMEOUT 120)
 
 add_executable(tailscale_disco_test
     "${REPO_ROOT}/tests/tailscale_disco_test.cpp"
