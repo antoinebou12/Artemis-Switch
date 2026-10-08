@@ -128,13 +128,13 @@ const std::vector<KeyboardShortcut>& standardShortcuts(HostDeviceOs os) {
         buildShortcuts(HostDeviceOs::Windows);
     static const std::vector<KeyboardShortcut> macos =
         buildShortcuts(HostDeviceOs::MacOS);
-    static const std::vector<KeyboardShortcut> linux =
+    static const std::vector<KeyboardShortcut> linuxShortcuts =
         buildShortcuts(HostDeviceOs::Linux);
     switch (os) {
     case HostDeviceOs::MacOS:
         return macos;
     case HostDeviceOs::Linux:
-        return linux;
+        return linuxShortcuts;
     case HostDeviceOs::Windows:
     default:
         return windows;

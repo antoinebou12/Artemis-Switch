@@ -79,9 +79,9 @@ int main() {
     assert(findId(macos, "close_window")->keys ==
            (std::vector<short>{VirtualKeyLeftWindows, 0x51}));
 
-    const auto& linux = standardShortcuts(HostDeviceOs::Linux);
-    assert(!hasId(linux, "game_bar"));
-    assert(findId(linux, "paste")->keys ==
+    const auto& linuxShortcuts = standardShortcuts(HostDeviceOs::Linux);
+    assert(!hasId(linuxShortcuts, "game_bar"));
+    assert(findId(linuxShortcuts, "paste")->keys ==
            (std::vector<short>{VirtualKeyLeftControl, 0x56}));
 
     // Default overload stays Windows-compatible for callers.
