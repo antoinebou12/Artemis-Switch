@@ -36,6 +36,9 @@
         "search": "Rechercher",
         "search_error": "La recherche n'est pas disponible",
         "search_refresh": "Rafraîchir",
+        "subnet_shortcut": "Ajouter un hôte sur {}",
+        "subnet_via": "via {}",
+        "subnet_title": "IP de l'hôte sur {}",
         "try_connect": "Connexion à l'hôte en cours..."
     },
     "app_list": {
@@ -164,6 +167,7 @@
             "remote_access_off": "Désactivé",
             "remote_access_connecting": "Connexion",
             "remote_access_connected": "Connecté",
+            "tailscale_direct_connections": "Connexions directes (expérimental)",
             "remote_access_prefer_lan": "Préférer le LAN",
             "remote_access_prefer_lan_hint": "Utiliser le réseau local lorsque l’hôte y est accessible, même si l’accès à distance est actif",
             "remote_access_auto_connect": "Connexion au démarrage",
@@ -532,6 +536,7 @@
         "tailscale_auth_key_file_title": "Sélectionner une clé d’authentification Tailscale",
         "tailscale_auth_key_file_invalid": "Aucune clé d’authentification Tailscale valide dans ce fichier",
         "tailscale_auth_key_found": "Clé trouvée",
+        "tailscale_direct_connections": "Connexions directes (expérimental)",
         "remote_access_backend_isolated_real": "Réel · isolé",
         "stream_audio_configuration": "Canaux audio du stream",
         "audio_stereo": "Stéréo",

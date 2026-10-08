@@ -47,6 +47,7 @@ private:
     BRLS_BIND(brls::DetailCell, netbirdServer, "netbird_server");
     BRLS_BIND(brls::DetailCell, netbirdSetupKey, "netbird_setup_key");
     BRLS_BIND(brls::DetailCell, tailscaleAuthKeyPath, "tailscale_auth_key_path");
+    BRLS_BIND(brls::BooleanCell, tailscaleDirectConnections, "tailscale_direct_connections");
     BRLS_BIND(brls::BooleanCell, remoteAccessPreferLan, "remote_access_prefer_lan");
     BRLS_BIND(brls::BooleanCell, remoteAccessAutoConnect, "remote_access_auto_connect");
     BRLS_BIND(brls::DetailCell, remoteAccessAction, "remote_access_action");

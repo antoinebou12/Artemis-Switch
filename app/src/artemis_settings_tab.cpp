@@ -669,6 +669,14 @@ ArtemisSettingsTab::ArtemisSettingsTab() {
             return true;
         });
 
+    // Takes effect on the next route (the next host connection).
+    tailscaleDirectConnections->init(
+        "settings/tailscale_direct_connections"_i18n,
+        Settings::instance().tailscale_direct_connections(), [](bool enabled) {
+            Settings::instance().set_tailscale_direct_connections(enabled);
+            Settings::instance().save();
+        });
+
     remoteAccessPreferLan->init(
         "settings/remote_access_prefer_lan"_i18n,
         Settings::instance().remote_access_prefer_lan(), [](bool enabled) {
@@ -747,6 +755,7 @@ ArtemisSettingsTab::ArtemisSettingsTab() {
     netbirdServer->removeFromSuperView(true);
     netbirdSetupKey->removeFromSuperView(true);
     tailscaleAuthKeyPath->removeFromSuperView(true);
+    tailscaleDirectConnections->removeFromSuperView(true);
     remoteAccessPreferLan->removeFromSuperView(true);
     remoteAccessAutoConnect->removeFromSuperView(true);
     remoteAccessAction->removeFromSuperView(true);
@@ -840,6 +849,7 @@ void ArtemisSettingsTab::refreshRemoteAccessRows() {
     show(netbirdServer, visible.netBird);
     show(netbirdSetupKey, visible.netBird);
     show(tailscaleAuthKeyPath, visible.tailscale);
+    show(tailscaleDirectConnections, visible.tailscale);
 
     // Prefer-LAN and connect-on-startup only mean something once a provider is
     // chosen.

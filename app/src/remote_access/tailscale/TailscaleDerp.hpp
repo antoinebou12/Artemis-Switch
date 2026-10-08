@@ -1,6 +1,7 @@
 #pragma once
 
 #include "TailscaleTransport.hpp"
+#include "TailscaleTypes.hpp"
 
 #include <array>
 #include <cstddef>
@@ -9,19 +10,10 @@
 #include <optional>
 #include <span>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace artemis::tailscale {
-
-// DERP relay wire protocol, matching Tailscale's own implementation
-// (derp/derp.go). Frames have NO per-frame magic and are delimited by a fixed
-// 5-byte header: [FrameType byte][big-endian uint32 length][payload]. The 8-byte
-// "DERP🔑" magic appears only in the FrameServerKey greeting payload. All
-// multi-byte numbers are big-endian.
-//
-// The relay identity handshake (ClientInfo/ServerInfo) uses NaCl crypto_box
-// (X25519 + XSalsa20Poly1305) with a 24-byte random nonce and requires a valid
-// Tailscale node key, so a DERP session fails closed until that layer exists.
 
 enum class DerpFrameType : std::uint8_t {
     ServerKey = 0x01,       // 8B magic + 32B key
@@ -45,6 +37,7 @@ enum class DerpFrameType : std::uint8_t {
 constexpr std::size_t kDerpFrameHeaderLen = 5;  // type(1) + length BE u32(4)
 constexpr std::size_t kDerpKeyLen = 32;
 constexpr std::size_t kDerpNonceLen = 24;
+constexpr std::size_t kDerpTagLen = 16;
 constexpr std::size_t kDerpMaxPacketSize = 64 * 1024;
 
 // The 8-byte magic sent inside the FrameServerKey greeting ("DERP" + U+1F511).
@@ -56,9 +49,6 @@ struct DerpFrame {
     std::vector<std::uint8_t> payload;
 };
 
-// Bounded encoder/decoder for the 5-byte DERP frame container. Encode wraps a
-// payload with type + big-endian length; Decode accumulates a byte stream and
-// returns complete frames, guarding the receive buffer and per-frame size.
 class DerpCodec {
 public:
     static constexpr std::size_t kMaxFramePayload = 1 << 20;  // MaxInfoLen
@@ -75,18 +65,62 @@ private:
     std::vector<std::uint8_t> buffer_;
 };
 
-// A DERP relay session on an injected byte-stream. connect() currently FAILS
-// CLOSED because the relay identity handshake (naclbox ClientInfo/ServerInfo)
-// is not yet implemented; the session exposes the pure packet-forward framing
-// (sendPacket/recvFrame/ping) for already-WireGuard-encrypted Tailscale
-// packets on top of an established transport.
+// NaCl crypto_box (XSalsa20-Poly1305) for the ClientInfo/ServerInfo
+// handshake and, through DerpCrypto, the relay framing auth envelope.
+class IDerpCrypto {
+public:
+    virtual ~IDerpCrypto() = default;
+    virtual bool seal(std::span<const std::uint8_t> plainText,
+                      const Key32& myPrivate,
+                      const Key32& theirPublic,
+                      std::span<const std::uint8_t, kDerpNonceLen> nonce,
+                      std::vector<std::uint8_t>& cipherTextOut,
+                      std::string* error) = 0;
+    virtual bool open(std::span<const std::uint8_t> cipherText,
+                      const Key32& myPrivate,
+                      const Key32& theirPublic,
+                      std::span<const std::uint8_t, kDerpNonceLen> nonce,
+                      std::vector<std::uint8_t>& plainTextOut,
+                      std::string* error) = 0;
+};
+
+class DerpCrypto final : public IDerpCrypto {
+public:
+    bool seal(std::span<const std::uint8_t> plainText,
+              const Key32& myPrivate,
+              const Key32& theirPublic,
+              std::span<const std::uint8_t, kDerpNonceLen> nonce,
+              std::vector<std::uint8_t>& cipherTextOut,
+              std::string* error) override;
+    bool open(std::span<const std::uint8_t> cipherText,
+              const Key32& myPrivate,
+              const Key32& theirPublic,
+              std::span<const std::uint8_t, kDerpNonceLen> nonce,
+              std::vector<std::uint8_t>& plainTextOut,
+              std::string* error) override;
+};
+
+// Builds the plain-HTTP upgrade request that turns a connected (usually TLS)
+// byte stream into a DERP frame stream: `GET /derp` with `Upgrade: DERP`.
+// The caller writes the result, reads the response header through the first
+// CRLF CRLF, and validates it with validateDerpUpgradeResponse before handing
+// the transport to DerpSession.
+std::string buildDerpUpgradeRequest(std::string_view host);
+
+// Validates the complete HTTP response header (through CRLF CRLF) to a DERP
+// upgrade request: status 101 plus an Upgrade token naming DERP
+// (case-insensitive, tolerant of extra tokens for headscale compatibility).
+// No response body is permitted before DERP framing begins.
+bool validateDerpUpgradeResponse(std::string_view header,
+                                 std::string* error = nullptr);
+
 class DerpSession {
 public:
-    explicit DerpSession(std::unique_ptr<ITransport> transport)
-        : transport_(std::move(transport)) {}
+    explicit DerpSession(std::unique_ptr<ITransport> transport,
+                         Key32 clientPrivate = {},
+                         Key32 clientPublic = {},
+                         std::shared_ptr<IDerpCrypto> crypto = nullptr);
 
-    // Until the naclbox relay handshake exists this always fails closed so a
-    // caller can never treat a half-open relay as usable.
     bool connect(std::string* error);
 
     bool sendPacket(std::span<const std::uint8_t> destKey,
@@ -97,10 +131,21 @@ public:
     bool writeRaw(DerpFrameType type, std::span<const std::uint8_t> payload,
                   std::string* error);
     void close() noexcept;
+    // Unblocks a reader thread waiting in the transport (see
+    // ITransport::interrupt). The reader's owner still calls close().
+    void interrupt() noexcept;
+
+    [[nodiscard]] bool isConnected() const noexcept;
+    [[nodiscard]] Key32 serverKey() const noexcept;
 
 private:
     std::unique_ptr<ITransport> transport_;
     DerpCodec codec_;
+    Key32 clientPrivate_{};
+    Key32 clientPublic_{};
+    Key32 serverKey_{};
+    std::shared_ptr<IDerpCrypto> crypto_;
+    bool connected_ = false;
 };
 
 } // namespace artemis::tailscale

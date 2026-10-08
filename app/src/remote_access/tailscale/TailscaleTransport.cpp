@@ -170,6 +170,17 @@ void TcpTransport::close() noexcept {
     }
 }
 
+void TcpTransport::interrupt() noexcept {
+    const int socket = socket_;
+    if (socket < 0)
+        return;
+#if defined(_WIN32)
+    ::shutdown(socket, SD_BOTH);
+#else
+    ::shutdown(socket, SHUT_RDWR);
+#endif
+}
+
 #if defined(__SWITCH__)
 
 struct SwitchTlsTransport::Impl {
@@ -327,6 +338,17 @@ bool SwitchTlsTransport::write(std::span<const std::uint8_t> bytes,
         offset += transferred;
     }
     return true;
+}
+
+void SwitchTlsTransport::interrupt() noexcept {
+    // Only the socket is touched: the SSL connection/context are torn down by
+    // close() on the I/O thread once the blocked call has returned. The SSL
+    // service reads from this same TCP socket, so shutting it down makes a
+    // pending sslConnectionRead fail right away.
+    if (!impl_) return;
+    const int socket = impl_->socket;
+    if (socket >= 0)
+        ::shutdown(socket, SHUT_RDWR);
 }
 
 void SwitchTlsTransport::close() noexcept {

@@ -132,6 +132,51 @@ Default location: `sdmc:/switch/Artemis-Switch/wg0.conf`.
 > Keep credential files out of the repository. `netbird_config.json`,
 > `netbird_switch_config.json`, `netbird.conf` and `wg0.conf` are gitignored.
 
+### Tailscale
+
+User guide (setup, settings, troubleshooting): [`TAILSCALE.md`](TAILSCALE.md).
+
+Configured with a control host, port, control public key (`mkey:`), hostname,
+and a one-off auth key file. The control plane (TS2021 Noise + HTTP/2 netmap
+stream, with flow control and automatic reconnect) is implemented in-app.
+The encrypted packet path is **DERP-relayed** by default; an opt-in
+experimental direct UDP path (STUN + disco) can take over once proven by
+pongs. Hosts behind a subnet router are reached by their LAN IP. Because DERP
+is always the fallback, both of these must hold or the route is refused with
+an explanatory error instead of hanging the handshake:
+
+- the control netmap carries a `DERPMap` with at least the peer's home region,
+- the peer advertises a non-zero home DERP region (`HomeDERP`).
+
+**Add Host filtering.** For the Tailscale provider, Add Host lists only peers
+that run a GameStream server (`app/src/remote_access/AddHostPeerFilter.*`,
+host-tested; probing in `add_host_tab.cpp`). Per online peer:
+
+1. Android/iOS (`Hostinfo.OS`) or no address: hidden without a probe.
+2. A GameStream port (47989/47984) in `Hostinfo.Services`: shown without a
+   probe. An empty TCP list proves nothing: control usually sends only
+   `peerapi` entries, so absence never hides a peer.
+3. Otherwise probed: `acquireRouteFor(peer)`, then
+   `GET http://127.0.0.1:47989/serverinfo` (5 s timeout); shown if it returns
+   `<appversion>`. The lease is dropped right after.
+
+Probing never runs while `RemoteAccessManager::hasActiveRoute()` is true
+(the route is exclusive, so a probe would retire the host in use); those peers
+are listed unchecked. A connect, a new search or leaving the screen bumps a
+generation counter that stops the loop and discards any in-flight result. At
+most 16 probes per search. `ProbeCache` keeps found hosts for the session and
+misses for 10 minutes; Refresh drops the misses. Peers that share LAN subnets
+(`AllowedIPs`, exit-node routes excluded) get "Add host on <subnet>" rows that
+pre-type the subnet prefix. Decisions are logged as `add host filter: ...`.
+
+On route activation Artemis dials the home region over verified TLS, performs
+the `GET /derp` upgrade, authenticates as the local node key, and bridges
+WireGuard packets as `SendPacket`/`RecvPacket` frames addressed by node key.
+Moonlight still dials `127.0.0.1`; the lwIP proxy from the NetBird/WireGuard
+path is reused unchanged. Relay loss mid-stream drops egress fast and the next
+activation reconnects; `vpn.log` (tag `TS`) records control, DERP, and route
+events for on-device debugging.
+
 ## Verifying a build has the real backend
 
 ```bash

@@ -159,6 +159,18 @@ bool connect_to_addresses_sync(const std::vector<std::string>& addresses,
         // before any tunnel route is ever considered.
         RemoteRouteLease candidateLease =
             artemis::remote::acquireRouteFor(address);
+        if (candidateLease.refused()) {
+            // The address named a known tunnel peer but the provider could
+            // not build the packet path (no DERP relay, no proxy). Dialing
+            // the overlay address directly would blackhole into a minute-long
+            // TCP timeout, so fail fast with the provider's reason instead.
+            error = artemis::remote::routeRefusalReason(candidateLease);
+            if (error.empty())
+                error = "Tunnel route refused";
+            artemis::remote::logConnectionResult(candidateLease, address,
+                                                 false, error);
+            continue;
+        }
         const std::string dialAddress =
             artemis::remote::connectAddressFor(candidateLease, address);
 
@@ -739,6 +751,13 @@ void GameStreamClient::pair(const std::string& address, const std::string& pin,
                 gs_set_error("Pairing cancelled");
             }
             const std::string error = status == GS_OK ? std::string{} : gs_error();
+            {
+                const char* dialed =
+                    m_server_data[cachedAddress].serverInfo.address;
+                artemis::remote::logProxiedPairingResult(
+                    dialed ? std::string(dialed) : std::string{},
+                    status == GS_OK, error);
+            }
 
             brls::sync([this, callback, status, error, cachedAddress,
                         cancellation] {

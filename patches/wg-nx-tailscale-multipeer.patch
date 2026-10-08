@@ -89,7 +89,11 @@ index 8500d25..e5e5d72 100644
 +    }
 +
 +    peer->connected = true;
-+    for (int attempt = 0; attempt < WG_MAX_TIMER_HANDSHAKES; attempt++) {
++    // Bounded handshake for relay use: DERP round-trips are sub-second when
++    // the peer is alive, so a handful of attempts is plenty. The generic
++    // WG_MAX_TIMER_HANDSHAKES budget (18 x 5s = 90s) would stall route
++    // activation past any reasonable UI timeout for a dead peer.
++    for (int attempt = 0; attempt < 4; attempt++) {
 +        WgHandshakeInit message;
 +        crypto_wipe(&peer->pending_hs, sizeof(peer->pending_hs));
 +        peer->hs_pending = true;

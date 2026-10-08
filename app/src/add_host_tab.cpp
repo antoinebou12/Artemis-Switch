@@ -8,8 +8,21 @@
 #include "add_host_tab.hpp"
 
 #if defined(__SWITCH__) && (defined(ENABLE_NETBIRD) || defined(ENABLE_WIREGUARD) || defined(ENABLE_TAILSCALE))
+#include "remote_access/AddHostPeerFilter.hpp"
 #include "remote_access/RemoteAccessManager.hpp"
+#include "remote_access/RemoteRouting.hpp"
 #include "remote_access_provider_id.hpp"
+#include "http.h"
+#include "vpn/VpnFileLogger.hpp"
+#include <chrono>
+
+namespace {
+// Probe results outlive the screen, so reopening Add Host is instant.
+artemis::remote::ProbeCache& peerProbeCache() {
+    static artemis::remote::ProbeCache cache;
+    return cache;
+}
+} // namespace
 #endif
 #include "DiscoverManager.hpp"
 #include "NetBirdManager.hpp"
@@ -47,24 +60,7 @@ AddHostTab::AddHostTab() {
 
     connect->setText("add_host/connect"_i18n);
     connect->registerClickAction([this](View* view) {
-        Host host;
-        const auto inputAddress = hostIP->getValue();
-        const auto parsed = artemis::host::parse_host_address(inputAddress);
-        if (parsed.host.empty()) {
-            showError("add_host/invalid_address"_i18n);
-            return true;
-        }
-
-        if (artemis::host::should_store_as_remote(parsed)) {
-            host.remoteAddress = inputAddress;
-        } else {
-            host.address = inputAddress;
-        }
-        host.ensure_endpoints();
-        for (const auto& endpoint : extraEndpoints) {
-            host.add_endpoint("Custom", endpoint);
-        }
-        connectHost(host);
+        connectTypedAddress(hostIP->getValue());
         return true;
     });
 
@@ -80,10 +76,59 @@ AddHostTab::AddHostTab() {
 #ifdef MULTICAST_DISABLED
                        DiscoverManager::instance().reset();
 #endif
+#if defined(__SWITCH__) && (defined(ENABLE_NETBIRD) || defined(ENABLE_WIREGUARD) || defined(ENABLE_TAILSCALE))
+                       // An explicit Refresh rechecks devices that did not
+                       // answer before (a PC that was asleep); found hosts
+                       // stay known so the list still fills in fast.
+                       peerProbeCache().forgetMisses();
+#endif
                        findHost();
                        return true;
                    });
     setActionAvailable(BUTTON_X, GameStreamClient::can_find_host());
+}
+
+void AddHostTab::connectTypedAddress(const std::string& inputAddress) {
+    Host host;
+    const auto parsed = artemis::host::parse_host_address(inputAddress);
+    if (parsed.host.empty()) {
+        showError("add_host/invalid_address"_i18n);
+        return;
+    }
+
+    if (artemis::host::should_store_as_remote(parsed)) {
+        host.remoteAddress = inputAddress;
+    } else {
+        host.address = inputAddress;
+    }
+    host.ensure_endpoints();
+    for (const auto& endpoint : extraEndpoints) {
+        host.add_endpoint("Custom", endpoint);
+    }
+    connectHost(host);
+}
+
+void AddHostTab::appendSubnetShortcut(const std::string& subnet,
+                                      const std::string& inputPrefix,
+                                      const std::string& viaName) {
+    auto cell = new brls::DetailCell();
+    cell->setText(brls::getStr("add_host/subnet_shortcut", subnet));
+    cell->setDetailText(brls::getStr("add_host/subnet_via", viaName));
+    cell->setDetailTextColor(
+        brls::Application::getTheme()["brls/text_disabled"]);
+    cell->registerClickAction([this, subnet, inputPrefix](View*) {
+        // Hosts behind a subnet router are not tailnet devices, so they cannot
+        // be listed; pre-type the subnet so only the last part is needed.
+        Application::getPlatform()->getImeManager()->openForText(
+            [this](const std::string& text) {
+                if (!text.empty())
+                    connectTypedAddress(text);
+            },
+            brls::getStr("add_host/subnet_title", subnet), "", 64, inputPrefix,
+            0);
+        return true;
+    });
+    searchBox->addView(cell);
 }
 
 void AddHostTab::refreshExtraEndpointsDetail() {
@@ -151,12 +196,21 @@ void AddHostTab::appendRemoteAccessPeers() {
     // peers() is a cache read. Refresh the authenticated provider directory off
     // the UI thread and only then build the rows.
     const std::string providerName = provider->name();
-    brls::async([this, provider, providerName, guard = alive]() {
+    const bool filterPeers = provider->id() == "tailscale";
+    const std::uint64_t generation = probeGeneration->fetch_add(1) + 1;
+    brls::async([this, provider, providerName, filterPeers, generation,
+                 probeGen = probeGeneration, guard = alive]() {
         if (!guard->load()) {
             return;
         }
         provider->refreshPeers();
         auto peers = provider->peers();
+
+        if (filterPeers) {
+            appendFilteredPeers(peers, providerName, generation, probeGen,
+                                guard);
+            return;
+        }
 
         brls::sync([this, guard, peers, providerName]() {
             if (!guard->load()) {
@@ -193,6 +247,173 @@ void AddHostTab::appendRemoteAccessPeers() {
     });
 #endif
 }
+
+#if defined(__SWITCH__) && (defined(ENABLE_NETBIRD) || defined(ENABLE_WIREGUARD) || defined(ENABLE_TAILSCALE))
+namespace {
+
+using artemis::remote::PeerVerdict;
+
+constexpr std::size_t kMaxPeerProbes = 16;
+
+enum class ProbeResult { Host, NotHost, Unknown };
+
+void logAddHostFilter(const std::string& message) {
+    VpnFileLogger::append(Settings::instance().working_dir() + "/vpn.log",
+                          "Remote", VpnFileLogger::Severity::Info,
+                          "add host filter: " + message);
+}
+
+// Opens the peer's route for a moment and asks for /serverinfo over plain
+// HTTP (no pairing or client certificate needed). Any GameStream server
+// (Sunshine, Apollo, Vibepollo, GFE) answers with its <appversion>. The
+// route is released when the lease goes out of scope.
+ProbeResult probeGameStreamPeer(const std::string& address) {
+    auto lease = artemis::remote::acquireRouteFor(address);
+    if (!lease.isActive())
+        return ProbeResult::Unknown; // route refused: cannot tell
+    http_init(Settings::instance().key_dir());
+    Data data;
+    const std::string url = std::string("http://") +
+                            artemis::remote::kProxyAddress + ":" +
+                            std::to_string(artemis::remote::kGameStreamHttpPort) +
+                            "/serverinfo?uniqueid=0123456789ABCDEF";
+    if (http_request(url, &data, HTTPRequestTimeoutMedium) != GS_OK)
+        return ProbeResult::NotHost;
+    std::string version;
+    return xml_search(data, "appversion", &version) == GS_OK && !version.empty()
+               ? ProbeResult::Host
+               : ProbeResult::NotHost;
+}
+
+Host hostFromPeer(const RemoteAccessPeer& peer, const std::string& providerName) {
+    Host host;
+    // Display label only; pairing replaces it with the server's own name.
+    host.hostname = artemis::remote::peerDisplayName(peer) + " · " + providerName;
+    host.address = peer.address;
+    HostEndpoint endpoint;
+    endpoint.label = providerName;
+    endpoint.address = peer.address;
+    endpoint.priority = 2; // LAN (0) and manual remote (1) stay ahead
+    host.endpoints.push_back(std::move(endpoint));
+    return host;
+}
+
+} // namespace
+
+void AddHostTab::appendFilteredPeers(
+    const std::vector<RemoteAccessPeer>& peers, const std::string& providerName,
+    std::uint64_t generation,
+    std::shared_ptr<std::atomic<std::uint64_t>> probeGen,
+    std::shared_ptr<std::atomic<bool>> guard) {
+    const auto current = [&] {
+        return guard->load() && probeGen->load() == generation;
+    };
+    const auto appendHosts = [this, guard](std::vector<Host> hosts) {
+        if (hosts.empty())
+            return;
+        brls::sync([this, guard, hosts = std::move(hosts)]() {
+            if (guard->load())
+                appendSearchHosts(hosts);
+        });
+    };
+
+    const auto shortcuts = artemis::remote::subnetShortcuts(peers);
+    std::vector<Host> ready;
+    std::vector<RemoteAccessPeer> toProbe;
+    const auto now = artemis::remote::ProbeCache::Clock::now();
+    for (const auto& peer : peers) {
+        const auto name = artemis::remote::peerDisplayName(peer);
+        switch (artemis::remote::classifyPeerForAddHost(peer)) {
+        case PeerVerdict::Hidden:
+            if (peer.online)
+                logAddHostFilter(name + " hidden (" +
+                                 (peer.address.empty() ? std::string("no address")
+                                                       : peer.os) +
+                                 ")");
+            break;
+        case PeerVerdict::Host:
+            logAddHostFilter(name + " shown (reports a GameStream port)");
+            ready.push_back(hostFromPeer(peer, providerName));
+            break;
+        case PeerVerdict::Probe:
+            if (const auto cached = peerProbeCache().lookup(peer.peerId, now)) {
+                if (*cached)
+                    ready.push_back(hostFromPeer(peer, providerName));
+            } else {
+                toProbe.push_back(peer);
+            }
+            break;
+        }
+    }
+
+    brls::sync([this, guard, shortcuts, ready]() {
+        if (!guard->load())
+            return;
+        for (const auto& shortcut : shortcuts)
+            appendSubnetShortcut(shortcut.subnet, shortcut.inputPrefix,
+                                 shortcut.viaName);
+        appendSearchHosts(ready);
+    });
+
+    if (toProbe.empty())
+        return;
+    auto& manager = RemoteAccessManager::instance();
+    std::size_t probed = 0;
+    for (std::size_t i = 0; i < toProbe.size(); ++i) {
+        if (!current())
+            return; // left the screen, new search, or connecting to a host
+        // Never replace a route that is in use (stream, app list, pairing),
+        // and stay bounded on large tailnets. Unchecked peers are shown
+        // rather than hidden, so nothing goes missing.
+        if (manager.hasActiveRoute() || probed >= kMaxPeerProbes) {
+            std::vector<Host> unchecked;
+            for (std::size_t j = i; j < toProbe.size(); ++j)
+                unchecked.push_back(hostFromPeer(toProbe[j], providerName));
+            logAddHostFilter(std::to_string(unchecked.size()) +
+                             " peers shown unchecked (" +
+                             (probed >= kMaxPeerProbes ? "probe limit reached"
+                                                       : "a host is in use") +
+                             ")");
+            appendHosts(std::move(unchecked));
+            return;
+        }
+        const auto& peer = toProbe[i];
+        const auto name = artemis::remote::peerDisplayName(peer);
+        ++probed;
+        const auto started = std::chrono::steady_clock::now();
+        const auto result = probeGameStreamPeer(peer.address);
+        const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                            std::chrono::steady_clock::now() - started)
+                            .count();
+        // A connect that started meanwhile replaces the probe's route, which
+        // makes the probe fail: that answer says nothing about the peer.
+        if (!current())
+            return;
+        switch (result) {
+        case ProbeResult::Host:
+            peerProbeCache().store(peer.peerId, true, now);
+            logAddHostFilter(name + " shown (GameStream answered in " +
+                             std::to_string(ms) + " ms)");
+            appendHosts({hostFromPeer(peer, providerName)});
+            break;
+        case ProbeResult::NotHost:
+            peerProbeCache().store(peer.peerId, false, now);
+            logAddHostFilter(name + " hidden (no GameStream server, " +
+                             std::to_string(ms) + " ms)");
+            break;
+        case ProbeResult::Unknown:
+            logAddHostFilter(name + " shown unchecked (route refused)");
+            appendHosts({hostFromPeer(peer, providerName)});
+            break;
+        }
+    }
+}
+#else
+void AddHostTab::appendFilteredPeers(
+    const std::vector<RemoteAccessPeer>&, const std::string&, std::uint64_t,
+    std::shared_ptr<std::atomic<std::uint64_t>>,
+    std::shared_ptr<std::atomic<bool>>) {}
+#endif
 
 bool AddHostTab::searchBoxIpExists(const std::string& ip) {
     return std::any_of(searchBox->getChildren().begin(), searchBox->getChildren().end(), [ip](View* child) {
@@ -293,7 +514,30 @@ void AddHostTab::stopSearchHost() {
 #endif
 }
 
+namespace {
+// Saves a newly paired host and records the outcome in vpn.log on VPN builds,
+// so a host that fails to reach the list is visible instead of silent.
+void savePairedHost(const Host& host) {
+#if defined(__SWITCH__) && (defined(ENABLE_NETBIRD) || defined(ENABLE_WIREGUARD) || defined(ENABLE_TAILSCALE))
+    const size_t before = Settings::instance().hosts().size();
+#endif
+    Settings::instance().add_host(host);
+#if defined(__SWITCH__) && (defined(ENABLE_NETBIRD) || defined(ENABLE_WIREGUARD) || defined(ENABLE_TAILSCALE))
+    const auto saved = Settings::instance().hosts();
+    const bool found = std::any_of(saved.begin(), saved.end(),
+                                   [&host](const Host& candidate) {
+                                       return hosts_match(candidate, host);
+                                   });
+    artemis::remote::logHostSaveResult(host.hostname, host.preferred_address(),
+                                       host.mac, before, saved.size(), found);
+#endif
+}
+} // namespace
+
 void AddHostTab::connectHost(const Host& host) {
+    // A running peer probe must not hold or replace the route this connect
+    // is about to use.
+    probeGeneration->fetch_add(1);
     pauseSearching();
 
     Dialog* loaderView = createLoadingDialog("add_host/try_connect"_i18n);
@@ -309,7 +553,7 @@ void AddHostTab::connectHost(const Host& host) {
 
                     if (result.value().paired) {
                         showAlert("add_host/paired_error"_i18n, [pairedHost] {
-                            Settings::instance().add_host(pairedHost);
+                            savePairedHost(pairedHost);
                             MainTabs::getInstanse()->refillTabs();
                         });
 
@@ -343,7 +587,7 @@ void AddHostTab::connectHost(const Host& host) {
                             }
                             const auto finish = [result, pairedHost] {
                                 if (result.isSuccess()) {
-                                    Settings::instance().add_host(pairedHost);
+                                    savePairedHost(pairedHost);
                                     MainTabs::getInstanse()->refillTabs();
                                     AddHostTab::startSearching();
                                 } else {
@@ -384,6 +628,7 @@ void AddHostTab::startSearching() {
 AddHostTab::~AddHostTab() {
     // An in-flight peer probe must not append rows to a destroyed view.
     alive->store(false);
+    probeGeneration->fetch_add(1);
     stopSearchHost();
 #ifdef MULTICAST_DISABLED
     DiscoverManager::instance().pause();

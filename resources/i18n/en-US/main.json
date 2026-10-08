@@ -36,6 +36,9 @@
         "search": "Search",
         "search_error": "Search is unavailable",
         "search_refresh": "Refresh",
+        "subnet_shortcut": "Add host on {}",
+        "subnet_via": "via {}",
+        "subnet_title": "Host IP on {}",
         "try_connect": "Trying to connect to the host"
     },
     "app_list": {
@@ -164,6 +167,7 @@
             "remote_access_off": "Off",
             "remote_access_connecting": "Connecting",
             "remote_access_connected": "Connected",
+            "tailscale_direct_connections": "Direct connections (experimental)",
             "remote_access_prefer_lan": "Prefer LAN",
             "remote_access_prefer_lan_hint": "Use the local network when the host is reachable there, even while remote access is on",
             "remote_access_auto_connect": "Connect on startup",
@@ -545,6 +549,7 @@
         "tailscale_auth_key_file_title": "Select a Tailscale auth key file",
         "tailscale_auth_key_file_invalid": "No valid Tailscale auth key found in that file",
         "tailscale_auth_key_found": "Key found",
+        "tailscale_direct_connections": "Direct connections (experimental)",
         "remote_access_status": "Remote Access Status",
         "remote_access_prefer_lan": "Prefer LAN",
         "remote_access_connect": "Connect now",

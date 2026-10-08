@@ -84,6 +84,61 @@ endif ()
 
 set(_archive "${TAILSCALE_WGX_STAGE}/libwireguard.a")
 set(_output "${TAILSCALE_WGX_STAGE}/libtailscale-wgx.a")
+
+# The loopback lwIP relay (C++) must live inside this archive. Compiled into
+# the app instead, its wg_*/lwIP calls bind to the standalone WireGuard
+# provider's un-namespaced libwireguard.a and Tailscale traffic never reaches
+# the DERP transport. Adding it here lets the renaming below rebind all of it
+# to the Tailscale copy; the app reaches it via wgx_relay_shim.cpp.
+foreach (_required TAILSCALE_WGX_CXX TAILSCALE_WGX_SHIM TAILSCALE_WGX_RELAY)
+    if (NOT DEFINED ${_required} OR "${${_required}}" STREQUAL "")
+        message(FATAL_ERROR "${_required} is required")
+    endif ()
+endforeach ()
+if (NOT DEFINED ENV{DEVKITPRO} OR "$ENV{DEVKITPRO}" STREQUAL "")
+    message(FATAL_ERROR "DEVKITPRO must be set to build the Tailscale relay")
+endif ()
+set(_devkitpro "$ENV{DEVKITPRO}")
+set(_relay_flags
+    -g -O2 -Wall -ffunction-sections -std=gnu++17
+    -march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIC
+    -D__SWITCH__
+    "-I${TAILSCALE_WGX_STAGE}/include"
+    "-I${TAILSCALE_WGX_STAGE}/src"
+    "-I${TAILSCALE_WGX_STAGE}/library/crypto"
+    "-I${TAILSCALE_WGX_STAGE}/library/lwip/src/include"
+    "-I${TAILSCALE_WGX_STAGE}/lwip-relay/include"
+    "-I${TAILSCALE_WGX_STAGE}/lwip-relay/include/arch"
+    "-I${TAILSCALE_WGX_RELAY}"
+    "-I${_devkitpro}/portlibs/switch/include"
+    "-I${_devkitpro}/libnx/include")
+set(_relay_objects)
+foreach (_relay_source
+        "${TAILSCALE_WGX_RELAY}/TsLwipRelay.cpp"
+        "${TAILSCALE_WGX_SHIM}")
+    get_filename_component(_relay_name "${_relay_source}" NAME_WE)
+    set(_relay_object "${TAILSCALE_WGX_STAGE}/build/${_relay_name}.o")
+    execute_process(
+        COMMAND "${TAILSCALE_WGX_CXX}" ${_relay_flags}
+                -c "${_relay_source}" -o "${_relay_object}"
+        RESULT_VARIABLE _relay_result
+        OUTPUT_VARIABLE _relay_output
+        ERROR_VARIABLE _relay_error)
+    if (NOT _relay_result EQUAL 0)
+        message(FATAL_ERROR
+            "Could not compile Tailscale relay ${_relay_source}:\n"
+            "${_relay_output}${_relay_error}")
+    endif ()
+    list(APPEND _relay_objects "${_relay_object}")
+endforeach ()
+execute_process(
+    COMMAND "${TAILSCALE_WGX_AR}" rc "${_archive}" ${_relay_objects}
+    RESULT_VARIABLE _relay_ar_result
+    ERROR_VARIABLE _relay_ar_error)
+if (NOT _relay_ar_result EQUAL 0)
+    message(FATAL_ERROR
+        "Could not add the relay to the Tailscale archive: ${_relay_ar_error}")
+endif ()
 set(_expected_members
     blake2s_neon.o platform_switch.o wg_chacha20_neon.o wg_counter.o
     wg_crypto.o wg_noise.o wg_poly1305_neon.o wg_relay.o wg_thread.o
@@ -92,7 +147,7 @@ set(_expected_members
     lwip_pbuf.o lwip_raw.o lwip_stats.o lwip_sys.o lwip_timeouts.o
     lwip_tcp.o lwip_tcp_in.o lwip_tcp_out.o lwip_udp.o lwip_dns.o
     lwip_icmp.o lwip_ip4.o lwip_ip4_addr.o lwip_ip4_frag.o sys_arch.o
-    wg_netif.o)
+    wg_netif.o TsLwipRelay.o wgx_relay_shim.o)
 execute_process(COMMAND "${TAILSCALE_WGX_AR}" t "${_archive}"
                 RESULT_VARIABLE _inventory_result
                 OUTPUT_VARIABLE _inventory_output

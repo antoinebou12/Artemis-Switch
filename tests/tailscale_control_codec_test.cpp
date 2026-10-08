@@ -9,6 +9,7 @@ using namespace artemis::tailscale;
 
 int main() {
     RegisterRequestData registration;
+    registration.capabilityVersion = 0;
     registration.nodePublic.fill(7);
     registration.authKey = "tskey-auth-test";
     assert(encodeRegisterRequest(registration).empty());
@@ -21,6 +22,7 @@ int main() {
            std::string::npos);
 
     MapRequestData request;
+    request.capabilityVersion = 0;
     request.nodePublic.fill(1);
     request.discoPublic.fill(2);
     assert(encodeMapRequest(request).empty());
@@ -48,6 +50,46 @@ int main() {
     assert(update->fullPeers && update->fullPeers->size() == 1);
     assert(update->fullPeers->front().stableId == "stable-42");
     assert(update->fullPeers->front().endpoints.front().port == 41641);
+    // No Hostinfo: nothing is known about the peer's software.
+    assert(update->fullPeers->front().os.empty());
+    assert(!update->fullPeers->front().servicesKnown);
+    assert(update->fullPeers->front().tcpServicePorts.empty());
+
+    // Hostinfo.OS and the TCP ports in Hostinfo.Services feed the Add Host
+    // filter. UDP, malformed and duplicate entries are skipped; an empty
+    // Services list still counts as known.
+    {
+        MapCodec hostinfoCodec;
+        const std::string withHostinfo =
+            "{\"Node\":{\"Addresses\":[\"100.64.0.2/32\"]},\"Peers\":["
+            "{\"ID\":1,\"StableID\":\"pc\",\"Key\":\"nodekey:" + zeroKey +
+            "\",\"Addresses\":[\"100.64.0.10/32\"],\"Hostinfo\":{"
+            "\"OS\":\"Windows\",\"Services\":["
+            "{\"Proto\":\"tcp\",\"Port\":47989,\"Description\":\"sunshine\"},"
+            "{\"Proto\":\"tcp\",\"Port\":47984},"
+            "{\"Proto\":\"tcp\",\"Port\":47989},"
+            "{\"Proto\":\"udp\",\"Port\":47998},"
+            "{\"Proto\":\"tcp\",\"Port\":0},"
+            "{\"Proto\":\"tcp\",\"Port\":\"80\"},"
+            "\"garbage\",null]}},"
+            "{\"ID\":2,\"StableID\":\"phone\",\"Key\":\"nodekey:" + zeroKey +
+            "\",\"Addresses\":[\"100.64.0.11/32\"],\"Hostinfo\":{"
+            "\"OS\":\"android\",\"Services\":[]}},"
+            "{\"ID\":3,\"StableID\":\"odd\",\"Key\":\"nodekey:" + zeroKey +
+            "\",\"Addresses\":[\"100.64.0.12/32\"],\"Hostinfo\":{"
+            "\"OS\":null,\"Services\":{}}}]}";
+        const auto decoded = hostinfoCodec.decode(withHostinfo, &error);
+        assert(decoded && decoded->fullPeers && decoded->fullPeers->size() == 3);
+        const auto& pc = (*decoded->fullPeers)[0];
+        assert(pc.os == "windows");
+        assert(pc.servicesKnown);
+        assert((pc.tcpServicePorts == std::vector<std::uint16_t>{47989, 47984}));
+        const auto& phone = (*decoded->fullPeers)[1];
+        assert(phone.os == "android" && phone.servicesKnown &&
+               phone.tcpServicePorts.empty());
+        const auto& odd = (*decoded->fullPeers)[2];
+        assert(odd.os.empty() && !odd.servicesKnown);
+    }
 
     const auto removed = codec.decode("{\"PeersRemoved\":[42]}", &error);
     assert(removed && removed->delta.removedStableIds.size() == 1);
@@ -90,5 +132,73 @@ int main() {
     assert(!decoder.take(&error));
     assert(decoder.append(std::span(framed).subspan(5), &error));
     assert(decoder.take(&error) == keepAlive);
+
+    // Frames without a DERPMap section leave the update empty-handed; the
+    // engine keeps its stored relay map.
+    assert(!update->derpMap.has_value());
+
+    // A DERPMap section decodes to relay regions. HostName wins over IPv4,
+    // DERPPort defaults to 443, and unusable regions are skipped.
+    const std::string withDerp =
+        "{\"Node\":{\"Addresses\":[\"100.64.0.2/32\"]},\"Peers\":[],"
+        "\"DERPMap\":{\"Regions\":{"
+        "\"1\":{\"RegionID\":1,\"RegionCode\":\"nyc\",\"Nodes\":["
+        "{\"Name\":\"1a\",\"RegionID\":1,\"HostName\":\"derp1.example\","
+        "\"IPv4\":\"203.0.2.1\",\"DERPPort\":443},"
+        "{\"Name\":\"1b\",\"RegionID\":1,\"IPv4\":\"203.0.2.2\"}]},"
+        "\"2\":{\"RegionID\":2,\"RegionCode\":\"fra\",\"Nodes\":["
+        "{\"Name\":\"2a\",\"RegionID\":2,\"HostName\":\"derp2.example\","
+        "\"DERPPort\":8443,\"STUNPort\":-1},"
+        "{\"Name\":\"2s\",\"RegionID\":2,\"HostName\":\"stun2.example\","
+        "\"STUNOnly\":true}]},"
+        "\"3\":{\"RegionID\":3,\"RegionCode\":\"empty\",\"Nodes\":["
+        "{\"Name\":\"3a\",\"RegionID\":3}]}}}}";
+    const auto derpUpdate = codec.decode(withDerp, &error);
+    assert(derpUpdate && derpUpdate->derpMap.has_value());
+    assert(derpUpdate->derpMap->size() == 2);
+    const DerpRegion* nyc = nullptr;
+    const DerpRegion* fra = nullptr;
+    for (const auto& region : *derpUpdate->derpMap) {
+        if (region.regionId == 1) nyc = &region;
+        if (region.regionId == 2) fra = &region;
+    }
+    assert(nyc && nyc->regionCode == "nyc" && nyc->nodes.size() == 2);
+    assert(nyc->nodes[0].host == "derp1.example" && nyc->nodes[0].port == 443);
+    assert(nyc->nodes[1].host == "203.0.2.2" && nyc->nodes[1].port == 443);
+    assert(fra && fra->nodes.size() == 1);
+    assert(fra->nodes[0].host == "derp2.example" && fra->nodes[0].port == 8443);
+    // STUN: default 3478, -1 disables it, STUN-only nodes are not relays.
+    assert(nyc->nodes[0].stunPort == 3478);
+    assert(fra->nodes[0].stunPort == 0);
+    assert(fra->nodes.size() == 1);
+
+    // A malformed DERPMap section fails the update rather than installing a
+    // half-parsed relay map the data path would then trust.
+    assert(!codec.decode("{\"DERPMap\":{\"Regions\":[]}}", &error));
+    assert(error == "netmap DERPMap.Regions is not an object");
+    assert(!codec.decode("{\"DERPMap\":[]}", &error));
+    assert(error == "netmap DERPMap is not an object");
+
+    // Official control planes emit PeersChangedPatch frames with partial
+    // per-node updates. NodeIDs resolve through the same mapping as
+    // removals; unknown or malformed entries are skipped, never fatal.
+    MapCodec patchCodec;
+    const auto patchFull = patchCodec.decode(
+        "{\"Peers\":[{\"ID\":7,\"StableID\":\"gaming-pc\",\"Key\":\"nodekey:" +
+            zeroKey + "\"}]}",
+        &error);
+    assert(patchFull && patchFull->fullPeers->size() == 1);
+    const auto patch = patchCodec.decode(
+        "{\"PeersChangedPatch\":["
+        "{\"NodeID\":7,\"Online\":false,\"LastSeen\":\"2026-09-13T19:32:40Z\"},"
+        "{\"NodeID\":777,\"Online\":true},"
+        "{\"Online\":true},"
+        "\"not-an-object\"]}",
+        &error);
+    assert(patch);
+    assert(patch->delta.onlineChanges.size() == 1);
+    assert(patch->delta.onlineChanges.front().stableId == "gaming-pc");
+    assert(!patch->delta.onlineChanges.front().online);
+    assert(!patch->derpMap.has_value());
     return 0;
 }

@@ -5,6 +5,8 @@
 
 #include <borealis/extern/nlohmann/json.hpp>
 
+#include <algorithm>
+#include <cctype>
 #include <charconv>
 #include <limits>
 
@@ -18,6 +20,49 @@ std::string stripPrefix(std::string address) {
     if (slash != std::string::npos)
         address.resize(slash);
     return address;
+}
+
+// Hostinfo.OS and the TCP ports in Hostinfo.Services, used to tell game
+// hosts from phones and servers. Every field is optional and type-checked:
+// control may omit, null or trim any of it.
+void parseHostinfo(const Json& node, Peer& peer) {
+    const auto hostinfo = node.find("Hostinfo");
+    if (hostinfo == node.end() || !hostinfo->is_object())
+        return;
+    if (const auto os = hostinfo->find("OS");
+        os != hostinfo->end() && os->is_string()) {
+        peer.os = os->get<std::string>();
+        if (peer.os.size() > 32)
+            peer.os.resize(32);
+        std::transform(peer.os.begin(), peer.os.end(), peer.os.begin(),
+                       [](unsigned char c) {
+                           return static_cast<char>(std::tolower(c));
+                       });
+    }
+    const auto services = hostinfo->find("Services");
+    if (services == hostinfo->end() || !services->is_array())
+        return;
+    peer.servicesKnown = true;
+    constexpr std::size_t kMaxServices = 256;
+    for (const auto& service : *services) {
+        if (peer.tcpServicePorts.size() >= kMaxServices)
+            break;
+        if (!service.is_object())
+            continue;
+        const auto proto = service.find("Proto");
+        const auto port = service.find("Port");
+        if (proto == service.end() || !proto->is_string() ||
+            proto->get<std::string>() != "tcp" || port == service.end() ||
+            !port->is_number_unsigned())
+            continue;
+        const auto value = port->get<std::uint64_t>();
+        if (value == 0 || value > 65535)
+            continue;
+        const auto tcpPort = static_cast<std::uint16_t>(value);
+        if (std::find(peer.tcpServicePorts.begin(), peer.tcpServicePorts.end(),
+                      tcpPort) == peer.tcpServicePorts.end())
+            peer.tcpServicePorts.push_back(tcpPort);
+    }
 }
 
 std::optional<Peer> parsePeer(
@@ -62,17 +107,31 @@ std::optional<Peer> parsePeer(
                 peer.addresses.push_back(stripPrefix(value.get<std::string>()));
         }
     }
-    if (peer.addresses.empty()) {
-        if (const auto allowed = node.find("AllowedIPs");
-            allowed != node.end() && allowed->is_array()) {
-            if (allowed->size() > 32) {
-                if (error) *error = "netmap peer address limit exceeded";
-                return std::nullopt;
+    if (const auto allowed = node.find("AllowedIPs");
+        allowed != node.end() && allowed->is_array()) {
+        const bool addressesFromAllowed = peer.addresses.empty();
+        if (addressesFromAllowed && allowed->size() > 32) {
+            if (error) *error = "netmap peer address limit exceeded";
+            return std::nullopt;
+        }
+        for (const auto& value : *allowed) {
+            if (!value.is_string())
+                continue;
+            // A subnet router can advertise many routes; keep a bounded set
+            // instead of rejecting the whole peer.
+            if (!addressesFromAllowed &&
+                peer.allowedIPs.size() >= PeerDirectory::kMaxAllowedIPsPerPeer)
+                break;
+            const auto cidr = value.get<std::string>();
+            if (addressesFromAllowed) {
+                peer.addresses.push_back(stripPrefix(cidr));
+                continue;
             }
-            for (const auto& value : *allowed) {
-                if (value.is_string())
-                    peer.addresses.push_back(stripPrefix(value.get<std::string>()));
-            }
+            // Subnet routes advertised by this peer (e.g. an OpenWrt subnet
+            // router sharing 192.168.1.0/24). Exit-node default routes and
+            // the peer's own /32 are not LAN subnets and are skipped.
+            if (PeerDirectory::isRoutableIPv4Subnet(cidr, peer.addresses))
+                peer.allowedIPs.push_back(cidr);
         }
     }
     if (const auto endpoints = node.find("Endpoints");
@@ -113,6 +172,7 @@ std::optional<Peer> parsePeer(
         }
     }
     peer.online = node.value("Online", false);
+    parseHostinfo(node, peer);
     if (nodeId != 0)
         idMap[nodeId] = peer.stableId;
     return peer;
@@ -133,6 +193,98 @@ std::string localAddressFromNode(const Json& root) {
             return candidate;
     }
     return {};
+}
+
+constexpr std::size_t kMaxDerpRegions = 64;
+constexpr std::size_t kMaxDerpNodesPerRegion = 16;
+
+bool isPlausibleHostname(std::string_view host) {
+    if (host.empty() || host.size() > 253)
+        return false;
+    for (const char c : host) {
+        if (c <= ' ' || c == 127 || c == '/' || c == ':' || c == '@')
+            return false;
+    }
+    return true;
+}
+
+// Parses the control plane's DERPMap section:
+// {"Regions": {"1": {"RegionID": 1, "RegionCode": "nyc",
+//   "Nodes": [{"HostName": "derp1.example", "DERPPort": 443, "IPv4": "203.0.113.7"}]}}}
+// Returns nullopt with *error set when the section is present but malformed;
+// callers treat a missing section as "no update" rather than a failure.
+std::optional<std::vector<DerpRegion>> parseDerpMap(const Json& root,
+                                                    std::string* error) {
+    const auto derpMap = root.find("DERPMap");
+    if (derpMap == root.end() || derpMap->is_null())
+        return std::nullopt;
+    if (!derpMap->is_object()) {
+        if (error) *error = "netmap DERPMap is not an object";
+        return std::nullopt;
+    }
+    const auto regions = derpMap->find("Regions");
+    if (regions == derpMap->end() || regions->is_null())
+        return std::nullopt;
+    if (!regions->is_object()) {
+        if (error) *error = "netmap DERPMap.Regions is not an object";
+        return std::nullopt;
+    }
+    if (regions->size() > kMaxDerpRegions) {
+        if (error) *error = "netmap DERP region limit exceeded";
+        return std::nullopt;
+    }
+    std::vector<DerpRegion> out;
+    out.reserve(regions->size());
+    for (const auto& [key, region] : regions->items()) {
+        if (!region.is_object())
+            continue;
+        DerpRegion entry;
+        entry.regionId = region.value("RegionID", 0);
+        if (entry.regionId == 0) {
+            unsigned int parsed = 0;
+            const auto result = std::from_chars(key.data(), key.data() + key.size(), parsed);
+            if (result.ec == std::errc{} && result.ptr == key.data() + key.size() && parsed > 0 &&
+                parsed <= static_cast<unsigned int>(std::numeric_limits<int>::max()))
+                entry.regionId = static_cast<int>(parsed);
+        }
+        if (entry.regionId <= 0)
+            continue;
+        entry.regionCode = region.value("RegionCode", std::string{});
+        const auto nodes = region.find("Nodes");
+        if (nodes != region.end() && nodes->is_array()) {
+            for (const auto& node : *nodes) {
+                if (entry.nodes.size() >= kMaxDerpNodesPerRegion)
+                    break;
+                if (!node.is_object())
+                    continue;
+                DerpNode derpNode;
+                auto host = node.value("HostName", std::string{});
+                if (host.empty())
+                    host = node.value("IPv4", std::string{});
+                if (!isPlausibleHostname(host))
+                    continue;
+                derpNode.host = std::move(host);
+                const auto port = node.value("DERPPort", 443);
+                if (port <= 0 || port > 65535)
+                    continue;
+                derpNode.port = static_cast<std::uint16_t>(port);
+                // STUNPort: 0 means the default 3478, negative disables it.
+                const int stunPort = node.value("STUNPort", 0);
+                derpNode.stunPort =
+                    stunPort < 0 || stunPort > 65535
+                        ? std::uint16_t{0}
+                        : static_cast<std::uint16_t>(stunPort == 0 ? 3478
+                                                                   : stunPort);
+                if (node.value("STUNOnly", false))
+                    continue; // no DERP service on this node
+                entry.nodes.push_back(std::move(derpNode));
+            }
+        }
+        if (entry.nodes.empty())
+            continue;
+        out.push_back(std::move(entry));
+    }
+    return out;
 }
 
 } // namespace
@@ -196,19 +348,23 @@ std::string encodeRegisterRequest(const RegisterRequestData& request) {
 std::string encodeMapRequest(const MapRequestData& request) {
     if (request.capabilityVersion <= 0)
         return {};
+    Json hostinfo = {
+        {"Hostname", request.hostname.empty() ? std::string("artemis-switch")
+                                              : request.hostname},
+        {"OS", "nintendo-switch"},
+    };
+    if (request.preferredDerp > 0)
+        hostinfo["NetInfo"] = {{"PreferredDERP", request.preferredDerp}};
     Json root = {
         {"Version", request.capabilityVersion},
         {"NodeKey", encodeTypedKey("nodekey:", request.nodePublic)},
         {"DiscoKey", encodeTypedKey("discokey:", request.discoPublic)},
         {"Stream", request.stream},
         {"ReadOnly", false},
-        {"OmitPeers", false},
+        {"OmitPeers", request.omitPeers},
         {"Compress", ""},
         {"Endpoints", request.endpoints},
-        {"Hostinfo", {
-            {"Hostname", "artemis-switch"},
-            {"OS", "nintendo-switch"},
-        }},
+        {"Hostinfo", std::move(hostinfo)},
     };
     return root.dump();
 }
@@ -229,6 +385,17 @@ std::optional<MapUpdate> MapCodec::decode(std::string_view json,
     if (update.keepAlive)
         return update;
     update.localAddress = localAddressFromNode(root);
+
+    // A malformed DERPMap section fails the update: relay selection without
+    // trustworthy region data would blackhole the data path. Absent sections
+    // (typical for deltas) leave the engine's stored map untouched.
+    if (const auto derpIt = root.find("DERPMap");
+        derpIt != root.end() && !derpIt->is_null()) {
+        auto regions = parseDerpMap(root, error);
+        if (!regions)
+            return std::nullopt;
+        update.derpMap = std::move(*regions);
+    }
 
     // Decode into a copy and commit the ID mapping only if the entire update
     // validates. A malformed later peer must not poison subsequent deltas.
@@ -279,6 +446,34 @@ std::optional<MapUpdate> MapCodec::decode(std::string_view json,
                 update.delta.removedStableIds.push_back(found->second);
                 nextIdMap.erase(found);
             }
+        }
+    }
+    // Official control planes also emit PeersChangedPatch frames carrying
+    // partial per-node updates (presence, LastSeen, ...). Only the Online
+    // flag is actionable here; anything else is forward-compatible noise.
+    // Unknown or missing NodeIDs are skipped: the peer is either gone or from
+    // a future schema, and neither case may fail the update.
+    if (const auto patches = root.find("PeersChangedPatch");
+        patches != root.end() && patches->is_array()) {
+        if (patches->size() > PeerDirectory::kMaxPeers) {
+            if (error) *error = "netmap peer patch limit exceeded";
+            return std::nullopt;
+        }
+        for (const auto& patch : *patches) {
+            if (!patch.is_object())
+                continue;
+            const auto nodeIdIt = patch.find("NodeID");
+            const auto onlineIt = patch.find("Online");
+            if (nodeIdIt == patch.end() || !nodeIdIt->is_number_unsigned() ||
+                onlineIt == patch.end() || !onlineIt->is_boolean())
+                continue;
+            const auto found = nextIdMap.find(nodeIdIt->get<std::uint64_t>());
+            if (found == nextIdMap.end())
+                continue;
+            PeerOnlineChange change;
+            change.stableId = found->second;
+            change.online = onlineIt->get<bool>();
+            update.delta.onlineChanges.push_back(std::move(change));
         }
     }
     stableIdsByNodeId_ = std::move(nextIdMap);

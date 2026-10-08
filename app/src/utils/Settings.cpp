@@ -109,7 +109,11 @@ void Settings::add_host(const Host& host) {
     if (Host* existing = find_host_for_upsert(m_hosts, incoming)) {
         merge_host(*existing, incoming);
         existing->ensure_endpoints();
-    } else if (!incoming.preferred_address().empty() && is_usable_mac(incoming.mac)) {
+    } else if (!incoming.preferred_address().empty()) {
+        // No usable MAC is normal for tunnel hosts: Sunshine reports an
+        // all-zero MAC when reached over a Tailscale/WireGuard/NetBird
+        // interface. hosts_match() already falls back to address identity,
+        // so the address is enough to store and find the host again.
         m_hosts.push_back(incoming);
     }
 
@@ -537,6 +541,11 @@ void Settings::load() {
                 }
             }
 
+            if (json_t* direct = json_object_get(
+                    settings, "tailscale_direct_connections")) {
+                m_tailscale_direct_connections = json_typeof(direct) == JSON_TRUE;
+            }
+
             if (json_t* remote_access_prefer_lan =
                     json_object_get(settings, "remote_access_prefer_lan")) {
                 m_remote_access_prefer_lan =
@@ -911,6 +920,9 @@ void Settings::save() {
             json_object_set_new(
                 settings, "tailscale_auth_key_path",
                 json_string(m_tailscale_auth_key_path.c_str()));
+            json_object_set_new(settings, "tailscale_direct_connections",
+                                m_tailscale_direct_connections ? json_true()
+                                                               : json_false());
             json_object_set_new(settings, "remote_access_prefer_lan",
                                 m_remote_access_prefer_lan ? json_true() : json_false());
             json_object_set_new(settings, "remote_access_auto_connect",

@@ -34,11 +34,11 @@ if dkp-pacman -Q switch-enet >/dev/null 2>&1; then
 fi
 
 echo "== configure (compatibility pass) =="
-cmake -B build/switch -DCMAKE_BUILD_TYPE=Release -DPLATFORM_SWITCH=ON -DUSE_DEKO3D=ON \
+cmake -B build/switch -DCMAKE_BUILD_TYPE=Release -DPLATFORM_SWITCH=ON -DUSE_DEKO3D=ON -DENABLE_TAILSCALE=ON \
     || echo "compat-pass returned nonzero (allowed)"
 
 echo "== configure =="
-cmake -B build/switch -DCMAKE_BUILD_TYPE=Release -DPLATFORM_SWITCH=ON -DUSE_DEKO3D=ON
+cmake -B build/switch -DCMAKE_BUILD_TYPE=Release -DPLATFORM_SWITCH=ON -DUSE_DEKO3D=ON -DENABLE_TAILSCALE=ON
 
 echo "== build NRO =="
 cmake --build build/switch --target Moonlight.nro --parallel "$(nproc)"

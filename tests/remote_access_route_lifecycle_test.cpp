@@ -90,5 +90,28 @@ int main() {
     assert(provider->deactivations == 2);
     manager.deactivateRoute("route-test", "peer-b");
     assert(provider->deactivations == 3);
+
+    // Two LAN hosts behind one subnet router share a peer but are different
+    // routes: the second must re-activate instead of reusing the first.
+    const RemoteRouteTarget hostA{"router", "100.64.0.1", "192.168.1.10",
+                                  "127.0.0.1", RemoteRouteMode::Proxy};
+    const RemoteRouteTarget hostB{"router", "100.64.0.1", "192.168.1.11",
+                                  "127.0.0.1", RemoteRouteMode::Proxy};
+    assert(manager.activateRoute("route-test", hostA));
+    assert(provider->activations == 5);
+    assert(manager.activateRoute("route-test", hostA));
+    assert(provider->activations == 5); // same host: reference counted
+    assert(manager.activateRoute("route-test", hostB));
+    assert(provider->activations == 6);
+    assert(provider->deactivations == 4); // hostA retired (exclusive)
+    assert(!manager.prepareRouteForStreaming("route-test", "router",
+                                             "192.168.1.10"));
+    assert(manager.prepareRouteForStreaming("route-test", "router",
+                                            "192.168.1.11"));
+    // A stale hostA release must not tear down hostB.
+    manager.deactivateRoute("route-test", "router", "192.168.1.10");
+    assert(provider->deactivations == 4);
+    manager.deactivateRoute("route-test", "router", "192.168.1.11");
+    assert(provider->deactivations == 5);
     return 0;
 }

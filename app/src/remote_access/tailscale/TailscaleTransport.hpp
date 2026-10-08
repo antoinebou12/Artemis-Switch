@@ -26,6 +26,10 @@ public:
     virtual bool write(std::span<const std::uint8_t> bytes,
                        std::string* error) = 0;
     virtual void close() noexcept = 0;
+    // Wakes a read()/write() blocked on another thread so it fails promptly.
+    // Safe to call concurrently with I/O; the owner still calls close()
+    // afterwards from the I/O thread. Default: no-op (test fakes never block).
+    virtual void interrupt() noexcept {}
 };
 
 // Blocking TCP transport over the POSIX socket API so it is also usable on a
@@ -44,6 +48,7 @@ public:
     bool write(std::span<const std::uint8_t> bytes,
                std::string* error) override;
     void close() noexcept override;
+    void interrupt() noexcept override;
 
 private:
     int socket_ = -1;
@@ -66,6 +71,9 @@ public:
     bool write(std::span<const std::uint8_t> bytes,
                std::string* error) override;
     void close() noexcept override;
+    // Shuts the TCP socket down under the SSL service so a blocked
+    // sslConnectionRead returns instead of waiting for the server.
+    void interrupt() noexcept override;
 
 private:
     struct Impl;
