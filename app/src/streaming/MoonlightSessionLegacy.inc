@@ -437,7 +437,7 @@ void MoonlightSession::stop(int terminate_app, bool sync_host_quit) {
     // Sunshine can leave the host session paused after LiStopConnection alone
     // (community report: Moonlight-Switch #215). Always cancel for Sunshine so
     // other clients can reconnect without restarting the host service.
-    if (terminate_app || m_is_sunshine) {
+    if (terminate_app) {
         if (sync_host_quit)
             GameStreamClient::instance().quitNow(m_address);
         else
